@@ -1,5 +1,14 @@
 # Changelog
 
+## 6.3 (versionCode 21)
+
+- Rotating the phone no longer rebuilds the screen: the page, scroll position, open menu, live session screen and anything typed stay as they were.
+- "Preview notifications" in Notifications sends one sample of each Kadamm notification (live session card, goal reached, progress, time to move, almost there), each titled "Preview", so you can see them before a real one arrives.
+
+## 6.2 (versionCode 20)
+
+- Reminder times are configurable in Notifications. "Time to move": the hours it may remind you (from/until, can span midnight) and how long without steps first (30 min to 2 h). "Almost there": the evening time and how close to the goal (1,000 to 5,000 steps left). Defaults are the automatic times (8 am to 9 pm after 60 minutes; 7 pm at 2,000 steps), with "Reset to automatic".
+
 ## 6.1 (versionCode 19)
 
 - Notification settings (menu > Notifications): shows whether notifications are allowed, with an Allow button (Android's permission prompt, or the app's notification settings if it was declined before). Choose what Kadamm sends: details of the live session on the lock screen, daily goal reached, 60% progress, "Time to move" and the evening "Almost there". The reminder switches moved here from Goals & targets.

@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="6.1";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="6.3";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -864,9 +864,40 @@ public class MainActivity extends Activity {
         reminderSwitch(goals,"Daily goal reached","Once a day, when you hit your step goal","notifyGoal");
         reminderSwitch(goals,"You're making progress","Once a day, at 60% of your goal","notifyProgress");
         LinearLayout rem=card();rem.addView(tx("REMINDERS",10,muted,true));
-        reminderSwitch(rem,"Time to move","After an hour without steps, 8 am to 9 pm, at most every 2 hours","remindInactive");
-        reminderSwitch(rem,"Evening: almost there","After 7 pm when 2,000 steps or fewer are left","remindEvening");
+        boolean auto=Reminders.automatic(this);
+        LinearLayout modeRow=row();modeRow.setPadding(0,dp(10),0,dp(2));rem.addView(modeRow,lp(-1,-2));
+        modeRow.addView(tx(auto?"Automatic times":"Your own times",13,auto?positive:lime,true),new LinearLayout.LayoutParams(0,-2,1));
+        if(!auto){TextView reset=tx("Reset to automatic",12,lime,true);reset.setPadding(dp(8),dp(6),dp(8),dp(6));reset.setBackground(rippleOn(Color.TRANSPARENT,10));modeRow.addView(reset);reset.setOnClickListener(v->{Reminders.resetToAutomatic(this);renderPageNow();});}
+        int start=Reminders.get(this,"remStart",Reminders.DEF_START),end=Reminders.get(this,"remEnd",Reminders.DEF_END),after=Reminders.get(this,"remAfter",Reminders.DEF_AFTER),evening=Reminders.get(this,"remEvening",Reminders.DEF_EVENING),left=Reminders.get(this,"remLeft",Reminders.DEF_LEFT);
+        reminderSwitch(rem,"Time to move",String.format(Locale.US,"After %d min without steps, %s to %s",after,clock12(start),clock12(end)),"remindInactive");
+        if(getSharedPreferences("kadamm_settings",MODE_PRIVATE).getBoolean("remindInactive",true)){
+            LinearLayout hours=row();LinearLayout.LayoutParams hp=lp(-1,40);hp.topMargin=dp(8);rem.addView(hours,hp);
+            timeChip(hours,"From "+clock12(start),"remStart",start);timeChip(hours,"Until "+clock12(end),"remEnd",end);
+            choiceChips(rem,"Remind after",new int[]{30,45,60,90,120},after,"remAfter",v->v>=60&&v%60==0?(v/60)+" h":v+" min");
+        }
+        reminderSwitch(rem,"Evening: almost there",String.format(Locale.US,"At %s when %,d steps or fewer are left",clock12(evening),left),"remindEvening");
+        if(getSharedPreferences("kadamm_settings",MODE_PRIVATE).getBoolean("remindEvening",true)){
+            LinearLayout ev=row();LinearLayout.LayoutParams evp=lp(-1,40);evp.topMargin=dp(8);rem.addView(ev,evp);
+            timeChip(ev,"At "+clock12(evening),"remEvening",evening);ev.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
+            choiceChips(rem,"When steps left are",new int[]{1000,2000,3000,5000},left,"remLeft",v->String.format(Locale.US,"%,d",v));
+        }
+        Button preview=button("Preview notifications",raised,ink);LinearLayout.LayoutParams pvp=lp(-1,48);pvp.topMargin=dp(14);content.addView(preview,pvp);
+        TextView pvn=tx("Sends one sample of each, marked \"Preview\", so you can see how they look. Swipe them away when done.",11,muted,false);content.addView(pvn,lp(-1,-2));
+        preview.setOnClickListener(v->{if(!notificationsAllowed()){toast("Allow notifications first");return;}Reminders.preview(this);toast("Previews sent. Pull down the notification shade to see them.");});
         TextView more=tx("Sounds and vibration in Android settings  →",13,lime,true);more.setGravity(Gravity.CENTER_VERTICAL);more.setFocusable(true);more.setBackground(rippleOn(Color.TRANSPARENT,10));LinearLayout.LayoutParams mp=lp(-1,48);mp.topMargin=dp(10);content.addView(more,mp);more.setOnClickListener(v->openAppNotificationSettings());
+    }
+    private String clock12(int minutes){int h=minutes/60%24,m=minutes%60;return String.format(Locale.US,"%d:%02d %s",h%12==0?12:h%12,m,h<12?"am":"pm");}
+    /** A chip that opens a time picker and saves minutes-of-day under {@code key}. */
+    private void timeChip(LinearLayout parent,String label,String key,int minutes){
+        Button b=button(label,raised,ink);b.setTextSize(13);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1);if(parent.getChildCount()>0)p.leftMargin=dp(8);parent.addView(b,p);
+        b.setOnClickListener(v->new android.app.TimePickerDialog(this,darkTheme?android.R.style.Theme_DeviceDefault_Dialog_Alert:android.R.style.Theme_DeviceDefault_Light_Dialog_Alert,(tp,h,m)->{getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putInt(key,h*60+m).apply();renderPageNow();},minutes/60,minutes%60,android.text.format.DateFormat.is24HourFormat(this)).show());
+    }
+    /** A labelled row of preset choices saved as an int under {@code key}. */
+    private void choiceChips(LinearLayout parent,String label,int[] values,int current,String key,java.util.function.IntFunction<String> fmt){
+        TextView l=tx(label,11,muted,false);LinearLayout.LayoutParams lpp=lp(-1,-2);lpp.topMargin=dp(8);parent.addView(l,lpp);
+        LinearLayout r=row();LinearLayout.LayoutParams rp=lp(-1,36);rp.topMargin=dp(4);parent.addView(r,rp);
+        for(int v:values){boolean on=v==current;Button b=button(fmt.apply(v),on?lime:raised,on?accentOn:ink);b.setTextSize(12);b.setPadding(0,0,0,0);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1);if(r.getChildCount()>0)p.leftMargin=dp(6);r.addView(b,p);
+            b.setOnClickListener(x->{getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putInt(key,v).apply();renderPageNow();});}
     }
     // ---- Reminders ----
     private void renderReminderSettings(){
@@ -880,7 +911,13 @@ public class MainActivity extends Activity {
         LinearLayout r=row();r.setPadding(0,dp(10),0,0);c.addView(r,lp(-1,-2));LinearLayout l=col();r.addView(l,new LinearLayout.LayoutParams(0,-2,1));l.addView(tx(title,14,ink,true));l.addView(tx(sub,11,muted,false));
         android.widget.Switch sw=new android.widget.Switch(this);sw.setChecked(getSharedPreferences("kadamm_settings",MODE_PRIVATE).getBoolean(key,true));
         sw.setThumbTintList(android.content.res.ColorStateList.valueOf(lime));sw.setContentDescription(title);r.addView(sw);
-        sw.setOnCheckedChangeListener((b,on)->getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putBoolean(key,on).apply());
+        sw.setOnCheckedChangeListener((b,on)->{getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putBoolean(key,on).apply();if(key.startsWith("remind")){int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));}});
+    }
+    /** Rotation no longer recreates the screen; only refit what depends on the width. */
+    @Override public void onConfigurationChanged(android.content.res.Configuration config){
+        super.onConfigurationChanged(config);
+        if(drawer!=null){FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)drawer.getLayoutParams();p.width=Math.min(dp(340),getResources().getDisplayMetrics().widthPixels-dp(48));drawer.setLayoutParams(p);}
+        root.requestApplyInsets();
     }
     @Override public void onBackPressed(){
         if(authLayer!=null){super.onBackPressed();return;}
