@@ -157,32 +157,41 @@ final class DaySteps {
         if(live.getBoolean("active",false))ms+=live.getLong("elapsed",0);
         return ms/60000;
     }
-    /** Today's Health Connect steps from outside Kadamm sessions, or -1 when nothing was synced today. */
+    /** Today's full-day Health Connect total from the preferred source (Samsung Health first), or -1 when not synced today. */
     static long healthImportedToday(Context c){
         SharedPreferences h=c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE);
         if(!h.getBoolean("healthConnected",false)||!todayKey().equals(h.getString("healthDate","")))return -1;
-        return h.getLong("healthImportedSteps",Math.max(0,h.getLong("healthSteps",0)-h.getLong("healthSessionSteps",0)));
+        return h.getLong("healthDayTotal",h.getLong("healthImportedSteps",0));
     }
-
     /**
-     * Today's steps. The phone counter and Health Connect both measure the whole day, so the larger
-     * of the two is used rather than their sum; session steps are already inside the phone count.
+     * Health Connect's figure plus the steps the phone sensor has counted since that sync, so the
+     * total keeps rising between syncs instead of waiting for Samsung Health to write again.
      */
+    static long healthLiveToday(Context c){
+        long hc=healthImportedToday(c);if(hc<0)return -1;
+        long atSync=c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getLong("healthPhoneAtSync",-1);
+        return hc+(atSync<0?0:Math.max(0,phoneOn(c,todayKey())-atSync));
+    }
+    /** Today's steps: the most complete whole-day count. Session steps are part of it, never added on top. */
     static long todayTotal(Context c){
         String today=todayKey();
-        long session=sessionOn(c,today),imported=healthImportedToday(c);
-        long health=imported<0?0:imported+session;
-        return Math.max(phoneOn(c,today),Math.max(health,session));
+        return Math.max(phoneOn(c,today),Math.max(healthLiveToday(c),sessionOn(c,today)));
+    }
+    /** Estimated calories from today's Kadamm sessions, including the one in progress. */
+    static long sessionCaloriesToday(Context c){
+        long n=0;String today=todayKey();JSONArray all=sessions(c);
+        for(int i=0;i<all.length();i++){JSONObject s=all.optJSONObject(i);if(s!=null&&today.equals(s.optString("day","")))n+=s.optLong("calories",Math.round(s.optDouble("distanceKm",0)*65));}
+        SharedPreferences live=c.getSharedPreferences("stride_state",Context.MODE_PRIVATE);
+        if(live.getBoolean("active",false))n+=Math.round(live.getFloat("distance",0)*65);
+        return n;
     }
     /** "phone", "health", "sessions" or "none": where today's figure comes from. */
     static String todaySource(Context c){
-        String today=todayKey();
-        long session=sessionOn(c,today),imported=healthImportedToday(c),phone=phoneOn(c,today);
-        long health=imported<0?0:imported+session;
-        if(imported>0&&health>=phone)return "health";
+        String today=todayKey();long live=healthLiveToday(c),phone=phoneOn(c,today);
+        if(live>=0&&live>=phone)return "health";
         if(ready(c)&&startedAt(c)>0)return "phone";
-        if(imported>=0)return "health";
-        return session>0?"sessions":"none";
+        if(live>=0)return "health";
+        return sessionOn(c,today)>0?"sessions":"none";
     }
     static boolean hasTodayData(Context c){return !"none".equals(todaySource(c));}
 

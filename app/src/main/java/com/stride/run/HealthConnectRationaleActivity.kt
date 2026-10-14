@@ -28,7 +28,7 @@ class HealthConnectRationaleActivity : ComponentActivity() {
             setTextColor(theme.text)
         })
         content.addView(TextView(this).apply {
-            text = "Kadamm requests permission to read your steps, distance, calories burned, heart rate and sleep from Health Connect so your dashboard can include data recorded by your phone or other connected apps. Kadamm uses this data only to show your daily progress. Steps during Kadamm sessions are counted from the session itself and are excluded from imported time ranges to reduce double-counting. Your Health Connect data stays on this device and is not sent to Kadamm servers. You can change this permission at any time in Android Settings > Health Connect > App permissions > Kadamm."
+            text = "Kadamm requests permission to read your steps, distance and calories burned from Health Connect so your dashboard can include data recorded by your phone or other connected apps. Kadamm uses this data only to show your daily progress. Steps during Kadamm sessions are counted from the session itself and are excluded from imported time ranges to reduce double-counting. Your Health Connect data stays on this device and is not sent to Kadamm servers. You can change this permission at any time in Android Settings > Health Connect > App permissions > Kadamm."
             textSize = 16f
             setTextColor(theme.textMuted)
             setPadding(0, 24, 0, 0)

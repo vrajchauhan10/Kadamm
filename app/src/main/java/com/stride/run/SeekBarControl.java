@@ -9,7 +9,7 @@ import java.util.function.IntConsumer;
 final class SeekBarControl {
     private SeekBarControl() {}
 
-    static void add(Context context, LinearLayout parent, int value, int min, int max, IntConsumer listener) {
+    static SeekBar add(Context context, LinearLayout parent, int value, int min, int max, IntConsumer listener) {
         SeekBar seek = new SeekBar(context);
         seek.setMax(max - min);
         seek.setProgress(Math.max(0, Math.min(max - min, value - min)));
@@ -21,5 +21,6 @@ final class SeekBarControl {
             @Override public void onStartTrackingTouch(SeekBar bar) {}
             @Override public void onStopTrackingTouch(SeekBar bar) {}
         });
+        return seek;
     }
 }

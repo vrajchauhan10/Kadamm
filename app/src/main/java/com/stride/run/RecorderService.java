@@ -50,7 +50,7 @@ public class RecorderService extends Service implements LocationListener, Sensor
         currentType=prefs.getString("currentType","Walk");candidateType=currentType;
         walkDuration=prefs.getLong("walkDurationMs",0);runDuration=prefs.getLong("runDurationMs",0);walkDistance=prefs.getFloat("walkDistanceKm",0);runDistance=prefs.getFloat("runDistanceKm",0);
         createChannel();
-        if(!promoteForeground(notification(paused?"Activity paused":"Recording resumed"))){active=false;recover(this);return;}
+        if(!promoteForeground(notification(paused?"Activity paused":"Recording resumed"))){active=false;stopSelf();return;}
         if(!paused){if(!"indoor".equals(prefs.getString("activityMode","outdoor")))beginLocation();registerSteps();}
         handler.removeCallbacks(ticker);handler.post(ticker);
     }
@@ -60,10 +60,12 @@ public class RecorderService extends Service implements LocationListener, Sensor
      */
     static void recover(Context c){
         android.content.SharedPreferences p=c.getSharedPreferences("stride_state",MODE_PRIVATE);
-        if(!p.getBoolean("active",false)||(running&&c instanceof android.app.Activity))return;
+        if(!p.getBoolean("active",false)||running)return;
+        // Only the app itself decides to give up on a session; a refused background restart waits for it.
+        if(!(c instanceof android.app.Activity))return;
         long elapsed=p.getLong("elapsed",0),started=p.getLong("sessionStartTimeMs",System.currentTimeMillis()-elapsed);
         long beat=p.getLong("heartbeatMs",started+elapsed);
-        if(c instanceof android.app.Activity&&System.currentTimeMillis()-beat<10*60000L){
+        if(c instanceof android.app.Activity&&System.currentTimeMillis()-beat<90*60000L){
             try{Intent i=new Intent(c,RecorderService.class).setAction(ACTION_RESTORE);if(Build.VERSION.SDK_INT>=26)c.startForegroundService(i);else c.startService(i);return;}catch(Exception ignored){}
         }
         float km=p.getFloat("distance",0);int steps=p.getInt("steps",0);

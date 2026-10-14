@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.2 (versionCode 14)
+
+- Daily steps now match Samsung Health. Health Connect was adding Samsung Health and the phone's own step tracker together (13 Oct showed 28,425 instead of 15,789). Kadamm reads each source separately and uses the most complete one, for today, past days, distance and calories. It syncs every time the app opens, and the phone sensor keeps the number rising between syncs.
+- Kadamm session steps and calories are shown as part of the day ("In Kadamm sessions: …"), never added on top.
+- Heart rate and sleep removed from the dashboard and from the permissions requested. Active calories are read when allowed.
+- New live session screen in Kadamm's black, white and blue map theme: full-screen greyscale map with a blue route, time, average pace, distance, steps, calories and speed, a large Pause button, then Resume and Finish. It opens on Start, and again whenever the app is reopened during a session.
+- Share now creates an image in the same theme: route map, Kadamm logo, and distance, time, pace, steps, calories and elevation, with a preview before sharing.
+- Sessions keep running in the background: a refused restart no longer ends the session, an interrupted session is resumed for up to 90 minutes, and Kadamm asks once to be exempt from battery optimisation. Tracking readiness shows the background status.
+- Redesigned Goals & targets: today's progress against each goal, colour-coded goal cards with − / + steppers, tinted sliders and presets. Move-minute and stride goals included.
+- Dashboard tiles each have their own colour and icon.
+- Back from Goals, History, Profile or the step-sources page returns to Today instead of closing the app; back closes the live screen and the menu first.
+- New Kadamm logo (two footprints mid-stride) as the launcher icon and in the app header.
+
 ## 5.1 (versionCode 13)
 
 - Fixed the app appearing frozen: if Android killed the recorder while a session was active, the saved state stayed "active" forever, so the timer never moved and Pause/Finish did nothing. On launch Kadamm now resumes a session interrupted in the last 10 minutes and saves an older one to History. A system restart of the recorder no longer starts a blank session.

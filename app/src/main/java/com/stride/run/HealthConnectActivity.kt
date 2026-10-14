@@ -86,7 +86,7 @@ class HealthConnectActivity : ComponentActivity() {
         layout.addView(statusText)
         layout.addView(action("Connect / refresh steps", true) { connect() })
         layout.addView(TextView(this).apply {
-            text = "Samsung Health keeps its step count private until you switch on sharing: Samsung Health > Settings > Health Connect > allow Steps. Kadamm only reads steps, distance, calories, heart rate and sleep, and nothing leaves this phone."
+            text = "Samsung Health keeps its step count private until you switch on sharing: Samsung Health > Settings > Health Connect > allow Steps. Kadamm only reads steps, distance and calories, and nothing leaves this phone."
             textSize = 13f
             setTextColor(theme.textMuted)
             setPadding(0, dp(18f), 0, dp(2f))

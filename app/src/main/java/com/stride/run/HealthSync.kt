@@ -5,11 +5,11 @@ import android.os.Handler
 import android.os.Looper
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
-import androidx.health.connect.client.records.HeartRateRecord
-import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
+import androidx.health.connect.client.records.metadata.DataOrigin
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -32,10 +32,17 @@ object HealthSync {
     val allPermissions = readSteps + setOf(
         HealthPermission.getReadPermission(DistanceRecord::class),
         HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
-        HealthPermission.getReadPermission(HeartRateRecord::class),
-        HealthPermission.getReadPermission(SleepSessionRecord::class)
+        HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class)
     )
     @JvmStatic fun isRunning() = running
+    private const val SAMSUNG = "com.sec.android.app.shealth"
+    @JvmStatic fun label(pkg: String) = when {
+        pkg == SAMSUNG -> "Samsung Health"
+        pkg.startsWith("com.android.healthconnect.phone") -> "Phone (Health Connect)"
+        pkg == "com.google.android.apps.fitness" -> "Google Fit"
+        pkg.isEmpty() -> "Health Connect"
+        else -> pkg.substringAfterLast('.')
+    }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     @Volatile private var running = false
 
@@ -113,51 +120,64 @@ object HealthSync {
         }
         aggregate(cursor, end)
 
+        // Health Connect adds every source together, so Samsung Health plus the phone's own tracker double the day.
+        // Read each source on its own and use the most complete one. Samsung Health shows the phone tracker's count
+        // live but writes its own record to Health Connect late, so the highest source is the one that matches it.
+        val dayRange = TimeRangeFilter.between(start, end)
+        val perOrigin = linkedMapOf<String, Long>()
+        val all = hc.aggregate(AggregateRequest(setOf(StepsRecord.COUNT_TOTAL), dayRange))
+        for (origin in all.dataOrigins) {
+            perOrigin[origin.packageName] = hc.aggregate(AggregateRequest(setOf(StepsRecord.COUNT_TOTAL), dayRange, setOf(origin)))[StepsRecord.COUNT_TOTAL] ?: 0L
+            origins.add(origin.packageName)
+        }
+        val preferred = perOrigin.maxByOrNull { it.value }?.key
+        val dayTotal = preferred?.let { perOrigin[it] } ?: (all[StepsRecord.COUNT_TOTAL] ?: 0L)
+        val filter = preferred?.let { setOf(DataOrigin(it)) } ?: emptySet()
+
         val prefs = context.getSharedPreferences("kadamm_health", Context.MODE_PRIVATE)
         val days = try { JSONObject(prefs.getString("healthDays", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
-        try {
-            val groups = hc.aggregateGroupByPeriod(
-                AggregateGroupByPeriodRequest(
-                    setOf(StepsRecord.COUNT_TOTAL),
-                    TimeRangeFilter.between(today.minusDays(29).atStartOfDay(), LocalDateTime.now(zone)),
-                    Period.ofDays(1)
+        val fresh = JSONObject()
+        // Past days: the highest single source per day, for the same reason.
+        val window = TimeRangeFilter.between(today.minusDays(29).atStartOfDay(), LocalDateTime.now(zone))
+        for (origin in perOrigin.keys.ifEmpty { listOf("") }) {
+            try {
+                val groups = hc.aggregateGroupByPeriod(
+                    AggregateGroupByPeriodRequest(setOf(StepsRecord.COUNT_TOTAL), window, Period.ofDays(1),
+                        if (origin.isEmpty()) emptySet() else setOf(DataOrigin(origin)))
                 )
-            )
-            for (group in groups) {
-                val count = group.result[StepsRecord.COUNT_TOTAL] ?: continue
-                days.put(group.startTime.toLocalDate().toString(), count)
+                for (group in groups) {
+                    val count = group.result[StepsRecord.COUNT_TOTAL] ?: continue
+                    val key = group.startTime.toLocalDate().toString()
+                    if (fresh.optLong(key, -1) < count) fresh.put(key, count)
+                }
+            } catch (_: Exception) {
+                // Daily history is a bonus for the calendar; today's total is what matters.
             }
-        } catch (_: Exception) {
-            // Daily history is a bonus for the calendar; today's total above is what matters.
         }
+        for (key in fresh.keys()) days.put(key, fresh.getLong(key))
 
-        // Optional metrics: each is read only when its permission was granted, and cleared otherwise.
         val granted = try { hc.permissionController.getGrantedPermissions() } catch (_: Exception) { emptySet() }
         val edit = prefs.edit()
-        val dayRange = TimeRangeFilter.between(start, end)
-        fun has(record: kotlin.reflect.KClass<out androidx.health.connect.client.records.Record>) =
-            granted.contains(HealthPermission.getReadPermission(record))
-        edit.remove("healthDistanceM").remove("healthKcal").remove("healthHrAvg").remove("healthHrMin").remove("healthHrMax").remove("healthSleepMin")
-        try {
-            if (has(DistanceRecord::class)) hc.aggregate(AggregateRequest(setOf(DistanceRecord.DISTANCE_TOTAL), dayRange))[DistanceRecord.DISTANCE_TOTAL]
-                ?.let { edit.putFloat("healthDistanceM", it.inMeters.toFloat()) }
-            if (has(TotalCaloriesBurnedRecord::class)) hc.aggregate(AggregateRequest(setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL), dayRange))[TotalCaloriesBurnedRecord.ENERGY_TOTAL]
-                ?.let { edit.putFloat("healthKcal", it.inKilocalories.toFloat()) }
-            if (has(HeartRateRecord::class)) {
-                val hr = hc.aggregate(AggregateRequest(setOf(HeartRateRecord.BPM_AVG, HeartRateRecord.BPM_MIN, HeartRateRecord.BPM_MAX), dayRange))
-                hr[HeartRateRecord.BPM_AVG]?.let { edit.putLong("healthHrAvg", it) }
-                hr[HeartRateRecord.BPM_MIN]?.let { edit.putLong("healthHrMin", it) }
-                hr[HeartRateRecord.BPM_MAX]?.let { edit.putLong("healthHrMax", it) }
+        edit.remove("healthDistanceM").remove("healthKcal").remove("healthActiveKcal")
+        suspend fun best(metric: androidx.health.connect.client.aggregate.AggregateMetric<*>, value: (Any) -> Double): Double? {
+            var top: Double? = null
+            for (origin in perOrigin.keys) {
+                val v = try { hc.aggregate(AggregateRequest(setOf(metric), dayRange, setOf(DataOrigin(origin))))[metric] } catch (_: Exception) { null } ?: continue
+                val d = value(v); if (top == null || d > top) top = d
             }
-            if (has(SleepSessionRecord::class)) {
-                // Last night: anything recorded since 6 pm yesterday.
-                val night = TimeRangeFilter.between(today.minusDays(1).atTime(18, 0).atZone(zone).toInstant(), end)
-                hc.aggregate(AggregateRequest(setOf(SleepSessionRecord.SLEEP_DURATION_TOTAL), night))[SleepSessionRecord.SLEEP_DURATION_TOTAL]
-                    ?.let { edit.putLong("healthSleepMin", it.toMinutes()) }
-            }
-        } catch (_: Exception) {
+            return top ?: try { hc.aggregate(AggregateRequest(setOf(metric), dayRange))[metric]?.let(value) } catch (_: Exception) { null }
         }
-        edit.putString("healthGranted", granted.joinToString(",") { it.substringAfterLast("READ_") }).apply()
+        if (granted.contains(HealthPermission.getReadPermission(DistanceRecord::class)))
+            best(DistanceRecord.DISTANCE_TOTAL) { (it as androidx.health.connect.client.units.Length).inMeters }?.let { edit.putFloat("healthDistanceM", it.toFloat()) }
+        if (granted.contains(HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class)))
+            best(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL) { (it as androidx.health.connect.client.units.Energy).inKilocalories }?.let { edit.putFloat("healthActiveKcal", it.toFloat()) }
+        if (granted.contains(HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class)))
+            best(TotalCaloriesBurnedRecord.ENERGY_TOTAL) { (it as androidx.health.connect.client.units.Energy).inKilocalories }?.let { edit.putFloat("healthKcal", it.toFloat()) }
+        edit.putLong("healthDayTotal", dayTotal)
+            .putString("healthOrigin", preferred ?: "")
+            .putString("healthSourceTotals", perOrigin.entries.joinToString(" · ") { "${label(it.key)} %,d".format(it.value) })
+            .putLong("healthPhoneAtSync", DaySteps.phoneOn(context, today.toString()))
+            .apply()
 
         val verified = outside + sessionSteps
         prefs.edit()
@@ -170,7 +190,9 @@ object HealthSync {
             .putString("healthDays", days.toString())
             .putBoolean("healthConnected", true)
             .apply()
-        val status = if (outside == 0L) {
+        val status = if (dayTotal > 0L) {
+            "Connected · %,d steps today from %s.".format(dayTotal, label(preferred ?: ""))
+        } else if (outside == 0L) {
             "Connected, but Health Connect has no step records for today yet. If your steps are in Samsung Health, open Samsung Health > Settings > Health Connect and allow it to share Steps, then come back and refresh."
         } else {
             "Connected · %,d steps today from Health Connect (%,d outside Kadamm sessions, %,d during sessions).".format(verified, outside, sessionSteps)

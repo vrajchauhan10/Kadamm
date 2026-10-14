@@ -94,7 +94,29 @@ def shot(name):
         f.write(subprocess.run([ADB, "exec-out", "screencap", "-p"], capture_output=True).stdout)
 
 
+def awake():
+    """Wakes the screen; the tests cannot (and will not) unlock a secured lock screen."""
+    adb("shell", "input keyevent KEYCODE_WAKEUP")
+    time.sleep(.4)
+    if "mDreamingLockscreen=true" in adb("shell", "dumpsys window | grep mDreamingLockscreen") or \
+       "isKeyguardShowing=true" in adb("shell", "dumpsys window | grep -i isKeyguardShowing"):
+        raise AssertionError("the phone is locked; unlock it and keep the screen on while tests run")
+
+
+def home():
+    """Back to the Today tab, whatever page a previous test left open."""
+    launch(False)
+    for _ in range(4):
+        if visible("Good "):
+            break
+        sh("input keyevent KEYCODE_BACK"); time.sleep(.8)
+        if PKG not in adb("shell", "dumpsys window | grep mCurrentFocus"):
+            launch(False)
+    top()
+
+
 def launch(cold=True):
+    awake()
     if cold:
         sh(f"am force-stop {PKG}")
         time.sleep(.5)
@@ -119,7 +141,7 @@ def test_launch():
 
 
 def test_drawer():
-    launch(False); top()
+    home()
     tap("Kadamm menu", at="right")          # edge of the wordmark button, not the text
     assert wait("Goals & targets"), "drawer did not open"
     shot("02_drawer")
@@ -127,14 +149,14 @@ def test_drawer():
     assert wait("Browse your sessions by day"), "History row edge tap did nothing"
     tap("Kadamm menu")
     tap("Goals & targets", at="right")
-    assert wait("Daily move minutes"), "Goals row edge tap did nothing"
+    assert wait("Move minutes"), "Goals row edge tap did nothing"
     shot("03_goals")
     tap("Kadamm menu"); tap("Today", at="right", exact=True)
     assert wait("Good ")
 
 
 def test_swipe():
-    launch(False); top()
+    home()
     sh("input swipe 900 1200 150 1200 180"); time.sleep(1)
     assert wait("Browse your sessions by day"), "swipe left did not reach History"
     shot("04_history")
@@ -150,7 +172,7 @@ def test_swipe():
 
 
 def test_health_screens():
-    launch(False); top()
+    home()
     tap("Kadamm menu"); tap("Step sources & health", at="right")
     assert wait("Phone step sensor") and visible("Health Connect")
     shot("06_step_sources")
@@ -166,7 +188,7 @@ def test_health_screens():
 
 
 def test_sync():
-    launch(False); top()
+    home()
     assert scroll_to("steps come from"), "sources card not found"
     scroll_to("Manage step sources")
     n = find("Sync now")
@@ -174,7 +196,8 @@ def test_sync():
         assert visible("Health Connect not connected"), "no sync state shown"
         return "Health Connect not connected on this phone; not-connected state shown"
     before = sh(f"run-as {PKG} cat shared_prefs/kadamm_health.xml")
-    tap("Sync now")
+    x0, y0, x1, y1 = n["b"]
+    sh(f"input tap {(x0 + x1) // 2} {(y0 + y1) // 2}")
     time.sleep(5)
     after = sh(f"run-as {PKG} cat shared_prefs/kadamm_health.xml")
     stamp = lambda x: re.search(r'healthSyncedAt" value="(\d+)"', x).group(1)
@@ -231,6 +254,11 @@ def test_recording():
             sh(f"cmd location providers set-test-provider-location gps --location {lat0},{lon0} --accuracy 4")
         tap("Start activity")
         time.sleep(3)
+        try:
+            if visible("Keep tracking in the background"):
+                tap("Not now")
+        except RuntimeError:
+            pass
         assert '"active" value="true"' in _state(), "session did not start"
         assert "isForeground=true" in sh(f"dumpsys activity services {PKG}"), "recorder is not a foreground service"
         assert "stride_tracking" in sh("dumpsys notification --noredact | grep -A3 'pkg=" + PKG + "'"), "no tracking notification"
@@ -244,15 +272,19 @@ def test_recording():
             time.sleep(8)
         e1 = _value(_state(), "elapsed")
         assert e1 >= 5000, f"timer is not advancing ({e1} ms)"
-        shot("10_recording")
-        assert scroll_to("Finish"), "no Finish button"
-        tap("Pause"); time.sleep(1)
+        # The live map animates continuously, so uiautomator cannot read this screen: use its fixed button
+        # positions (bottom sheet, 1080-wide screen) and check the result through the saved session state.
+        W, H = [int(v) for v in re.search(r"(\d+)x(\d+)", sh("wm size")).groups()]
+        y = H - int(H * .072); pause, resume, finish = (W // 2, y), (W // 4 + 10, y), (W * 3 // 4 - 10, y)
+        shot("10_live")
+        sh("input tap %d %d" % pause); time.sleep(1.5)
         p1 = _value(_state(), "elapsed"); time.sleep(3); p2 = _value(_state(), "elapsed")
         assert 'name="paused" value="true"' in _state() and p2 == p1, "pause did not stop the timer"
-        tap("Resume"); time.sleep(3)
+        sh("input tap %d %d" % resume); time.sleep(3)
         assert _value(_state(), "elapsed") > p2, "resume did not restart the timer"
+        sh("input tap %d %d" % pause); time.sleep(1.5)
         km = _value(_state(), "distance"); points = _state().count("&quot;lat&quot;")
-        tap("Finish", exact=True)
+        sh("input tap %d %d" % finish)
         _confirm("Finish activity?", "Finish")
         assert wait("Session summary"), "summary screen did not open"
         time.sleep(2)
