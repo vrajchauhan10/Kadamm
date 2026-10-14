@@ -1,5 +1,15 @@
 # Changelog
 
+## 7.3 (versionCode 29)
+
+- Auto-tracking (menu > Auto-tracking, or from the Track card): Android's activity recognition starts a session with the map when you begin walking or running, even with Kadamm closed. Needs location "Allow all the time" for the route. Automatic sessions are marked "Auto"; ones under 3 minutes, 200 m and 300 steps are dropped.
+- Sessions finish by themselves after 3, 5 or 10 minutes without movement (or Off), whether started automatically or by you. Paused sessions are left alone.
+- Now Bar: on Android 16 the live session is posted as a Live Update (standard ongoing notification with a running timer, goal progress and the distance as its chip) and asks to be promoted, which is what One UI shows in the Now Bar.
+- Kadamm insight: the summary opens with one or two conversational sentences written from your numbers, comparing today with your usual same weekday, projecting when you'll reach your goal and mentioning your streak, e.g. "Nice going, Vraj. You're ahead of your usual Wednesday. At this pace you'll get there around 7:40 pm." Still generated on the phone, with no AI service.
+- Maps: kilometre markers (every 1 km, 500 m or 200 m depending on length) and direction arrows along the route; a Map: Auto / Light / Dark switch on the session map and the full-screen map.
+- Storage & backup (menu): what's stored on the phone, clear the map cache and share images, delete any month's sessions and daily steps, and save or restore a full backup file in any location you pick.
+- Fixed: a scroll that started on the dashboard map could open the full-screen map.
+
 ## 7.2 (versionCode 28)
 
 - Sessions under 100 m explain why there is no route line or pace and elevation charts, instead of showing an empty map and nothing below it.

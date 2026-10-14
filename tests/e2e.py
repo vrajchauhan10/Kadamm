@@ -107,7 +107,7 @@ def home():
     """Back to the Today tab, whatever page a previous test left open."""
     launch(False)
     for _ in range(4):
-        if visible("Good "):
+        if visible("DAILY STEP GOAL"):
             break
         sh("input keyevent KEYCODE_BACK"); time.sleep(.8)
         if PKG not in adb("shell", "dumpsys window | grep mCurrentFocus"):
@@ -161,7 +161,7 @@ def test_swipe():
     assert wait("Tap a day to see its steps"), "swipe left did not reach History"
     shot("04_history")
     sh("input swipe 900 1200 150 1200 180"); time.sleep(1)
-    assert wait("Appearance"), "swipe left did not reach Profile"
+    assert wait("YOUR SPACE"), "swipe left did not reach Profile"
     shot("05_profile")
     sh("input swipe 150 1200 900 1200 180"); time.sleep(1)
     assert wait("Tap a day to see its steps"), "swipe right did not return to History"

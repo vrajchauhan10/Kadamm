@@ -21,7 +21,7 @@ final class Coach {
     /** One line of the summary: a kind (steps, compare, sessions, active, left, streak, setup) and its text. */
     static final class Item { final String kind,text; Item(String k,String t){kind=k;text=t;} }
     static final class Summary {
-        final String title,headline;final List<Item> items;long steps;int goal;
+        final String title,headline;final List<Item> items;long steps;int goal;String insight="";
         Summary(String t,String h,List<Item> i){title=t;headline=h;items=i;}
         /** Notification text: the headline, then one line per item. */
         String text(){StringBuilder b=new StringBuilder(headline);for(Item i:items)b.append("\n• ").append(i.text);return b.toString();}
@@ -29,6 +29,33 @@ final class Coach {
 
     private static String pick(String day,int salt,String... options){return options[Math.abs((day+salt).hashCode())%options.length];}
 
+    /**
+     * One or two conversational sentences, written from the numbers: pace through the day against the user's usual
+     * same weekday, a projected finish time, and what would keep the streak. Rule-based; no AI service.
+     */
+    private static String insight(Context c,String day,int hour,long steps,int goal,long avg,int streak,int sessions,double km,Map<String,Long> totals){
+        String name=LocalAccount.name(c);String first=name==null?"":name.trim().split("\\s+")[0];
+        String hi=first.isEmpty()?"":pick(day,11,"Nice going, "+first+". ","Hey "+first+"! ","Good to see you, "+first+". ");
+        Calendar now=Calendar.getInstance();String weekday=new java.text.SimpleDateFormat("EEEE",Locale.getDefault()).format(now.getTime());
+        // usual steps on this weekday (last 4 weeks), scaled to this hour of the day
+        long same=0;int n=0;Calendar d=(Calendar)now.clone();
+        for(int i=0;i<4;i++){d.add(Calendar.DAY_OF_YEAR,-7);Long v=totals.get(DaySteps.key(d.getTimeInMillis()));if(v!=null&&v>0){same+=v;n++;}}
+        long usual=n>0?same/n:avg;double dayFrac=Math.max(.1,Math.min(1,(hour+now.get(Calendar.MINUTE)/60.0-6)/16.0));long usualByNow=Math.round(usual*dayFrac);
+        if(steps>=goal){
+            long extra=steps-goal;
+            return hi+String.format(Locale.US,pick(day,12,"Goal done with %,d to spare. %s","You've cleared your goal by %,d steps. %s","Target hit, plus %,d extra. %s"),extra,
+                streak>1?String.format(Locale.US,pick(day,13,"That's %d days in a row, so keep the run going tomorrow.","Your streak is now %d days strong."),streak):pick(day,13,"A gentle stretch tonight would round it off.","Rest well, you've earned it."));
+        }
+        long left=goal-steps;double rate=hour>6?steps/Math.max(.5,hour+now.get(Calendar.MINUTE)/60.0-6):0;
+        String eta="";if(rate>200&&hour<21){double h=left/rate;int fin=(int)Math.round((hour+now.get(Calendar.MINUTE)/60.0+h)*60);if(fin<22*60)eta=String.format(Locale.US," At this pace you'll get there around %d:%02d %s.",(fin/60)%12==0?12:(fin/60)%12,fin%60,fin/60<12?"am":"pm");}
+        if(usual>0&&steps>usualByNow*1.1)
+            return hi+pick(day,14,"You're ahead of your usual "+weekday+".","This "+weekday+" is busier than most.")+eta+(eta.isEmpty()?String.format(Locale.US," %,d more to go.",left):"");
+        if(usual>0&&steps<usualByNow*.8&&hour>=12)
+            return hi+String.format(Locale.US,pick(day,15,"A lighter %s so far. A %d-minute walk would close the gap%s.","Quieter than your usual %s. About %d minutes of walking gets you to your goal%s."),weekday,Math.max(5,Math.round(left/100.0)),streak>0?String.format(Locale.US," and keep your %d-day streak",streak):"");
+        if(sessions>0)
+            return hi+String.format(Locale.US,pick(day,16,"Your %.1f km session did a lot of the work today.","Good call getting a %.1f km session in."),km)+String.format(Locale.US," %,d steps left.",left);
+        return hi+String.format(Locale.US,pick(day,17,"Right on track for a %s.%s","Steady so far for a %s.%s"),weekday,eta.isEmpty()?String.format(Locale.US," %,d steps to go.",left):eta);
+    }
     static Summary today(Context c){
         String day=DaySteps.todayKey();int hour=Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         int goal=c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getInt("stepGoal",10000);
@@ -54,6 +81,6 @@ final class Coach {
         else out.add(new Item("streak",st[0]>1?String.format(Locale.US,"Goal done · %d-day streak",st[0]):"Goal done"));
         if(sessions>0)out.add(new Item("sessions",String.format(Locale.US,"%d %s · %s%d min",sessions,sessions==1?"session":"sessions",km>=.01?String.format(Locale.US,"%.1f km · ",km):"",ms/60000)));
         else if(avg>0&&Math.abs(steps-avg)>=avg*0.1)out.add(new Item(steps>avg?"up":"down",String.format(Locale.US,"%s%,d vs your usual day",steps>avg?"+":"−",Math.abs(steps-avg))));
-        Summary result=new Summary(title,headline,out);result.steps=steps;result.goal=goal;return result;
+        Summary result=new Summary(title,headline,out);result.steps=steps;result.goal=goal;result.insight=insight(c,day,hour,steps,goal,avg,st[0],sessions,km,totals);return result;
     }
 }

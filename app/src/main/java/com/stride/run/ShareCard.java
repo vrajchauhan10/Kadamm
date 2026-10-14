@@ -30,7 +30,7 @@ final class ShareCard {
         cv.drawColor(BG);
         String route=o.optString("route","[]");
         if(route.contains("lat")){
-            RouteView map=new RouteView(c);map.setTheme(BG,LINE,RT,dark);map.setRunColor(RUN);map.setLineScale(1.7f);map.setFollowLocation(false);map.setRoute(route);
+            RouteView map=new RouteView(c);map.setThemeExact(BG,LINE,RT,dark);map.setRunColor(RUN);map.setLineScale(1.7f);map.setFollowLocation(false);map.setRoute(route);
             map.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(mapH,View.MeasureSpec.EXACTLY));
             map.layout(0,0,w,mapH);cv.save();cv.clipRect(0,0,w,mapH);map.draw(cv);cv.restore();
         }else{

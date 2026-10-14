@@ -108,8 +108,8 @@ final class Reminders {
         if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CHANNEL,"Reminders",NotificationManager.IMPORTANCE_DEFAULT));
         Coach.Summary sum=Coach.today(c);
         android.widget.RemoteViews small=new android.widget.RemoteViews(c.getPackageName(),R.layout.notif_summary_small),big=new android.widget.RemoteViews(c.getPackageName(),R.layout.notif_summary_big);
-        small.setTextViewText(R.id.s_head,prefix+sum.headline);small.setTextViewText(R.id.s_line,sum.items.isEmpty()?sum.title:sum.items.get(0).text);
-        big.setTextViewText(R.id.s_title,(prefix+sum.title).toUpperCase(Locale.getDefault()));big.setTextViewText(R.id.s_head,sum.headline);
+        small.setTextViewText(R.id.s_head,prefix+sum.headline);small.setTextViewText(R.id.s_line,sum.insight.isEmpty()?(sum.items.isEmpty()?sum.title:sum.items.get(0).text):sum.insight);
+        big.setTextViewText(R.id.s_title,(prefix+sum.title).toUpperCase(Locale.getDefault())+"  ·  ✦ KADAMM INSIGHT");big.setTextViewText(R.id.s_head,sum.insight.isEmpty()?sum.headline:sum.insight);big.setFloat(R.id.s_head,"setTextSize",sum.insight.isEmpty()?20f:15f);
         big.setProgressBar(R.id.s_goal,1000,(int)Math.min(1000,sum.steps*1000L/Math.max(1,sum.goal)),false);
         int[] rowIds={R.id.s_row1,R.id.s_row2,R.id.s_row3,R.id.s_row4,R.id.s_row5,R.id.s_row6,R.id.s_row7},icIds={R.id.s_ic1,R.id.s_ic2,R.id.s_ic3,R.id.s_ic4,R.id.s_ic5,R.id.s_ic6,R.id.s_ic7},txIds={R.id.s_tx1,R.id.s_tx2,R.id.s_tx3,R.id.s_tx4,R.id.s_tx5,R.id.s_tx6,R.id.s_tx7};
         for(int i=0;i<rowIds.length&&i<sum.items.size();i++){

@@ -41,11 +41,40 @@ public class RouteView extends View {
     static int pendingTiles(){return pending.size();}
     /** True while a finger is on an interactive map, so the page swipe and scroll leave it alone. */
     static volatile boolean gestureActive=false;
-    private boolean interactive=false,manual=false;private double mX,mY,mZoom,lastX=.5,lastY=.5,lastZf=15;
+    private boolean interactive=false,manual=false,moved=false;private float downX,downY;private double mX,mY,mZoom,lastX=.5,lastY=.5,lastZf=15;
     private android.view.GestureDetector gestures;private android.view.ScaleGestureDetector pinch;
     private int runColor=Color.rgb(234,67,53);
     void setRunColor(int color){runColor=color;invalidate();}
-    private float lineScale=1f;
+    private float lineScale=1f;private boolean markers=true;
+    /** Kilometre markers and direction arrows; off for tiny previews. */
+    void setMarkers(boolean on){markers=on;invalidate();}
+    private void drawMarkers(Canvas c,int z,double centerX,double centerY,double scale,float w,float h){
+        java.util.List<double[]> pts=smoothed();if(pts.size()<2)return;
+        double total=0;for(int i=1;i<pts.size();i++)if(pts.get(i)[2]==0)total+=Insights.metres(pts.get(i-1)[0],pts.get(i-1)[1],pts.get(i)[0],pts.get(i)[1]);
+        double every=total>=3000?1000:total>=1200?500:total>=400?200:0;
+        double run=0,nextMark=every,sinceArrow=0;float arrowGap=dp(70)*lineScale;
+        android.graphics.Paint tp=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);tp.setTextAlign(android.graphics.Paint.Align.CENTER);tp.setTypeface(android.graphics.Typeface.create("sans-serif-medium",0));
+        for(int i=1;i<pts.size();i++){
+            double[] a=pts.get(i-1),b=pts.get(i);if(b[2]>0)continue;
+            float ax=(float)((tileX(a[1],z)*TILE-centerX)*scale+w/2),ay=(float)((tileY(a[0],z)*TILE-centerY)*scale+h/2),bx=(float)((tileX(b[1],z)*TILE-centerX)*scale+w/2),by=(float)((tileY(b[0],z)*TILE-centerY)*scale+h/2);
+            double seg=Insights.metres(a[0],a[1],b[0],b[1]);float px=(float)Math.hypot(bx-ax,by-ay);
+            // direction arrows every ~70 dp along the line
+            sinceArrow+=px;
+            if(sinceArrow>=arrowGap&&px>0){sinceArrow=0;float mx=(ax+bx)/2,my=(ay+by)/2,ang=(float)Math.toDegrees(Math.atan2(by-ay,bx-ax));
+                c.save();c.rotate(ang,mx,my);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(1.8f)*lineScale);paint.setColor(Color.WHITE);paint.setStrokeCap(Paint.Cap.ROUND);
+                float s2=dp(3.2f)*lineScale;c.drawLine(mx-s2,my-s2,mx+s2*.6f,my,paint);c.drawLine(mx-s2,my+s2,mx+s2*.6f,my,paint);c.restore();}
+            // kilometre (or 200/500 m) markers
+            while(every>0&&run+seg>=nextMark){
+                double f=(nextMark-run)/Math.max(.001,seg);float mx=(float)(ax+(bx-ax)*f),my=(float)(ay+(by-ay)*f);
+                float r=dp(9)*lineScale;paint.setStyle(Paint.Style.FILL);paint.setColor(darkMode?Color.rgb(245,245,247):Color.rgb(11,11,13));c.drawCircle(mx,my,r,paint);
+                tp.setColor(darkMode?Color.rgb(11,11,13):Color.WHITE);tp.setTextSize(dp(nextMark>=1000?8.5f:7.5f)*lineScale);
+                String label=every>=1000?String.valueOf((int)(nextMark/1000)):String.format(java.util.Locale.US,"%.1f",nextMark/1000);c.drawText(label,mx,my+tp.getTextSize()*.35f,tp);
+                nextMark+=every;
+            }
+            run+=seg;
+        }
+        paint.setStyle(Paint.Style.FILL);
+    }
     /** Thicker lines and markers, for large renders such as the share image. */
     void setLineScale(float scale){lineScale=scale;invalidate();}
     /** Lets the user drag, pinch and double-tap to explore. Small previews stay static. */
@@ -70,7 +99,13 @@ public class RouteView extends View {
     /** Back to fitting the whole route (or following the user when live). */
     void resetView(){manual=false;invalidate();}
     @Override public boolean onTouchEvent(android.view.MotionEvent e){
-        if(!interactive)return super.onTouchEvent(e);
+        if(!interactive){
+            int act=e.getActionMasked();
+            if(act==android.view.MotionEvent.ACTION_DOWN){downX=e.getX();downY=e.getY();moved=false;}
+            else if(act==android.view.MotionEvent.ACTION_MOVE&&Math.hypot(e.getX()-downX,e.getY()-downY)>android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop())moved=true;
+            if(moved&&(act==android.view.MotionEvent.ACTION_UP)){setPressed(false);return true;}
+            return super.onTouchEvent(e);
+        }
         int a=e.getActionMasked();
         if(a==android.view.MotionEvent.ACTION_DOWN){gestureActive=true;if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);}
         pinch.onTouchEvent(e);if(!pinch.isInProgress())gestures.onTouchEvent(e);
@@ -128,11 +163,15 @@ public class RouteView extends View {
     public void clearCurrentLocation(){if(!hasLocation)return;hasLocation=false;invalidate();}
     public void setEmptyMessage(String message){if(message!=null&&!message.equals(emptyMessage)){emptyMessage=message;invalidate();}}
     public void setFollowLocation(boolean follow){followLocation=follow;if(follow)manual=false;invalidate();}
-    public void setTheme(int background,int grid,int track,boolean dark){mapBackground=background;routeGrid=grid;routeColor=track;darkMode=dark;invalidate();}
+    public void setTheme(int background,int grid,int track,boolean dark){mapBackground=background;routeGrid=grid;routeColor=track;
+        String style=getContext().getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getString("mapStyle","auto");
+        darkMode="dark".equals(style)?true:"light".equals(style)?false:dark;if("light".equals(style)&&dark)mapBackground=Color.rgb(236,238,240);if("dark".equals(style)&&!dark)mapBackground=Color.rgb(11,11,13);invalidate();}
+    /** For the share image: the card decides light or dark, not the app setting. */
+    void setThemeExact(int background,int grid,int track,boolean dark){mapBackground=background;routeGrid=grid;routeColor=track;darkMode=dark;invalidate();}
     @Override protected void onDraw(Canvas c){super.onDraw(c);float w=getWidth(),h=getHeight();c.drawColor(mapBackground);JSONArray points;try{points=new JSONArray(route);}catch(Exception e){points=new JSONArray();}if(points.length()==0&&!hasLocation){drawEmpty(c,w,h);return;}
         double minLat=90,maxLat=-90,minLon=180,maxLon=-180;for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p==null)continue;double lat=p.optDouble("lat"),lon=p.optDouble("lon");minLat=Math.min(minLat,lat);maxLat=Math.max(maxLat,lat);minLon=Math.min(minLon,lon);maxLon=Math.max(maxLon,lon);}if(hasLocation){minLat=Math.min(minLat,currentLat);maxLat=Math.max(maxLat,currentLat);minLon=Math.min(minLon,currentLon);maxLon=Math.max(maxLon,currentLon);}double centerLat=followLocation&&hasLocation?currentLat:(minLat+maxLat)/2,centerLon=followLocation&&hasLocation?currentLon:(minLon+maxLon)/2;int z=followLocation&&hasLocation?17:zoomFor(minLat,maxLat,minLon,maxLon,w,h);double world=Math.scalb((double)TILE,z);double centerX=tileX(centerLon,z)*TILE,centerY=tileY(centerLat,z)*TILE;double spanX=Math.max(2,(tileX(maxLon,z)-tileX(minLon,z))*TILE),spanY=Math.max(2,(tileY(minLat,z)-tileY(maxLat,z))*TILE);double scale=followLocation&&hasLocation?1.0:Math.min(2.5,Math.min(w*.78/spanX,h*.78/spanY));if(manual){z=Math.max(3,Math.min(19,(int)Math.floor(mZoom)));scale=Math.pow(2,mZoom-z);centerX=mX*TILE*Math.scalb(1.0,z);centerY=mY*TILE*Math.scalb(1.0,z);}lastZf=z+Math.log(scale)/Math.log(2);lastX=centerX/(TILE*Math.scalb(1.0,z));lastY=centerY/(TILE*Math.scalb(1.0,z));double left=w/2-centerX*scale,top=h/2-centerY*scale,tileScreen=TILE*scale;
         int x0=(int)Math.floor((-left)/tileScreen),x1=(int)Math.floor((w-left)/tileScreen),y0=(int)Math.floor((-top)/tileScreen),y1=(int)Math.floor((h-top)/tileScreen);int limit=(1<<z);for(int ty=y0;ty<=y1;ty++)for(int tx=x0;tx<=x1;tx++){if(tx<0||tx>=limit||ty<0||ty>=limit)continue;String key=z+"/"+tx+"/"+ty;Bitmap b=tiles.get(key);if(b==null){load(key);continue;}float x=(float)(left+tx*tileScreen),y=(float)(top+ty*tileScreen);paint.setColorFilter(darkMode?DARK_MAP:LIGHT_MAP);c.drawBitmap(b,null,new RectF(x,y,x+(float)tileScreen,y+(float)tileScreen),paint);paint.setColorFilter(null);}
-        Path line=new Path(),walkLine=new Path(),runLine=new Path(),gaps=new Path();float px=Float.NaN,py=Float.NaN;for(double[] p:smoothed()){float x=(float)((tileX(p[1],z)*TILE-centerX)*scale+w/2),y=(float)((tileY(p[0],z)*TILE-centerY)*scale+h/2);Path typed=p[3]>0?runLine:walkLine;if(p[2]>0){if(!Float.isNaN(px)&&(x!=px||y!=py)){gaps.moveTo(px,py);gaps.lineTo(x,y);}line.moveTo(x,y);typed.moveTo(x,y);}else{line.lineTo(x,y);typed.lineTo(x,y);}px=x;py=y;}paint.setStyle(Paint.Style.STROKE);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeWidth(dp(2.5f)*lineScale);paint.setColor(darkMode?Color.argb(200,200,200,205):Color.argb(200,95,99,104));paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{dp(4)*lineScale,dp(4)*lineScale},0));c.drawPath(gaps,paint);paint.setPathEffect(null);if(darkMode){paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(11f)*lineScale);paint.setColor(Color.argb(60,Color.red(routeColor),Color.green(routeColor),Color.blue(routeColor)));c.drawPath(walkLine,paint);paint.setColor(Color.argb(60,Color.red(runColor),Color.green(runColor),Color.blue(runColor)));c.drawPath(runLine,paint);}paint.setColor(darkMode?Color.argb(190,0,0,0):Color.argb(235,255,255,255));paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(7.5f)*lineScale);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);c.drawPath(line,paint);paint.setStrokeWidth(dp(4.5f)*lineScale);paint.setColor(routeColor);c.drawPath(walkLine,paint);paint.setColor(runColor);c.drawPath(runLine,paint);paint.setStyle(Paint.Style.FILL);JSONObject first=points.optJSONObject(0),last=points.optJSONObject(points.length()-1);if(first!=null)dot(c,(float)((tileX(first.optDouble("lon"),z)*TILE-centerX)*scale+w/2),(float)((tileY(first.optDouble("lat"),z)*TILE-centerY)*scale+h/2),Color.rgb(11,11,13));if(last!=null&&points.length()>1)dot(c,(float)((tileX(last.optDouble("lon"),z)*TILE-centerX)*scale+w/2),(float)((tileY(last.optDouble("lat"),z)*TILE-centerY)*scale+h/2),routeColor);if(hasLocation){float x=(float)((tileX(currentLon,z)*TILE-centerX)*scale+w/2),y=(float)((tileY(currentLat,z)*TILE-centerY)*scale+h/2);double metersPerPixel=156543.03392*Math.cos(Math.toRadians(currentLat))/Math.scalb(1.0,z);float radius=(float)(currentAccuracy/Math.max(.1,metersPerPixel)*scale);paint.setColor(Color.argb(45,33,150,243));c.drawCircle(x,y,Math.max(dp(12),radius),paint);paint.setColor(Color.WHITE);c.drawCircle(x,y,dp(9),paint);paint.setColor(Color.rgb(30,136,229));c.drawCircle(x,y,dp(6),paint);}
+        Path line=new Path(),walkLine=new Path(),runLine=new Path(),gaps=new Path();float px=Float.NaN,py=Float.NaN;for(double[] p:smoothed()){float x=(float)((tileX(p[1],z)*TILE-centerX)*scale+w/2),y=(float)((tileY(p[0],z)*TILE-centerY)*scale+h/2);Path typed=p[3]>0?runLine:walkLine;if(p[2]>0){if(!Float.isNaN(px)&&(x!=px||y!=py)){gaps.moveTo(px,py);gaps.lineTo(x,y);}line.moveTo(x,y);typed.moveTo(x,y);}else{line.lineTo(x,y);typed.lineTo(x,y);}px=x;py=y;}paint.setStyle(Paint.Style.STROKE);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeWidth(dp(2.5f)*lineScale);paint.setColor(darkMode?Color.argb(200,200,200,205):Color.argb(200,95,99,104));paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{dp(4)*lineScale,dp(4)*lineScale},0));c.drawPath(gaps,paint);paint.setPathEffect(null);if(darkMode){paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(11f)*lineScale);paint.setColor(Color.argb(60,Color.red(routeColor),Color.green(routeColor),Color.blue(routeColor)));c.drawPath(walkLine,paint);paint.setColor(Color.argb(60,Color.red(runColor),Color.green(runColor),Color.blue(runColor)));c.drawPath(runLine,paint);}paint.setColor(darkMode?Color.argb(190,0,0,0):Color.argb(235,255,255,255));paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(7.5f)*lineScale);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);c.drawPath(line,paint);paint.setStrokeWidth(dp(4.5f)*lineScale);paint.setColor(routeColor);c.drawPath(walkLine,paint);paint.setColor(runColor);c.drawPath(runLine,paint);if(markers)drawMarkers(c,z,centerX,centerY,scale,w,h);paint.setStyle(Paint.Style.FILL);JSONObject first=points.optJSONObject(0),last=points.optJSONObject(points.length()-1);if(first!=null)dot(c,(float)((tileX(first.optDouble("lon"),z)*TILE-centerX)*scale+w/2),(float)((tileY(first.optDouble("lat"),z)*TILE-centerY)*scale+h/2),Color.rgb(11,11,13));if(last!=null&&points.length()>1)dot(c,(float)((tileX(last.optDouble("lon"),z)*TILE-centerX)*scale+w/2),(float)((tileY(last.optDouble("lat"),z)*TILE-centerY)*scale+h/2),routeColor);if(hasLocation){float x=(float)((tileX(currentLon,z)*TILE-centerX)*scale+w/2),y=(float)((tileY(currentLat,z)*TILE-centerY)*scale+h/2);double metersPerPixel=156543.03392*Math.cos(Math.toRadians(currentLat))/Math.scalb(1.0,z);float radius=(float)(currentAccuracy/Math.max(.1,metersPerPixel)*scale);paint.setColor(Color.argb(45,33,150,243));c.drawCircle(x,y,Math.max(dp(12),radius),paint);paint.setColor(Color.WHITE);c.drawCircle(x,y,dp(9),paint);paint.setColor(Color.rgb(30,136,229));c.drawCircle(x,y,dp(6),paint);}
     }
     private void load(String key){if(pending.putIfAbsent(key,Boolean.TRUE)!=null)return;new Thread(()->{HttpURLConnection con=null;try{URL url=new URL("https://tile.openstreetmap.org/"+key+".png");con=(HttpURLConnection)url.openConnection();con.setConnectTimeout(5000);con.setReadTimeout(7000);con.setRequestProperty("User-Agent",UA);con.setUseCaches(true);try(InputStream in=con.getInputStream()){Bitmap b=BitmapFactory.decodeStream(in);if(b!=null)tiles.put(key,b);}}catch(Exception ignored){}finally{if(con!=null)con.disconnect();pending.remove(key);postInvalidate();}} ,"KadammMapTile").start();}
     private int zoomFor(double minLat,double maxLat,double minLon,double maxLon,float w,float h){double baseX=(tileX(maxLon,16)-tileX(minLon,16))*TILE,baseY=(tileY(minLat,16)-tileY(maxLat,16))*TILE;double ratio=Math.max((w*.70)/Math.max(1,baseX),(h*.70)/Math.max(1,baseY));int z=16+(int)Math.floor(Math.log(Math.max(.00001,ratio))/Math.log(2));return Math.max(3,Math.min(18,z));}
