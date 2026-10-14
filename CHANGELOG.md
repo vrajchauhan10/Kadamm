@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.2 (versionCode 28)
+
+- Sessions under 100 m explain why there is no route line or pace and elevation charts, instead of showing an empty map and nothing below it.
+
 ## 7.1 (versionCode 27)
 
 - Route lines are easier to see on every map: thicker blue (walk) and red (run) lines with a stronger outline, bigger start and finish markers, and clearer dashed GPS gaps. The share image is tuned to match.

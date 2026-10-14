@@ -146,7 +146,7 @@ def test_drawer():
     assert wait("Goals & targets"), "drawer did not open"
     shot("02_drawer")
     tap("History", at="right", exact=True)   # far right of the row, away from the label
-    assert wait("Browse your sessions by day"), "History row edge tap did nothing"
+    assert wait("Tap a day to see its steps"), "History row edge tap did nothing"
     tap("Kadamm menu")
     tap("Goals & targets", at="right")
     assert wait("Move minutes"), "Goals row edge tap did nothing"
@@ -158,13 +158,13 @@ def test_drawer():
 def test_swipe():
     home()
     sh("input swipe 900 1200 150 1200 180"); time.sleep(1)
-    assert wait("Browse your sessions by day"), "swipe left did not reach History"
+    assert wait("Tap a day to see its steps"), "swipe left did not reach History"
     shot("04_history")
     sh("input swipe 900 1200 150 1200 180"); time.sleep(1)
     assert wait("Appearance"), "swipe left did not reach Profile"
     shot("05_profile")
     sh("input swipe 150 1200 900 1200 180"); time.sleep(1)
-    assert wait("Browse your sessions by day"), "swipe right did not return to History"
+    assert wait("Tap a day to see its steps"), "swipe right did not return to History"
     sh("input swipe 150 1200 900 1200 180"); time.sleep(1)
     assert wait("Good "), "swipe right did not return to Today"
     sh("input swipe 500 1200 620 1200 300"); time.sleep(1)   # short drag must spring back
@@ -173,7 +173,12 @@ def test_swipe():
 
 def test_health_screens():
     home()
-    tap("Kadamm menu"); tap("Step sources & health", at="right")
+    tap("Kadamm menu")
+    for _ in range(3):
+        if visible("Step sources & health"):
+            break
+        sh("input swipe 300 1500 300 900 600"); time.sleep(.8)
+    tap("Step sources & health", at="right")
     assert wait("Phone step sensor") and visible("Health Connect")
     shot("06_step_sources")
     n = find("Refresh or manage") or find("Connect Health Connect")

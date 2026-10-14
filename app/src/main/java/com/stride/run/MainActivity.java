@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="7.1";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="7.2";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -808,6 +808,10 @@ public class MainActivity extends Activity {
         java.util.List<double[]> pace=Insights.pace(track),elev=Insights.elevation(track);
         // Charts need some distance to say anything; a session that barely moved gets none.
         boolean longEnough=!track.isEmpty()&&track.get(track.size()-1)[0]>=.1;if(!longEnough){pace=new java.util.ArrayList<>();elev=new java.util.ArrayList<>();}
+        if(!longEnough&&!"indoor".equals(o.optString("activityMode"))){
+            LinearLayout n=card();n.addView(tx("Too short for a route and charts",14,ink,true));
+            n.addView(tx(String.format(Locale.US,"This session covered %.0f m. The blue walking / red running line and the pace and elevation charts appear once you've moved 100 m or more.",o.optDouble("distanceKm",0)*1000),12,muted,false));
+        }
         if(pace.size()>=2){
             double best=Double.MAX_VALUE,sum=0;for(double[] q:pace){best=Math.min(best,q[1]);sum+=q[1];}
             LinearLayout pc=card();LinearLayout ph=row();pc.addView(ph);ph.addView(tx("Pace",16,ink,true),new LinearLayout.LayoutParams(0,-2,1));
