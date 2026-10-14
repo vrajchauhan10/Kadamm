@@ -40,22 +40,40 @@ final class Reminders {
         int goal=c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getInt("stepGoal",10000);long total=DaySteps.todayTotal(c);
         if(eveningOn(c)&&minute>=evening&&minute<Math.min(24*60,evening+180)&&total<goal&&goal-total<=leftMax&&!today.equals(steps.getString("eveningNudge",""))){
             steps.edit().putString("eveningNudge",today).apply();long left=goal-total;
-            post(c,31,"Almost there",String.format(Locale.US,"Only %,d steps to your goal. A %d-minute walk will do it.",left,Math.max(5,Math.round(left/100.0))));
+            String[] m=Messages.pick(c,"close",Messages.CLOSE,left,Math.max(5,Math.round(left/100.0)));if(m!=null)post(c,31,m[0],m[1]);
+            return;
+        }
+        // Daily summary: once a day from the chosen time (default 9 pm).
+        int sumAt=get(c,"sumAt",21*60);
+        if(c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getBoolean("notifySummary",true)&&minute>=sumAt&&!today.equals(steps.getString("summarySent",""))){
+            steps.edit().putString("summarySent",today).apply();postSummary(c,34,"");return;
+        }
+        // Weekly report: Monday from 9 am, once per week.
+        String weekKey=DaySteps.key(Progress.week(0).start.getTimeInMillis());
+        if(c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getBoolean("notifyWeekly",true)&&cal.get(Calendar.DAY_OF_WEEK)==Calendar.MONDAY&&minute>=9*60&&!weekKey.equals(steps.getString("weeklySent",""))){
+            steps.edit().putString("weeklySent",weekKey).apply();
+            org.json.JSONArray hist;try{hist=new org.json.JSONArray(c.getSharedPreferences("kadamm_history",Context.MODE_PRIVATE).getString("sessions","[]"));}catch(Exception e){hist=new org.json.JSONArray();}
+            java.util.Map<String,Long> totals=DaySteps.allDayTotals(c);Progress.Summary last=Progress.summarize(Progress.week(-1),hist,totals,goal),before=Progress.summarize(Progress.week(-2),hist,totals,goal);
+            String change=before.steps>0?String.format(Locale.US," (%+d%% vs the week before)",Math.round((last.steps-before.steps)*100.0/before.steps)):"";
+            postTo(c,33,"Your week in Kadamm",String.format(Locale.US,"%,d steps%s, %d of 7 goal days, %d sessions. Tap for your report.",last.steps,change,last.goalDays,last.sessions),"Reports");
             return;
         }
         long lastMove=steps.getLong("lastMoveAt",0);
         boolean inHours=start<=end?minute>=start&&minute<end:minute>=start||minute<end;
-        if(inactiveOn(c)&&inHours&&lastMove>0&&now-lastMove>=after*60000L&&now-steps.getLong("inactiveNudgeAt",0)>=Math.max(2*after,60)*60000L&&total<goal){
+        if(inactiveOn(c)&&inHours&&Messages.countToday(c,"move")<3&&lastMove>0&&now-lastMove>=after*60000L&&now-steps.getLong("inactiveNudgeAt",0)>=Math.max(2*after,60)*60000L&&total<goal){
             steps.edit().putLong("inactiveNudgeAt",now).apply();
-            post(c,32,"Time to move",(after>=60&&after%60==0?"You've been still for "+(after==60?"an hour":after/60+" hours"):"You've been still for "+after+" minutes")+". A 5-minute walk adds about 500 steps.");
+            String span=after>=60&&after%60==0?(after==60?"an hour":after/60+" hours"):after+" minutes";
+            String[] m=Messages.pick(c,"move",Messages.MOVE,span);if(m!=null)post(c,32+Messages.countToday(c,"move"),m[0],Character.toUpperCase(m[1].charAt(0))+m[1].substring(1));
         }
     }
     /** Posts one sample of every Kadamm notification, labelled as a preview, so the user can see them in advance. */
     static void preview(Context c){
         post(c,41,"Preview · Daily goal achieved!","Great work! You've reached your daily activity goal today.");
         post(c,42,"Preview · You're making progress!","You've completed 6,000 steps today. Just 4,000 more to reach your daily goal. Keep moving!");
+        postSummary(c,47,"Preview · ");
+        postTo(c,46,"Preview · Your week in Kadamm","52,340 steps (+8% vs the week before), 5 of 7 goal days, 4 sessions. Tap for your report.","Reports");
         post(c,43,"Preview · Time to move","You've been still for an hour. A 5-minute walk adds about 500 steps.");
-        post(c,44,"Preview · Almost there","Only 1,240 steps to your goal. A 12-minute walk will do it.");
+        post(c,44,"Preview · Close to your goal","Only 1,240 steps to your goal. A 12-minute walk will do it.");
         previewLive(c);
     }
     /** The live-session card with sample numbers; not ongoing, and dismissable. */
@@ -75,10 +93,43 @@ final class Reminders {
         b.addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(c,R.drawable.ic_stop),"Finish",null).build());
         nm.notify(45,b.build());
     }
-    private static void post(Context c,int id,String title,String text){
+    /** Icon and colour for each kind of summary row, matching the Today card. */
+    private static int[] look(String kind){
+        switch(kind){
+            case "steps":return new int[]{R.drawable.ic_walk,Color.rgb(26,115,232)};case "up":return new int[]{R.drawable.ic_chart,Color.rgb(30,142,62)};
+            case "down":return new int[]{R.drawable.ic_chart,Color.rgb(232,113,10)};case "sessions":return new int[]{R.drawable.ic_place,Color.rgb(147,52,230)};
+            case "active":return new int[]{R.drawable.ic_timer,Color.rgb(30,142,62)};case "left":return new int[]{R.drawable.ic_flag,Color.rgb(18,158,175)};
+            case "streak":return new int[]{R.drawable.ic_bolt,Color.rgb(242,153,0)};default:return new int[]{R.drawable.ic_chart,Color.rgb(128,134,139)};
+        }
+    }
+    /** The daily summary as a designed card: headline and steps when collapsed; goal bar and icon rows when expanded. */
+    static void postSummary(Context c,int id,String prefix){
         NotificationManager nm=c.getSystemService(NotificationManager.class);if(nm==null)return;
         if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CHANNEL,"Reminders",NotificationManager.IMPORTANCE_DEFAULT));
-        PendingIntent open=PendingIntent.getActivity(c,6,new Intent(c,MainActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        Coach.Summary sum=Coach.today(c);
+        android.widget.RemoteViews small=new android.widget.RemoteViews(c.getPackageName(),R.layout.notif_summary_small),big=new android.widget.RemoteViews(c.getPackageName(),R.layout.notif_summary_big);
+        small.setTextViewText(R.id.s_head,prefix+sum.headline);small.setTextViewText(R.id.s_line,sum.items.isEmpty()?sum.title:sum.items.get(0).text);
+        big.setTextViewText(R.id.s_title,(prefix+sum.title).toUpperCase(Locale.getDefault()));big.setTextViewText(R.id.s_head,sum.headline);
+        big.setProgressBar(R.id.s_goal,1000,(int)Math.min(1000,sum.steps*1000L/Math.max(1,sum.goal)),false);
+        int[] rowIds={R.id.s_row1,R.id.s_row2,R.id.s_row3,R.id.s_row4,R.id.s_row5,R.id.s_row6,R.id.s_row7},icIds={R.id.s_ic1,R.id.s_ic2,R.id.s_ic3,R.id.s_ic4,R.id.s_ic5,R.id.s_ic6,R.id.s_ic7},txIds={R.id.s_tx1,R.id.s_tx2,R.id.s_tx3,R.id.s_tx4,R.id.s_tx5,R.id.s_tx6,R.id.s_tx7};
+        for(int i=0;i<rowIds.length&&i<sum.items.size();i++){
+            int[] l=look(sum.items.get(i).kind);big.setViewVisibility(rowIds[i],android.view.View.VISIBLE);
+            big.setImageViewResource(icIds[i],l[0]);big.setInt(icIds[i],"setColorFilter",l[1]);big.setTextViewText(txIds[i],sum.items.get(i).text);
+        }
+        PendingIntent open=PendingIntent.getActivity(c,6+id,new Intent(c,MainActivity.class).putExtra("page","Today"),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent walk=PendingIntent.getActivity(c,60+id,new Intent(c,MainActivity.class).putExtra("page","Today").putExtra("startWalk",true),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(c,CHANNEL):new Notification.Builder(c);
+        b.setSmallIcon(R.drawable.ic_stat_kadamm).setColor(Color.rgb(26,115,232)).setContentTitle(prefix+sum.headline).setContentText(sum.text().replace("\n"," "))
+            .setStyle(new Notification.DecoratedCustomViewStyle()).setCustomContentView(small).setCustomBigContentView(big).setContentIntent(open).setAutoCancel(true)
+            .addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(c,R.drawable.ic_chart),"View today",open).build());
+        if(sum.steps<sum.goal)b.addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(c,R.drawable.ic_walk),"Start a walk",walk).build());
+        nm.notify(id,b.build());
+    }
+    private static void post(Context c,int id,String title,String text){postTo(c,id,title,text,null);}
+    private static void postTo(Context c,int id,String title,String text,String page){
+        NotificationManager nm=c.getSystemService(NotificationManager.class);if(nm==null)return;
+        if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CHANNEL,"Reminders",NotificationManager.IMPORTANCE_DEFAULT));
+        PendingIntent open=PendingIntent.getActivity(c,6+id,new Intent(c,MainActivity.class).putExtra("page",page),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(c,CHANNEL):new Notification.Builder(c);
         b.setSmallIcon(R.drawable.ic_stat_kadamm).setColor(Color.rgb(26,115,232)).setContentTitle(title).setContentText(text).setStyle(new Notification.BigTextStyle().bigText(text)).setContentIntent(open).setAutoCancel(true);
         nm.notify(id,b.build());

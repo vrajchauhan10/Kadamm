@@ -21,8 +21,12 @@ public class StepSyncJob extends JobService {
     }
 
     @Override public boolean onStartJob(JobParameters params){
-        if(!DaySteps.ready(this))return false;
-        DaySteps.sample(this,()->{Reminders.check(this);jobFinished(params,false);});
+        if(!DaySteps.ready(this)&&!HealthSync.backgroundGranted(this))return false;
+        DaySteps.sample(this,()->{
+            Runnable after=()->{Reminders.check(this);StepsWidget.refresh(this);jobFinished(params,false);};
+            // With background access, Health Connect's count (Samsung Health etc.) stays current while Kadamm is closed.
+            if(HealthSync.backgroundGranted(this))HealthSync.refresh(this,after);else after.run();
+        });
         return true;
     }
     @Override public boolean onStopJob(JobParameters params){return false;}

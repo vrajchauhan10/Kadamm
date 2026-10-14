@@ -254,13 +254,12 @@ final class DaySteps {
             if(today.equals(p.getString("goalNotified","")))return;
             if(!st.getBoolean("notifyGoal",true)){p.edit().putString("goalNotified",today).putString("progressNotified",today).apply();return;}
             p.edit().putString("goalNotified",today).putString("progressNotified",today).apply();
-            title="Daily goal achieved!";text="Great work! You've reached your daily activity goal today.";
+            String[] m=Messages.pick(c,"goal",Messages.GOAL,n);if(m==null)return;title=m[0];text=m[1];
         }else if(n>=Math.ceil(goal*.6)){
             if(today.equals(p.getString("progressNotified","")))return;
             if(!st.getBoolean("notifyProgress",true)){p.edit().putString("progressNotified",today).apply();return;}
             p.edit().putString("progressNotified",today).apply();
-            title="You're making progress!";
-            text=String.format(Locale.US,"You've completed %,d steps today. Just %,d more to reach your daily goal. Keep moving!",n,goal-n);
+            String[] m=Messages.pick(c,"progress",Messages.PROGRESS,n,goal-n);if(m==null)return;title=m[0];text=m[1];
         }else return;
         NotificationManager nm=c.getSystemService(NotificationManager.class);
         if(nm==null)return;

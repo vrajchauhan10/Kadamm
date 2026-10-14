@@ -30,7 +30,7 @@ final class ShareCard {
         cv.drawColor(BG);
         String route=o.optString("route","[]");
         if(route.contains("lat")){
-            RouteView map=new RouteView(c);map.setTheme(BG,LINE,RT,dark);map.setRunColor(RUN);map.setFollowLocation(false);map.setRoute(route);
+            RouteView map=new RouteView(c);map.setTheme(BG,LINE,RT,dark);map.setRunColor(RUN);map.setLineScale(1.7f);map.setFollowLocation(false);map.setRoute(route);
             map.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(mapH,View.MeasureSpec.EXACTLY));
             map.layout(0,0,w,mapH);cv.save();cv.clipRect(0,0,w,mapH);map.draw(cv);cv.restore();
         }else{
@@ -38,7 +38,7 @@ final class ShareCard {
             p.setColor(TEXT);p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));p.setTextSize(64);
             cv.drawText("indoor".equals(o.optString("activityMode"))?"Indoor session":"No GPS route",w/2f,mapH/2f,p);p.setTextAlign(Paint.Align.LEFT);
         }
-        p.setShader(new LinearGradient(0,mapH-280,0,mapH,Color.argb(0,Color.red(BG),Color.green(BG),Color.blue(BG)),BG,Shader.TileMode.CLAMP));cv.drawRect(0,mapH-280,w,mapH,p);
+        p.setShader(new LinearGradient(0,mapH-320,0,mapH,Color.argb(0,Color.red(BG),Color.green(BG),Color.blue(BG)),BG,Shader.TileMode.CLAMP));cv.drawRect(0,mapH-320,w,mapH,p);
         p.setShader(new LinearGradient(0,0,0,220,dark?Color.argb(170,0,0,0):Color.argb(200,255,255,255),Color.argb(0,Color.red(BG),Color.green(BG),Color.blue(BG)),Shader.TileMode.CLAMP));cv.drawRect(0,0,w,220,p);p.setShader(null);
         Drawable logo=c.getDrawable(dark?R.drawable.ic_kadamm_logo_dark:R.drawable.ic_kadamm_logo);
         if(logo!=null){logo.setBounds(56,50,56+88,50+88);logo.draw(cv);}

@@ -27,10 +27,11 @@ public class StepsWidget extends AppWidgetProvider {
 
     /** Redraws every placed widget, at most once every 30 seconds. */
     static void refresh(Context c){
-        long now=SystemClock.elapsedRealtime();if(now-lastRefresh<30000)return;lastRefresh=now;
+        long now=SystemClock.elapsedRealtime();if(now-lastRefresh<30000&&lastRefresh>0)return;lastRefresh=now;
         AppWidgetManager manager=AppWidgetManager.getInstance(c);
         int[] ids=manager.getAppWidgetIds(new ComponentName(c,StepsWidget.class));
         if(ids!=null&&ids.length>0)render(c.getApplicationContext(),manager,ids);
+        WeekWidget.refresh(c.getApplicationContext());
     }
 
     private static void render(Context c,AppWidgetManager manager,int[] ids){

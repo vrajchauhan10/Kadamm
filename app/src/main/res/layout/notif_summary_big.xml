@@ -1,0 +1,34 @@
+<!-- Expanded daily summary: headline, goal bar and one icon row per point. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <TextView android:id="@+id/s_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@android:style/TextAppearance.Material.Notification.Info" />
+    <TextView android:id="@+id/s_head" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@android:style/TextAppearance.Material.Notification.Title" android:textSize="20sp" />
+    <ProgressBar android:id="@+id/s_goal" style="@android:style/Widget.Material.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="6dp" android:layout_marginTop="8dp" android:max="1000" android:progressTint="#1A73E8" android:progressBackgroundTint="#661A73E8" />
+    <LinearLayout android:id="@+id/s_row1" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:gravity="center_vertical" android:orientation="horizontal" android:visibility="gone">
+        <ImageView android:id="@+id/s_ic1" android:layout_width="18dp" android:layout_height="18dp" />
+        <TextView android:id="@+id/s_tx1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:layout_weight="1" android:textAppearance="@android:style/TextAppearance.Material.Notification" android:textSize="14sp" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/s_row2" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:gravity="center_vertical" android:orientation="horizontal" android:visibility="gone">
+        <ImageView android:id="@+id/s_ic2" android:layout_width="18dp" android:layout_height="18dp" />
+        <TextView android:id="@+id/s_tx2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:layout_weight="1" android:textAppearance="@android:style/TextAppearance.Material.Notification" android:textSize="14sp" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/s_row3" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:gravity="center_vertical" android:orientation="horizontal" android:visibility="gone">
+        <ImageView android:id="@+id/s_ic3" android:layout_width="18dp" android:layout_height="18dp" />
+        <TextView android:id="@+id/s_tx3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:layout_weight="1" android:textAppearance="@android:style/TextAppearance.Material.Notification" android:textSize="14sp" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/s_row4" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:gravity="center_vertical" android:orientation="horizontal" android:visibility="gone">
+        <ImageView android:id="@+id/s_ic4" android:layout_width="18dp" android:layout_height="18dp" />
+        <TextView android:id="@+id/s_tx4" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:layout_weight="1" android:textAppearance="@android:style/TextAppearance.Material.Notification" android:textSize="14sp" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/s_row5" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:gravity="center_vertical" android:orientation="horizontal" android:visibility="gone">
+        <ImageView android:id="@+id/s_ic5" android:layout_width="18dp" android:layout_height="18dp" />
+        <TextView android:id="@+id/s_tx5" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:layout_weight="1" android:textAppearance="@android:style/TextAppearance.Material.Notification" android:textSize="14sp" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/s_row6" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:gravity="center_vertical" android:orientation="horizontal" android:visibility="gone">
+        <ImageView android:id="@+id/s_ic6" android:layout_width="18dp" android:layout_height="18dp" />
+        <TextView android:id="@+id/s_tx6" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:layout_weight="1" android:textAppearance="@android:style/TextAppearance.Material.Notification" android:textSize="14sp" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/s_row7" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:gravity="center_vertical" android:orientation="horizontal" android:visibility="gone">
+        <ImageView android:id="@+id/s_ic7" android:layout_width="18dp" android:layout_height="18dp" />
+        <TextView android:id="@+id/s_tx7" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:layout_weight="1" android:textAppearance="@android:style/TextAppearance.Material.Notification" android:textSize="14sp" />
+    </LinearLayout>
+</LinearLayout>

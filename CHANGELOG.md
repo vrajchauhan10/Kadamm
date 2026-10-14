@@ -1,5 +1,47 @@
 # Changelog
 
+## 7.1 (versionCode 27)
+
+- Route lines are easier to see on every map: thicker blue (walk) and red (run) lines with a stronger outline, bigger start and finish markers, and clearer dashed GPS gaps. The share image is tuned to match.
+- Tracking readiness is now one compact card: "Ready to track" or what needs fixing, with small GPS, Steps, Alerts, Battery and Health status pills. Tap it to open Permissions.
+- Sessions that barely moved (under 100 m) no longer show empty pace and elevation charts.
+
+## 7.0 (versionCode 26) — major release
+
+Kadamm 7 adds everything from 6.4 to 6.7 (background Health Connect sync, reports with custom ranges, achievements and challenges, the large week widget, non-repeating notifications, the daily summary and its notification card) and:
+
+- Maps no longer look broken: GPS gaps are bridged with a thin dashed line, so a route reads as one path.
+- Dark maps are redrawn: an inverted, cool-toned map where roads and buildings stand out on black, with a soft glow under the route.
+- Share image: a bolder route and bigger start and finish markers, scaled for the 1080-pixel image, with a longer fade into the stats.
+- Pace and elevation charts are easier to read: taller, three labelled gridlines, the line coloured blue for walking and red for running, a dashed average line, a shaded area under elevation, and distance marks at start, middle and end. Above each chart: average, fastest and distance for pace; gain, lowest and highest for elevation.
+- Kadamm summary is short: a one- or two-word headline and at most three rows (steps against goal, steps to go or streak, and today's sessions or how today compares with your usual day).
+- Track an activity is redesigned: four clear choices (outdoor walk, outdoor run, indoor walk, indoor run) with icons and one big Start button that names what it starts. Live numbers and Live screen / Finish / Discard appear only while a session runs.
+- Activity overview removed from Today (Reports covers it); a Reports link takes its place.
+- New Permissions page (menu, and from Tracking readiness): unrestricted battery for background tracking (with the Samsung battery settings shortcut), precise location, physical activity, notifications and Health Connect, each showing Allowed or Needed with a button to fix it.
+- Sessions that look like a vehicle ride (15+ km/h with very few steps) get a note on their summary explaining the speed and the gaps.
+
+## 6.7 (versionCode 25)
+
+- The daily summary notification is now a designed card: collapsed it shows the headline and your steps; expanded it adds a goal progress bar and one row per point with its own coloured icon, the same as the Today card. Buttons: "View today", and "Start a walk" when the goal isn't reached yet.
+- Summary time: quick picks for 7, 8, 9 and 10 pm next to the time picker in Notifications.
+
+## 6.6 (versionCode 24)
+
+- Notifications never repeat in a day: each kind has several phrasings, and a phrasing already sent today isn't used again until tomorrow. "Time to move" comes at most three times a day, each worded differently.
+- Daily summary: a few plain sentences about your day, written on the phone from your real numbers (steps against your goal and your recent average, sessions, distance, active minutes, streak and what's left). Shown on Today as a short headline ("Over halfway", "Goal done") with one row per point and a small coloured icon each, not a paragraph; the notification lists the same points one per line. Also sent as a once-a-day notification at a time you choose (default 9 pm, switch in Notifications). It runs offline and uses no AI service.
+
+## 6.5 (versionCode 23)
+
+- Custom reports: besides Week and Month, choose "Last N" days (up to 90), weeks (up to 26) or months (up to 12), or pick a start and end date. Each report compares with the same number of days just before it; ranges over two months show weekly bars. The shared image is titled to match ("My last 2 weeks in Kadamm").
+
+## 6.4 (versionCode 22)
+
+- Health Connect background sync: Kadamm can now ask for Android's background-read permission, so Samsung Health's count reaches the widgets and reminders every 15 minutes even while Kadamm is closed.
+- Reports (menu > Reports): week or month, with previous periods. Total steps with the change against the period before, a daily bar chart against your goal, distance, active time, goal days, sessions, daily average and best day. Share it as an image (light or dark). A "Weekly report" notification arrives on Monday morning (switch in Notifications).
+- Achievements (menu > Achievements): 16 badges (10K and 20K days, 7- and 30-day streaks, goal days, first run, 5 and 10 km sessions, 50/100/500 km totals, 25 and 100 sessions, early bird, night owl), each showing its progress until earned. New badges get a banner on Today and confetti. Challenges with targets you choose: monthly steps, monthly distance and goal days this week.
+- Large home-screen widget (4×2): both rings, today's steps, goal, distance, calories and minutes, and this week's step bars.
+- "Almost there" is now called "Close to your goal (evening)", with a plain explanation: from the evening time you set, if you are within the chosen number of steps of your goal, a nudge to finish it.
+
 ## 6.3 (versionCode 21)
 
 - Rotating the phone no longer rebuilds the screen: the page, scroll position, open menu, live session screen and anything typed stay as they were.

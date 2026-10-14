@@ -1,0 +1,5 @@
+<!-- Collapsed daily summary: headline and today's steps. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <TextView android:id="@+id/s_head" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@android:style/TextAppearance.Material.Notification.Title" android:maxLines="1" />
+    <TextView android:id="@+id/s_line" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@android:style/TextAppearance.Material.Notification.Info" android:maxLines="1" />
+</LinearLayout>

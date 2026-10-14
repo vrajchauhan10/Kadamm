@@ -139,8 +139,9 @@ class HealthConnectActivity : ComponentActivity() {
         lifecycleScope.launch {
             val granted = hc.permissionController.getGrantedPermissions()
             // Already connected for steps: one more tap offers the optional metrics, then refreshes.
-            if (granted.containsAll(HealthSync.readSteps) && (granted.containsAll(HealthSync.allPermissions) || askedExtras)) syncSteps()
-            else { askedExtras = true; permissionLauncher.launch(HealthSync.allPermissions) }
+            val wanted = HealthSync.requested(this@HealthConnectActivity)
+            if (granted.containsAll(HealthSync.readSteps) && (granted.containsAll(wanted) || askedExtras)) syncSteps()
+            else { askedExtras = true; permissionLauncher.launch(wanted) }
         }
     }
 

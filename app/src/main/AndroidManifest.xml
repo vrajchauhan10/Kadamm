@@ -16,6 +16,7 @@
     <uses-permission android:name="android.permission.health.READ_DISTANCE" />
     <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
     <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <application android:theme="@style/Kadamm" android:label="Kadamm" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:usesCleartextTraffic="false" android:allowBackup="true">
@@ -27,6 +28,10 @@
         <receiver android:name=".StepsWidget" android:exported="true" android:label="Kadamm steps">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/steps_widget_info" />
+        </receiver>
+        <receiver android:name=".WeekWidget" android:exported="true" android:label="Kadamm week">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/week_widget_info" />
         </receiver>
         <activity android:name=".HealthConnectActivity" android:exported="false" android:theme="@style/Kadamm" />
         <activity android:name=".HealthConnectRationaleActivity" android:exported="true" android:theme="@style/Kadamm">

@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
@@ -37,6 +38,14 @@ object HealthSync {
         HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class)
     )
     @JvmStatic fun isRunning() = running
+    /** Lets Kadamm read while closed, so the widget and reminders stay current. Only offered where Health Connect supports it. */
+    const val BACKGROUND = HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
+    @JvmStatic fun backgroundSupported(context: Context): Boolean = try {
+        HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE &&
+            HealthConnectClient.getOrCreate(context).features.getFeatureStatus(HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND) == HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
+    } catch (_: Throwable) { false }
+    @JvmStatic fun requested(context: Context): Set<String> = if (backgroundSupported(context)) allPermissions + BACKGROUND else allPermissions
+    @JvmStatic fun backgroundGranted(context: Context) = context.getSharedPreferences("kadamm_health", Context.MODE_PRIVATE).getBoolean("hcBackground", false)
     private const val SAMSUNG = "com.sec.android.app.shealth"
     @JvmStatic fun label(pkg: String) = when {
         pkg == SAMSUNG -> "Samsung Health"
@@ -52,7 +61,7 @@ object HealthSync {
     @JvmStatic
     fun refresh(context: Context, done: Runnable?) {
         val app = context.applicationContext
-        if (running || HealthConnectClient.getSdkStatus(app) != HealthConnectClient.SDK_AVAILABLE) return
+        if (running || HealthConnectClient.getSdkStatus(app) != HealthConnectClient.SDK_AVAILABLE) { done?.run(); return }
         running = true
         scope.launch {
             try {
@@ -207,6 +216,7 @@ object HealthSync {
             if (changed) history.edit().putString("sessions", sessionsAll.toString()).apply()
         } catch (_: Exception) {
         }
+        edit.putBoolean("hcBackground", granted.contains(BACKGROUND))
         edit.putLong("healthDayTotal", dayTotal)
             .putString("healthOrigin", preferred ?: "")
             .putString("healthSourceTotals", perOrigin.entries.joinToString(" · ") { "${label(it.key)} %,d".format(it.value) })
