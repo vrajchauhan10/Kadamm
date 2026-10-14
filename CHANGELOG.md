@@ -1,5 +1,47 @@
 # Changelog
 
+## 6.1 (versionCode 19)
+
+- Notification settings (menu > Notifications): shows whether notifications are allowed, with an Allow button (Android's permission prompt, or the app's notification settings if it was declined before). Choose what Kadamm sends: details of the live session on the lock screen, daily goal reached, 60% progress, "Time to move" and the evening "Almost there". The reminder switches moved here from Goals & targets.
+- Opening animation follows the phone's light or dark mode: it starts on the same colour and logo as Android's own splash screen (white with the blue logo, or black with the black logo), the logo shows as a circle, and the blue circle grows out of it. The app's window colours match too, so there is no white or black flash.
+
+## 6.0 (versionCode 18) — major release
+
+Kadamm 6 brings together everything since 5.2: matched Health Connect steps, the live session screen and lock-screen notification, sharing, the track logo and theme, the ring calendar, walk/run detection, explorable maps, local accounts, and these new features:
+
+- Pace and elevation charts on the session summary, with walking stretches shaded blue and running stretches red. Route points now carry time and altitude, so charts appear for sessions recorded from 6.0 on.
+- Personal records on Profile: fastest 1 km and 5 km, longest distance, longest session and most steps in a day. Each opens the session it came from. A new record gets a highlighted card and a burst of confetti the first time you open that session.
+- Route library: save a session as a named route ("Morning lap"). Later sessions that follow it (same start and end within 60 m, distance within 15%, same shape) are listed as attempts with your time against your best, on the session summary and on the new Routes page (in the menu), where routes can be renamed or deleted.
+- Reminders, with switches in Goals & targets: "Time to move" after an hour without steps (8 am to 9 pm, at most every two hours), and "Almost there" after 7 pm when 2,000 steps or fewer are left. Never during a session.
+
+## 5.5 (versionCode 17)
+
+- New live-session notification: a timer that ticks on its own, distance and pace when collapsed; expanded, it adds steps, active calories, speed, today's steps and a goal progress bar, with Pause/Resume and Finish buttons and a status line (GPS accuracy, paused, indoor). It uses the Kadamm track icon in the status bar.
+- The notification is public on the lock screen, so the session can be followed without unlocking. Tapping it opens the live session screen on top of the lock screen; the rest of the app still needs the phone unlocked.
+- Notifications use a new silent "Live session" channel at default importance so Samsung shows them in full on the lock screen.
+
+## 5.4 (versionCode 16)
+
+- Health Connect sync now also brings in active minutes for the whole day (minutes with 60+ steps), shown on the Active time tile and counted toward the move-minutes ring, alongside steps, distance and calories.
+- Each Kadamm session from the last 30 days is matched against Health Connect: the steps and active calories it recorded during that session's time window are shown on the session summary.
+- Session calories are now worked out from pace, time and your body weight (standard MET values for walking and running, active calories only), instead of a flat 65 kcal per km. Treadmill-corrected sessions are recalculated. Body weight can be set in Goals & targets (default 70 kg).
+
+## 5.3 (versionCode 15)
+
+- The whole app now uses the logo palette: black, white and blue (light blue for move minutes). Dashboard tiles and the calendar use shades of blue instead of many colours.
+- Routes are smoothed before drawing: GPS wobble is averaged out and the line simplified to 2 m, so walking the same path many times shows one clean line instead of a thick blob. Thinner route line; the start is a dark dot, the finish a blue one.
+- Local sign-up and log-in: name, email and password, kept only on this phone (the password is stored as a salted PBKDF2 hash, never in plain text). Shown on first launch, with "Continue as guest". Your name and initials appear on Profile and in the menu; log out from Profile.
+- Opening animation: the logo appears, then a blue circle grows out of it to fill the screen and opens onto the dashboard. Also plays after signing up or logging in, and is skipped when the system turns animations off.
+- Maps can be explored: drag to move, pinch or double-tap to zoom on the session summary and live screens, with a button to fit the whole route again. The dashboard map stays still so the page scrolls; tap it for a full-screen map. Light maps are toned down so the route stands out.
+- Walking and running are split automatically from step cadence (about 150+ steps a minute is running, under ~125 walking) together with sustained GPS speed, and need four agreeing readings before switching. This now works indoors too. Routes draw walking in blue and running in red, with a walk/run key on the summary and on share images.
+- Status colours are back: live, connected and goal reached show in green. Each "Today at a glance" tile has its own soft colour (blue distance, orange calories, green active time, purple sessions, teal walking, pink running, amber streak, indigo average).
+- Proper vector icons replace text symbols in the bottom bar, glance tiles, menu, goal cards, header settings, menu close and the live map's follow button.
+- Redesigned calendar: month summary (steps, goal days, distance), each day drawn as a small ring that fills toward the goal and turns solid blue when reached, a dot for days with sessions, today outlined, streak line, and a selected-day card with steps, progress, distance, active time, calories and sessions.
+- The logo follows the theme: white track on brand blue in light mode, and on black with a blue dot in dark mode. The in-app logo follows Kadamm's Light/Dark/System setting, the share image matches its Light/Dark choice, and the app icon switches with the phone's dark mode. White track on brand blue, larger in the header with the wordmark and a version pill.
+- New Kadamm logo: a running track with a blue dot marking where you are on it, in black, white and blue. Used for the launcher icon (including themed icons), the app header, the menu and share images.
+- Share images come in Light and Dark; the preview lets you switch before sharing.
+- Redesigned menu: logo header, profile card, today's progress with a small ring, Activity and Settings sections with counts, a Light/Dark/System switch, a Start activity button, and a full slide-in animation.
+
 ## 5.2 (versionCode 14)
 
 - Daily steps now match Samsung Health. Health Connect was adding Samsung Health and the phone's own step tracker together (13 Oct showed 28,425 instead of 15,789). Kadamm reads each source separately and uses the most complete one, for today, past days, distance and calories. It syncs every time the app opens, and the phone sensor keeps the number rising between syncs.

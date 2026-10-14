@@ -18,7 +18,9 @@ final class ProgressRingView extends View {
     private final KadammTheme theme;
     private float shown=0,target=-1;
     private long steps=0;private int goal=10000;private boolean available=false;
-    private ValueAnimator animator;private float inner=0;
+    private ValueAnimator animator;private float inner=0;private boolean compact=false;
+    /** Compact: thinner ring with just the percentage, for small places like the menu. */
+    void setCompact(boolean value){compact=value;invalidate();}
 
     /** Inner ring: move minutes as a fraction of their goal. */
     void setInner(float fraction){fraction=Math.max(0,Math.min(1,fraction));if(fraction!=inner){inner=fraction;invalidate();}}
@@ -50,13 +52,17 @@ final class ProgressRingView extends View {
 
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
-        float w=getWidth(),h=getHeight(),stroke=dp(11),r=Math.min(w,h)/2-stroke/2-dp(2),cx=w/2,cy=h/2;
+        float w=getWidth(),h=getHeight(),stroke=compact?dp(6):dp(11),r=Math.min(w,h)/2-stroke/2-dp(2),cx=w/2,cy=h/2;
         oval.set(cx-r,cy-r,cx+r,cy+r);
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(stroke);p.setStrokeCap(Paint.Cap.ROUND);
         p.setColor(theme.surfaceRaised);c.drawArc(oval,0,360,false,p);
         int color=colorFor(theme,shown*100);
         if(shown>0){p.setColor(color);c.drawArc(oval,-90,Math.max(1.5f,Math.min(1f,shown)*360f),false,p);}
 
+        if(compact){
+            p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);p.setColor(theme.text);p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));p.setTextSize(dp(13));
+            c.drawText(available?String.format(Locale.US,"%d%%",Math.round(steps*100f/goal)):"—",cx,cy+dp(4.5f),p);p.setTextAlign(Paint.Align.LEFT);return;
+        }
         float r2=r-stroke-dp(4);oval.set(cx-r2,cy-r2,cx+r2,cy+r2);p.setStrokeWidth(dp(8));
         p.setColor(theme.surfaceRaised);c.drawArc(oval,0,360,false,p);
         if(inner>0){p.setColor(theme.accentSecondary);c.drawArc(oval,-90,Math.max(1.5f,inner*360f),false,p);}

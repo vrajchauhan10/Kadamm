@@ -22,7 +22,7 @@ public class StepSyncJob extends JobService {
 
     @Override public boolean onStartJob(JobParameters params){
         if(!DaySteps.ready(this))return false;
-        DaySteps.sample(this,()->jobFinished(params,false));
+        DaySteps.sample(this,()->{Reminders.check(this);jobFinished(params,false);});
         return true;
     }
     @Override public boolean onStopJob(JobParameters params){return false;}

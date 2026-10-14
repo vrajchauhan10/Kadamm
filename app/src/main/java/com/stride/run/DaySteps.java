@@ -78,7 +78,7 @@ final class DaySteps {
                         JSONObject days=new JSONObject(p.getString("days","{}"));
                         distribute(days,lastAt,now,delta);
                         prune(days);
-                        e.putString("days",days.toString());
+                        e.putString("days",days.toString()).putLong("lastMoveAt",now);
                         changed=true;
                     }catch(Exception ignored){}
                 }
@@ -182,7 +182,7 @@ final class DaySteps {
         long n=0;String today=todayKey();JSONArray all=sessions(c);
         for(int i=0;i<all.length();i++){JSONObject s=all.optJSONObject(i);if(s!=null&&today.equals(s.optString("day","")))n+=s.optLong("calories",Math.round(s.optDouble("distanceKm",0)*65));}
         SharedPreferences live=c.getSharedPreferences("stride_state",Context.MODE_PRIVATE);
-        if(live.getBoolean("active",false))n+=Math.round(live.getFloat("distance",0)*65);
+        n+=Calories.live(c);
         return n;
     }
     /** "phone", "health", "sessions" or "none": where today's figure comes from. */
@@ -249,12 +249,15 @@ final class DaySteps {
         long n=todayTotal(c);
         SharedPreferences p=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
         String today=todayKey(),title,text;
+        SharedPreferences st=c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE);
         if(n>=goal){
             if(today.equals(p.getString("goalNotified","")))return;
+            if(!st.getBoolean("notifyGoal",true)){p.edit().putString("goalNotified",today).putString("progressNotified",today).apply();return;}
             p.edit().putString("goalNotified",today).putString("progressNotified",today).apply();
             title="Daily goal achieved!";text="Great work! You've reached your daily activity goal today.";
         }else if(n>=Math.ceil(goal*.6)){
             if(today.equals(p.getString("progressNotified","")))return;
+            if(!st.getBoolean("notifyProgress",true)){p.edit().putString("progressNotified",today).apply();return;}
             p.edit().putString("progressNotified",today).apply();
             title="You're making progress!";
             text=String.format(Locale.US,"You've completed %,d steps today. Just %,d more to reach your daily goal. Keep moving!",n,goal-n);
@@ -265,7 +268,7 @@ final class DaySteps {
         PendingIntent open=PendingIntent.getActivity(c,3,new Intent(c,MainActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(c,GOAL_CHANNEL):new Notification.Builder(c);
         b.setContentTitle(title).setContentText(text).setStyle(new Notification.BigTextStyle().bigText(text))
-            .setSmallIcon(android.R.drawable.ic_menu_directions).setContentIntent(open).setAutoCancel(true);
+            .setSmallIcon(R.drawable.ic_stat_kadamm).setColor(android.graphics.Color.rgb(26,115,232)).setContentIntent(open).setAutoCancel(true);
         nm.notify(GOAL_NOTIFICATION,b.build());
     }
 }

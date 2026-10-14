@@ -10,6 +10,7 @@ import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.metadata.DataOrigin
+import androidx.health.connect.client.request.AggregateGroupByDurationRequest
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -19,6 +20,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -173,6 +175,38 @@ object HealthSync {
             best(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL) { (it as androidx.health.connect.client.units.Energy).inKilocalories }?.let { edit.putFloat("healthActiveKcal", it.toFloat()) }
         if (granted.contains(HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class)))
             best(TotalCaloriesBurnedRecord.ENERGY_TOTAL) { (it as androidx.health.connect.client.units.Energy).inKilocalories }?.let { edit.putFloat("healthKcal", it.toFloat()) }
+        // Active minutes: minutes of the day with 60+ steps from the chosen source, close to Samsung Health's "active time".
+        edit.remove("healthActiveMin")
+        try {
+            val minutes = hc.aggregateGroupByDuration(AggregateGroupByDurationRequest(setOf(StepsRecord.COUNT_TOTAL), dayRange, Duration.ofMinutes(1), filter))
+            edit.putInt("healthActiveMin", minutes.count { (it.result[StepsRecord.COUNT_TOTAL] ?: 0L) >= 60L })
+        } catch (_: Exception) {
+        }
+        // Each Kadamm session from the last 30 days gets what Health Connect recorded in its time window,
+        // re-read until six hours after it ended (Samsung Health writes late), then left alone.
+        try {
+            val history = context.getSharedPreferences("kadamm_history", Context.MODE_PRIVATE)
+            val sessionsAll = JSONArray(history.getString("sessions", "[]"))
+            val now = System.currentTimeMillis(); var changed = false
+            val activeAllowed = granted.contains(HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class))
+            for (i in 0 until sessionsAll.length()) {
+                val s = sessionsAll.optJSONObject(i) ?: continue
+                val from = s.optLong("startTimeMs", 0L); val to = s.optLong("endTimeMs", 0L)
+                if (to <= from || now - to > 30L * 86400000L || s.optLong("hcSyncedAt", 0L) > to + 6L * 3600000L) continue
+                val range = TimeRangeFilter.between(Instant.ofEpochMilli(from), Instant.ofEpochMilli(to))
+                var steps = 0L; var kcal = -1.0
+                for (origin in perOrigin.keys) {
+                    val o = setOf(DataOrigin(origin))
+                    steps = maxOf(steps, hc.aggregate(AggregateRequest(setOf(StepsRecord.COUNT_TOTAL), range, o))[StepsRecord.COUNT_TOTAL] ?: 0L)
+                    if (activeAllowed) hc.aggregate(AggregateRequest(setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL), range, o))[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]
+                        ?.let { kcal = maxOf(kcal, it.inKilocalories) }
+                }
+                s.put("hcSteps", steps); if (kcal >= 0) s.put("hcActiveKcal", Math.round(kcal)) else s.remove("hcActiveKcal")
+                s.put("hcSyncedAt", now); changed = true
+            }
+            if (changed) history.edit().putString("sessions", sessionsAll.toString()).apply()
+        } catch (_: Exception) {
+        }
         edit.putLong("healthDayTotal", dayTotal)
             .putString("healthOrigin", preferred ?: "")
             .putString("healthSourceTotals", perOrigin.entries.joinToString(" · ") { "${label(it.key)} %,d".format(it.value) })

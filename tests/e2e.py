@@ -261,7 +261,7 @@ def test_recording():
             pass
         assert '"active" value="true"' in _state(), "session did not start"
         assert "isForeground=true" in sh(f"dumpsys activity services {PKG}"), "recorder is not a foreground service"
-        assert "stride_tracking" in sh("dumpsys notification --noredact | grep -A3 'pkg=" + PKG + "'"), "no tracking notification"
+        assert "kadamm_live" in sh("dumpsys notification --noredact | grep -A3 'pkg=" + PKG + "'"), "no tracking notification"
         if mock:
             step = 2.0 / 111320.0                  # 2 m of latitude per second, 300 m in total
             for i in range(1, 151):

@@ -1,0 +1,6 @@
+<resources>
+    <!-- Window colours match the opening animation, so the app opens without a white or black flash. -->
+    <style name="Kadamm" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/kadamm_window</item>
+    </style>
+</resources>

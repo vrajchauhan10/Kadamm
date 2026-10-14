@@ -45,13 +45,13 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="5.2";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="6.1";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
     private final SensorEventListener stepListener=new SensorEventListener(){@Override public void onSensorChanged(SensorEvent e){DaySteps.ingest(MainActivity.this,e.values[0]);}@Override public void onAccuracyChanged(Sensor sensor,int accuracy){}};
     private final Runnable refresh=()->{updateLive();handler.postDelayed(this.refresh,1000);};
-    @Override public void onCreate(Bundle b){super.onCreate(b);prefs=getSharedPreferences("stride_state",MODE_PRIVATE);historyPrefs=getSharedPreferences("kadamm_history",MODE_PRIVATE);if((getApplicationInfo().flags&android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0)android.os.StrictMode.setThreadPolicy(new android.os.StrictMode.ThreadPolicy.Builder().detectNetwork().detectCustomSlowCalls().penaltyLog().build());RecorderService.recover(this);applyTheme();buildShell();renderPage();handler.post(refresh);firstRunPermissions();if(prefs.getBoolean("active",false))root.post(this::openLive);}
+    @Override public void onCreate(Bundle b){super.onCreate(b);prefs=getSharedPreferences("stride_state",MODE_PRIVATE);historyPrefs=getSharedPreferences("kadamm_history",MODE_PRIVATE);if((getApplicationInfo().flags&android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0)android.os.StrictMode.setThreadPolicy(new android.os.StrictMode.ThreadPolicy.Builder().detectNetwork().detectCustomSlowCalls().penaltyLog().build());RecorderService.recover(this);applyTheme();buildShell();renderPage();handler.post(refresh);if(!LocalAccount.loggedIn(this)&&!LocalAccount.guest(this))showAuth(LocalAccount.exists(this));else{playIntro(null);firstRunPermissions();}if(prefs.getBoolean("active",false))root.post(this::openLive);}
     private void applyTheme(){String mode=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("themeMode","system");KadammTheme t=KadammTheme.resolve(this,mode);darkTheme=t.dark;bg=t.background;panel=t.surface;raised=t.surfaceRaised;lime=t.accent;violet=t.accentSecondary;accentOn=t.accentOn;ink=t.text;muted=t.textMuted;line=t.border;focus=t.focus;positive=t.positive;warning=t.warning;critical=t.critical;getWindow().setBackgroundDrawable(new ColorDrawable(bg));getWindow().setStatusBarColor(bg);getWindow().setNavigationBarColor(panel);getWindow().getDecorView().setSystemUiVisibility(darkTheme?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);if(root!=null)root.setBackgroundColor(bg);if(nav!=null)nav.setBackgroundColor(panel);if(route!=null)route.setTheme(bg,raised,lime,darkTheme);}
     private int dp(float x){return (int)(x*getResources().getDisplayMetrics().density+.5f);} private LinearLayout col(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);return l;} private LinearLayout row(){LinearLayout l=new LinearLayout(this);l.setOrientation(0);l.setGravity(Gravity.CENTER_VERTICAL);return l;} private LinearLayout.LayoutParams lp(int w,int h){return new LinearLayout.LayoutParams(w<0?w:dp(w),h<0?h:dp(h));}
     private TextView tx(String s,int sz,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(sz);t.setTextColor(color);if(bold)t.setTypeface(Typeface.create("sans-serif-medium",0));return t;} private GradientDrawable shape(int c,int r){GradientDrawable d=new GradientDrawable();d.setColor(c);d.setCornerRadius(dp(r));return d;}
@@ -61,7 +61,7 @@ public class MainActivity extends Activity {
     @Override public boolean dispatchTouchEvent(MotionEvent ev){
         int a=ev.getActionMasked();
         if(a==MotionEvent.ACTION_DOWN){gestureDownX=ev.getX();gestureDownY=ev.getY();gestureDownAt=System.currentTimeMillis();dragging=false;}
-        boolean pager=tabIndex(page)>=0&&drawerLayer!=null&&drawerLayer.getVisibility()!=View.VISIBLE&&(liveLayer==null||liveLayer.getVisibility()!=View.VISIBLE)&&ev.getPointerCount()==1;
+        boolean pager=!RouteView.gestureActive&&tabIndex(page)>=0&&drawerLayer!=null&&drawerLayer.getVisibility()!=View.VISIBLE&&(liveLayer==null||liveLayer.getVisibility()!=View.VISIBLE)&&(mapLayer==null||mapLayer.getVisibility()!=View.VISIBLE)&&ev.getPointerCount()==1;
         float dx=ev.getX()-gestureDownX,dy=ev.getY()-gestureDownY;
         if(pager&&a==MotionEvent.ACTION_MOVE){
             if(!dragging&&Math.abs(dx)>dp(20)&&Math.abs(dx)>Math.abs(dy)*1.7f){
@@ -78,44 +78,62 @@ public class MainActivity extends Activity {
         }
         return super.dispatchTouchEvent(ev);
     }
-    private LinearLayout navItem(String title,String icon){LinearLayout item=col();item.setGravity(Gravity.CENTER);item.setFocusable(true);item.setContentDescription(title);item.setOnClickListener(v->navigate(title));TextView symbol=tx(icon,23,muted,true);symbol.setGravity(Gravity.CENTER);item.addView(symbol,lp(-1,30));TextView label=tx(title,11,muted,true);label.setGravity(Gravity.CENTER);item.addView(label,lp(-1,20));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1);p.setMargins(dp(3),0,dp(3),0);nav.addView(item,p);return item;}
+    private LinearLayout navItem(String title,String icon){LinearLayout item=col();item.setGravity(Gravity.CENTER);item.setFocusable(true);item.setContentDescription(title);item.setOnClickListener(v->navigate(title));android.widget.ImageView symbol=icon(iconRes(title),muted,2);item.addView(symbol,lp(-1,28));TextView label=tx(title,11,muted,true);label.setGravity(Gravity.CENTER);item.addView(label,lp(-1,20));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1);p.setMargins(dp(3),0,dp(3),0);nav.addView(item,p);return item;}
     private void navigate(String destination){page=destination;scroller.scrollTo(0,0);closeDrawer();renderPage();}
-    private void openDrawer(){buildDrawerContents();drawer.setBackgroundColor(panel);drawerLayer.setVisibility(View.VISIBLE);drawerLayer.setAlpha(0f);drawerLayer.animate().alpha(1f).setDuration(reducedMotion()?0:160).start();drawer.setTranslationX(-dp(24));drawer.animate().translationX(0).setDuration(reducedMotion()?0:220).start();}
-    private void closeDrawer(){if(drawerLayer==null||drawerLayer.getVisibility()!=View.VISIBLE)return;drawerLayer.animate().alpha(0f).setDuration(reducedMotion()?0:120).withEndAction(()->drawerLayer.setVisibility(View.GONE)).start();}
+    private void openDrawer(){buildDrawerContents();drawer.setBackgroundColor(panel);drawerLayer.setVisibility(View.VISIBLE);drawerLayer.setAlpha(0f);drawerLayer.animate().alpha(1f).setDuration(reducedMotion()?0:160).start();drawer.setTranslationX(-drawer.getLayoutParams().width);drawer.animate().translationX(0).setInterpolator(new android.view.animation.DecelerateInterpolator()).setDuration(reducedMotion()?0:240).start();}
+    private void closeDrawer(){if(drawerLayer==null||drawerLayer.getVisibility()!=View.VISIBLE)return;drawer.animate().translationX(-drawer.getLayoutParams().width).setDuration(reducedMotion()?0:160).start();drawerLayer.animate().alpha(0f).setDuration(reducedMotion()?0:120).withEndAction(()->drawerLayer.setVisibility(View.GONE)).start();}
     private boolean reducedMotion(){try{return android.provider.Settings.Global.getFloat(getContentResolver(),"animator_duration_scale",1f)<=0f;}catch(Exception e){return false;}}
+    private LinearLayout drawerList;
     private void buildDrawerContents(){
-        drawer.removeAllViews();drawer.setPadding(dp(12),dp(14),dp(12),dp(16));
-        LinearLayout head=row();head.setPadding(dp(8),0,0,0);drawer.addView(head,lp(-1,64));
-        TextView avatar=tx("K",20,accentOn,true);avatar.setGravity(Gravity.CENTER);avatar.setBackground(shape(lime,24));head.addView(avatar,lp(48,48));
-        LinearLayout who=col();LinearLayout.LayoutParams wp=new LinearLayout.LayoutParams(0,-2,1);wp.leftMargin=dp(12);head.addView(who,wp);who.addView(tx("Kadamm athlete",17,ink,true));who.addView(tx("Guest profile · saved on this phone",11,muted,false));
-        TextView close=tx("×",26,muted,false);close.setGravity(Gravity.CENTER);close.setContentDescription("Close menu");close.setFocusable(true);close.setBackground(rippleOn(Color.TRANSPARENT,24));head.addView(close,lp(48,48));close.setOnClickListener(v->closeDrawer());
+        drawer.removeAllViews();drawer.setPadding(dp(14),dp(14),dp(14),dp(14));
+        LinearLayout top=row();drawer.addView(top,lp(-1,48));
+        android.widget.ImageView logo=new android.widget.ImageView(this);logo.setImageResource(logoRes());LinearLayout.LayoutParams lgp=lp(38,38);lgp.leftMargin=dp(6);top.addView(logo,lgp);
+        TextView word=tx("KADAMM",17,ink,true);word.setLetterSpacing(.14f);LinearLayout.LayoutParams wdp=lp(0,-2);wdp.weight=1;wdp.leftMargin=dp(10);top.addView(word,wdp);
+        android.widget.ImageView close=icon(R.drawable.ic_close,muted,12);close.setContentDescription("Close menu");close.setFocusable(true);close.setBackground(rippleOn(Color.TRANSPARENT,24));top.addView(close,lp(48,48));close.setOnClickListener(v->closeDrawer());
+        android.widget.ScrollView sv=new android.widget.ScrollView(this);sv.setVerticalScrollBarEnabled(false);LinearLayout.LayoutParams svp=new LinearLayout.LayoutParams(-1,0,1);svp.topMargin=dp(8);drawer.addView(sv,svp);
+        drawerList=col();sv.addView(drawerList);
+        LinearLayout prof=row();prof.setPadding(dp(12),dp(12),dp(12),dp(12));prof.setBackground(shape(raised,18));drawerList.addView(prof,lp(-1,-2));
+        TextView avatar=tx(initials(),15,accentOn,true);avatar.setGravity(Gravity.CENTER);avatar.setBackground(shape(lime,22));prof.addView(avatar,lp(44,44));
+        LinearLayout who=col();LinearLayout.LayoutParams wp=new LinearLayout.LayoutParams(0,-2,1);wp.leftMargin=dp(12);prof.addView(who,wp);who.addView(tx(displayName(),16,ink,true));who.addView(tx(LocalAccount.email(this)!=null?LocalAccount.email(this):"Guest · tap to sign in",11,muted,false));prof.setFocusable(true);prof.setBackground(rippleOn(raised,18));prof.setOnClickListener(v->navigate("Profile"));
         JSONArray sessions=history();int count=countOn(sessions,todayKey(),null);boolean data=DaySteps.hasTodayData(this);long n=DaySteps.todayTotal(this);int goal=dailyGoal();
-        LinearLayout today=col();today.setPadding(dp(16),dp(14),dp(16),dp(14));today.setBackground(shape(raised,18));LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(12);tp.bottomMargin=dp(14);drawer.addView(today,tp);
-        today.addView(tx("TODAY",10,muted,true));today.addView(tx(data?String.format(Locale.US,"%,d steps",n):"Steps not set up",22,ink,true));
-        ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(goal);bar.setProgress((int)Math.min(goal,n));bar.setProgressTintList(android.content.res.ColorStateList.valueOf(n>=goal?positive:lime));bar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(line));LinearLayout.LayoutParams bp=lp(-1,6);bp.topMargin=dp(8);bp.bottomMargin=dp(8);today.addView(bar,bp);
-        today.addView(tx(String.format(Locale.US,"%.2f km · %d %s · goal %,d",totalDistanceOn(sessions,todayKey()),count,count==1?"session":"sessions",goal),11,muted,false));
-        drawerAction("Today","◷","Today");drawerAction("History","▦","History");drawerAction("Profile","◉","Profile");
-        View rule=new View(this);rule.setBackgroundColor(line);LinearLayout.LayoutParams rp=lp(-1,1);rp.setMargins(dp(8),dp(10),dp(8),dp(6));drawer.addView(rule,rp);
-        drawerAction("Goals & targets","◎","Goals");drawerAction("Step sources & health","＋","Health");
-        drawer.addView(new View(this),new LinearLayout.LayoutParams(-1,0,1));
-        TextView footer=tx("Kadamm v"+APP_VERSION+" · Every Process. Every Signal. One View.",10,muted,false);footer.setPadding(dp(8),0,0,0);drawer.addView(footer);
+        LinearLayout today=row();today.setPadding(dp(12),dp(12),dp(12),dp(12));GradientDrawable tb=shape(panel,18);tb.setStroke(dp(1),line);today.setBackground(tb);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(10);drawerList.addView(today,tp);
+        ProgressRingView mini=new ProgressRingView(this,chartTheme());mini.setCompact(true);mini.setProgress(n,goal,data);today.addView(mini,lp(60,60));
+        LinearLayout tc=col();LinearLayout.LayoutParams tcp=new LinearLayout.LayoutParams(0,-2,1);tcp.leftMargin=dp(12);today.addView(tc,tcp);
+        tc.addView(tx("TODAY",10,muted,true));tc.addView(tx(data?String.format(Locale.US,"%,d steps",n):"Steps not set up",18,ink,true));
+        tc.addView(tx(String.format(Locale.US,"%.2f km · %d %s · goal %,d",totalDistanceOn(sessions,todayKey()),count,count==1?"session":"sessions",goal),11,muted,false));
+        drawerSection("ACTIVITY");
+        drawerAction("Today","◷","Today",null);drawerAction("History","▦","History",sessions.length()+(sessions.length()==1?" session":" sessions"));drawerAction("Profile","◉","Profile",null);int nr=Insights.routes(this).length();drawerAction("Routes","↗","Routes",nr==0?null:nr+(nr==1?" route":" routes"));
+        drawerSection("SETTINGS");
+        drawerAction("Goals & targets","◎","Goals",String.format(Locale.US,"%,d steps",goal));drawerAction("Notifications","bell","Notifications",notificationsAllowed()?"On":"Off");
+        drawerAction("Step sources & health","＋","Health",getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false)?"Connected":"Set up");
+        drawerSection("APPEARANCE");
+        LinearLayout modes=row();drawerList.addView(modes,lp(-1,40));String selectedMode=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("themeMode","system");
+        for(String m:new String[]{"Light","Dark","System"}){boolean on=m.equalsIgnoreCase(selectedMode);Button b=button(m,on?lime:raised,on?accentOn:ink);b.setTextSize(12);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(0,-1,1);if(modes.getChildCount()>0)bp.leftMargin=dp(6);modes.addView(b,bp);
+            b.setOnClickListener(v->{getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("themeMode",m.toLowerCase(Locale.US)).apply();applyTheme();drawer.setBackgroundColor(panel);buildDrawerContents();renderPageNow();});}
+        boolean active=prefs.getBoolean("active",false);
+        Button start=button(active?"View live session":"▶  Start activity",lime,accentOn);start.setTextSize(15);LinearLayout.LayoutParams sp=lp(-1,50);sp.topMargin=dp(10);drawer.addView(start,sp);
+        start.setOnClickListener(v->{closeDrawer();if(prefs.getBoolean("active",false))openLive();else{page="Today";renderPageNow();onRecord();}});
+        TextView footer=tx("Kadamm v"+APP_VERSION+" · Every step counts",10,muted,false);footer.setGravity(Gravity.CENTER);LinearLayout.LayoutParams fp=lp(-1,-2);fp.topMargin=dp(8);drawer.addView(footer,fp);
     }
-    /** Full-width 52dp row: the whole row is the touch target, with ripple and an active indicator. */
-    private void drawerAction(String label,String icon,String target){
-        boolean selected=target.equals(page);LinearLayout item=row();item.setBackground(rippleOn(selected?raised:Color.TRANSPARENT,14));LinearLayout.LayoutParams p=lp(-1,52);p.topMargin=dp(4);drawer.addView(item,p);
-        View bar=new View(this);bar.setBackground(shape(selected?lime:Color.TRANSPARENT,2));LinearLayout.LayoutParams bp=lp(4,24);bp.leftMargin=dp(4);item.addView(bar,bp);
-        TextView glyph=tx(icon,20,selected?lime:muted,true);glyph.setGravity(Gravity.CENTER);item.addView(glyph,lp(48,-1));
-        item.addView(tx(label,15,selected?lime:ink,selected),new LinearLayout.LayoutParams(0,-2,1));
+    private void drawerSection(String title){TextView t=tx(title,10,muted,true);t.setLetterSpacing(.1f);t.setPadding(dp(8),0,0,0);LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(18);p.bottomMargin=dp(4);drawerList.addView(t,p);}
+    /** Full-width 52dp row: the whole row is the touch target. Selected rows get a tinted background and a filled icon tile. */
+    private void drawerAction(String label,String icon,String target,String badge){
+        boolean selected=target.equals(page);LinearLayout item=row();item.setPadding(dp(6),0,dp(10),0);item.setBackground(rippleOn(selected?blend(panel,lime,darkTheme?.18f:.10f):Color.TRANSPARENT,14));LinearLayout.LayoutParams p=lp(-1,52);p.topMargin=dp(2);drawerList.addView(item,p);
+        android.widget.ImageView glyph=icon(iconRes(target),selected?accentOn:muted,8);glyph.setBackground(shape(selected?lime:raised,11));item.addView(glyph,lp(36,36));
+        TextView l=tx(label,15,selected?lime:ink,true);LinearLayout.LayoutParams llp=new LinearLayout.LayoutParams(0,-2,1);llp.leftMargin=dp(12);item.addView(l,llp);
+        if(badge!=null)item.addView(tx(badge,11,muted,false));
         item.setFocusable(true);item.setClickable(true);item.setContentDescription(label+(selected?", selected":""));item.setOnClickListener(v->navigate(target));
     }
     private android.graphics.drawable.Drawable ripple(android.graphics.drawable.Drawable content){return new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(darkTheme?56:38,Color.red(ink),Color.green(ink),Color.blue(ink))),content,content);}
     private android.graphics.drawable.Drawable rippleOn(int color,int radius){return new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(darkTheme?56:38,Color.red(ink),Color.green(ink),Color.blue(ink))),shape(color,radius),shape(Color.WHITE,radius));}
     private AlertDialog.Builder dialog(){return new AlertDialog.Builder(this,darkTheme?android.R.style.Theme_DeviceDefault_Dialog_Alert:android.R.style.Theme_DeviceDefault_Light_Dialog_Alert);}
     /** The Kadamm wordmark as a real button: 48dp tall, whole area opens the menu. */
+    /** The logo follows the app theme: blue badge in light, black badge with a blue dot in dark. */
+    private int logoRes(){return darkTheme?R.drawable.ic_kadamm_logo_dark:R.drawable.ic_kadamm_logo;}
     private LinearLayout brandButton(){
         LinearLayout b=row();b.setPadding(dp(8),0,dp(10),0);b.setBackground(rippleOn(Color.TRANSPARENT,14));b.setFocusable(true);b.setClickable(true);b.setContentDescription("Kadamm menu");b.setOnClickListener(v->openDrawer());
-        android.widget.ImageView menu=new android.widget.ImageView(this);menu.setImageResource(R.drawable.ic_kadamm_logo);b.addView(menu,lp(30,30));TextView name=tx("KADAMM",15,lime,true);name.setLetterSpacing(.14f);LinearLayout.LayoutParams np=lp(-2,-2);np.leftMargin=dp(10);b.addView(name,np);
-        TextView version=tx("v"+APP_VERSION,9,muted,true);LinearLayout.LayoutParams vp=lp(-2,-2);vp.leftMargin=dp(7);b.addView(version,vp);return b;
+        android.widget.ImageView menu=new android.widget.ImageView(this);menu.setImageResource(logoRes());b.addView(menu,lp(36,36));TextView name=tx("KADAMM",16,ink,true);name.setLetterSpacing(.14f);LinearLayout.LayoutParams np=lp(-2,-2);np.leftMargin=dp(10);b.addView(name,np);
+        TextView version=tx("v"+APP_VERSION,9,lime,true);version.setPadding(dp(7),dp(2),dp(7),dp(2));version.setBackground(shape(blend(panel,lime,darkTheme?.22f:.12f),10));LinearLayout.LayoutParams vp=lp(-2,-2);vp.leftMargin=dp(8);b.addView(version,vp);return b;
     }
     private static final String[] TABS={"Today","History","Profile"};private String renderedPage="";private boolean dragging=false;
     private int tabIndex(String p){return "Today".equals(p)?0:"History".equals(p)?1:"Profile".equals(p)?2:-1;}
@@ -126,13 +144,13 @@ public class MainActivity extends Activity {
         content.animate().translationX(-dir*w*.5f).alpha(0f).setDuration(110).withEndAction(()->{scroller.scrollTo(0,0);renderPageNow();content.setTranslationX(dir*w*.35f);content.setAlpha(0f);content.animate().translationX(0).alpha(1f).setDuration(210).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();}).start();
     }
     private void renderPage(){int from=tabIndex(renderedPage),to=tabIndex(page);if(from>=0&&to>=0&&from!=to&&content.getChildCount()>0){slideTo(to>from?1:-1);return;}content.setTranslationX(0);float motion=1f;try{motion=android.provider.Settings.Global.getFloat(getContentResolver(),"animator_duration_scale",1f);}catch(Exception ignored){}if(content.getChildCount()==0||motion<=0f){renderPageNow();return;}content.animate().cancel();content.animate().alpha(0f).setDuration(75).withEndAction(()->{renderPageNow();content.setAlpha(0f);content.animate().alpha(1f).setDuration(140).start();}).start();}
-    private void renderPageNow(){renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else renderDetail(lastSession);}
-    private void styleNavItem(LinearLayout item,boolean selected){int color=selected?lime:muted;item.setBackground(rippleOn(selected?raised:Color.TRANSPARENT,14));((TextView)item.getChildAt(0)).setTextColor(color);((TextView)item.getChildAt(1)).setTextColor(selected?ink:muted);}
+    private void renderPageNow(){renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else if(page.equals("Routes"))renderRoutes();else if(page.equals("Notifications"))renderNotifications();else renderDetail(lastSession);}
+    private void styleNavItem(LinearLayout item,boolean selected){int color=selected?lime:muted;item.setBackground(rippleOn(selected?raised:Color.TRANSPARENT,14));((android.widget.ImageView)item.getChildAt(0)).setImageTintList(android.content.res.ColorStateList.valueOf(color));((TextView)item.getChildAt(1)).setTextColor(selected?ink:muted);}
     private void brand(String eyebrow,String headline,String sub){LinearLayout brand=row();content.addView(brand,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);brand.addView(brandButton(),bbp);TextView e=tx(eyebrow.toUpperCase(Locale.US),10,muted,true);LinearLayout.LayoutParams ep=lp(-1,25);ep.topMargin=dp(8);content.addView(e,ep);TextView h=tx(headline,29,ink,true);content.addView(h);if(sub!=null){TextView s=tx(sub,13,muted,false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(5);sp.bottomMargin=dp(16);content.addView(s,sp);}}
     private LinearLayout card(){LinearLayout c=col();c.setPadding(dp(16),dp(16),dp(16),dp(16));c.setBackground(panelShape(16));LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(12);content.addView(c,p);return c;}
     private GradientDrawable panelShape(int radius){GradientDrawable d=shape(panel,radius);d.setStroke(dp(1),line);return d;}
     private void renderToday(){JSONArray hist=history();dayTotals=DaySteps.allDayTotals(this);loadIdleLocation();renderHeader();renderStepSetup();renderHero(hist);renderBento(hist);renderDistanceGoal(hist);
-        LinearLayout mapCard=card();trackCard=mapCard;LinearLayout head=row();TextView title=tx("Live route",16,ink,true);head.addView(title,new LinearLayout.LayoutParams(0,dp(26),1));status=tx("● READY",10,lime,true);head.addView(status);mapCard.addView(head);FrameLayout mapFrame=new FrameLayout(this);LinearLayout.LayoutParams mfp=lp(-1,190);mfp.topMargin=dp(8);mapCard.addView(mapFrame,mfp);route=new RouteView(this);route.setTheme(bg,raised,lime,darkTheme);mapFrame.addView(route,new FrameLayout.LayoutParams(-1,-1));Button follow=button("◎",raised,ink);FrameLayout.LayoutParams flp=new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.RIGHT|Gravity.TOP);flp.setMargins(0,dp(10),dp(10),0);mapFrame.addView(follow,flp);follow.setContentDescription("Follow my location");follow.setOnClickListener(v->{route.setFollowLocation(true);if(prefs.getBoolean("gpsFix",false))route.setCurrentLocation(prefs.getFloat("latitude",0),prefs.getFloat("longitude",0),prefs.getFloat("accuracy",0));else toast("Waiting for a reliable GPS fix");});LinearLayout mapMeta=row();mapCard.addView(mapMeta,lp(-1,26));accuracyLabel=tx("GPS accuracy · waiting for signal",10,muted,false);mapMeta.addView(accuracyLabel,new LinearLayout.LayoutParams(0,dp(26),1));TextView standard=tx("Standard map",10,muted,false);mapMeta.addView(standard);TextView mapHint=tx("© OpenStreetMap contributors · satellite tiles are not available from this map source",9,muted,false);mapCard.addView(mapHint);
+        LinearLayout mapCard=card();trackCard=mapCard;LinearLayout head=row();TextView title=tx("Live route",16,ink,true);head.addView(title,new LinearLayout.LayoutParams(0,dp(26),1));status=tx("● READY",10,lime,true);head.addView(status);mapCard.addView(head);FrameLayout mapFrame=new FrameLayout(this);LinearLayout.LayoutParams mfp=lp(-1,190);mfp.topMargin=dp(8);mapCard.addView(mapFrame,mfp);route=new RouteView(this);route.setTheme(bg,raised,lime,darkTheme);route.setContentDescription("Map. Tap to open full screen");route.setOnClickListener(v->openMapView());mapFrame.addView(route,new FrameLayout.LayoutParams(-1,-1));android.widget.ImageView follow=icon(R.drawable.ic_my_location,ink,10);follow.setBackground(rippleOn(raised,12));FrameLayout.LayoutParams flp=new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.RIGHT|Gravity.TOP);flp.setMargins(0,dp(10),dp(10),0);mapFrame.addView(follow,flp);follow.setContentDescription("Follow my location");follow.setOnClickListener(v->{route.setFollowLocation(true);if(prefs.getBoolean("gpsFix",false))route.setCurrentLocation(prefs.getFloat("latitude",0),prefs.getFloat("longitude",0),prefs.getFloat("accuracy",0));else toast("Waiting for a reliable GPS fix");});LinearLayout mapMeta=row();mapCard.addView(mapMeta,lp(-1,26));accuracyLabel=tx("GPS accuracy · waiting for signal",10,muted,false);mapMeta.addView(accuracyLabel,new LinearLayout.LayoutParams(0,dp(26),1));TextView standard=tx("Tap map to explore",10,lime,true);mapMeta.addView(standard);TextView mapHint=tx("© OpenStreetMap contributors · satellite tiles are not available from this map source",9,muted,false);mapCard.addView(mapHint);
         LinearLayout box=card();TextView tr=tx(prefs.getBoolean("active",false)?"Activity type":"Track an activity",16,ink,true);box.addView(tr);activityModeLabel=tx(prefs.getBoolean("active",false)?"Automatic detection · tap to correct manually":"Walk or run",11,muted,false);box.addView(activityModeLabel);LinearLayout modes=row();LinearLayout.LayoutParams modep=lp(-1,38);modep.topMargin=dp(8);box.addView(modes,modep);String savedMode=prefs.getString("activityMode","outdoor");for(String[] opt:new String[][]{{"Outdoor","outdoor"},{"Indoor / treadmill","indoor"}}){Button mb=smallChoice(opt[0],savedMode.equals(opt[1]));LinearLayout.LayoutParams xx=new LinearLayout.LayoutParams(0,-1,1);if(modes.getChildCount()>0)xx.leftMargin=dp(6);modes.addView(mb,xx);mb.setOnClickListener(v->{if(!prefs.getBoolean("active",false)){prefs.edit().putString("activityMode",opt[1]).apply();renderPage();}});}LinearLayout types=row();LinearLayout.LayoutParams typ=lp(-1,38);typ.topMargin=dp(8);box.addView(types,typ);String current=prefs.getBoolean("active",false)?prefs.getString("currentType",activityType):activityType;Button walk=smallChoice("Walk",current.equals("Walk"));Button run=smallChoice("Run",current.equals("Run"));types.addView(walk,new LinearLayout.LayoutParams(0,-1,1));LinearLayout.LayoutParams rlp=lp(90,-1);rlp.leftMargin=dp(8);types.addView(run,rlp);walk.setOnClickListener(v->{if(prefs.getBoolean("active",false)){setManualType("Walk");}else{activityType="Walk";renderPage();}});run.setOnClickListener(v->{if(prefs.getBoolean("active",false)){setManualType("Run");}else{activityType="Run";renderPage();}});
         timer=tx("00:00",38,ink,false);timer.setTypeface(Typeface.create("monospace",0));LinearLayout.LayoutParams tp=lp(-1,55);tp.topMargin=dp(13);box.addView(timer,tp);box.addView(tx("ELAPSED TIME",10,muted,true));LinearLayout stats=row();LinearLayout.LayoutParams stp=lp(-1,82);stp.topMargin=dp(10);box.addView(stats,stp);distance=value(stats,"DISTANCE","0.00 km");pace=value(stats,"AVG. PACE","— /km");steps=value(stats,"STEPS","0");LinearLayout stats2=row();box.addView(stats2,lp(-1,66));liveSpeed=value(stats2,"SPEED","— km/h");liveElev=value(stats2,"ELEV. GAIN","— m");liveKcal=value(stats2,"CALORIES","0 kcal");
         LinearLayout actions=row();LinearLayout.LayoutParams ap=lp(-1,48);ap.topMargin=dp(12);box.addView(actions,ap);start=button(prefs.getBoolean("active",false)?(prefs.getBoolean("paused",false)?"▶  Resume":"Ⅱ  Pause"):"▶  Start activity",lime,accentOn);actions.addView(start,new LinearLayout.LayoutParams(0,-1,1));start.setOnClickListener(v->onRecord());Button finish=button("Finish",raised,ink);LinearLayout.LayoutParams fp=lp(72,-1);fp.leftMargin=dp(6);actions.addView(finish,fp);finish.setOnClickListener(v->finishActivity());Button discard=button("Discard",raised,critical);LinearLayout.LayoutParams dp=lp(78,-1);dp.leftMargin=dp(6);actions.addView(discard,dp);discard.setOnClickListener(v->discardActivity());
@@ -168,7 +186,7 @@ public class MainActivity extends Activity {
     private boolean hasStepData(JSONArray all,String day){if(day.equals(todayKey()))return DaySteps.hasTodayData(this);return dayTotals!=null&&dayTotals.containsKey(day);}
     private int todayStepsByType(JSONArray all,String type){long n=0;for(int i=0;i<all.length();i++){JSONObject s=all.optJSONObject(i);if(s!=null&&dateKey(s).equals(todayKey())&&s.optBoolean("stepsAvailable",false)){String t=s.optString("type","Walk");if(type.equals(t)||("Mixed".equals(t)&&s.optLong(type.toLowerCase(Locale.US)+"DurationMs",0)>0))n+=s.optLong("steps",0);}}if(prefs.getBoolean("active",false)&&type.equals(prefs.getString("currentType","Walk")))n+=prefs.getInt("steps",0);return (int)n;}
     private long todayStepsFor(JSONArray all,String day){long n=0;for(int i=0;i<all.length();i++){JSONObject s=all.optJSONObject(i);if(s!=null&&dateKey(s).equals(day)&&s.optBoolean("stepsAvailable",false))n+=s.optLong("steps",0);}return n;}
-    private int todayCalories(JSONArray all){int n=0;for(int i=0;i<all.length();i++){JSONObject s=all.optJSONObject(i);if(s!=null&&dateKey(s).equals(todayKey()))n+=s.optInt("calories",(int)Math.round(s.optDouble("distanceKm")*65));}if(prefs.getBoolean("active",false))n+=Math.round(prefs.getFloat("distance",0)*65);return n;}
+    private int todayCalories(JSONArray all){int n=0;for(int i=0;i<all.length();i++){JSONObject s=all.optJSONObject(i);if(s!=null&&dateKey(s).equals(todayKey()))n+=s.optInt("calories",(int)Math.round(s.optDouble("distanceKm")*65));}n+=Calories.live(this);return n;}
     private long todayDuration(JSONArray all){long n=0;for(int i=0;i<all.length();i++){JSONObject s=all.optJSONObject(i);if(s!=null&&dateKey(s).equals(todayKey()))n+=s.optLong("durationMs",0);}if(prefs.getBoolean("active",false))n+=prefs.getLong("elapsed",0);return n;}
     private double distanceByType(JSONArray all,String day,String type){double n=0;for(int i=0;i<all.length();i++){JSONObject s=all.optJSONObject(i);if(s!=null&&dateKey(s).equals(day)){String key=type.toLowerCase(Locale.US)+"DistanceKm";if(s.has(key))n+=s.optDouble(key);else if(type.equals(s.optString("type","Walk")))n+=s.optDouble("distanceKm");}}if(day.equals(todayKey())&&prefs.getBoolean("active",false))n+=prefs.getFloat(type.toLowerCase(Locale.US)+"DistanceKm",0);return n;}
     private TextView summaryValue(LinearLayout parent,String label,String value){LinearLayout box=col();parent.addView(box,new LinearLayout.LayoutParams(0,-1,1));box.addView(tx(label,9,muted,true));TextView v=tx(value,16,ink,true);box.addView(v);return v;}
@@ -191,12 +209,65 @@ public class MainActivity extends Activity {
     private TextView metric(LinearLayout parent,String label,String value,String unit){LinearLayout c=col();c.setPadding(dp(12),dp(13),dp(8),dp(9));c.setBackground(panelShape(14));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(94),1);if(parent.getChildCount()>0)p.leftMargin=dp(8);parent.addView(c,p);c.addView(tx(label,9,muted,true));TextView v=tx(value,24,ink,true);LinearLayout.LayoutParams vp=lp(-1,34);vp.topMargin=dp(4);c.addView(v,vp);c.addView(tx(unit,10,muted,false));if(label.startsWith("TODAY"))todayCount=v;else if(label.equals("DISTANCE"))todayDistance=v;else if(label.equals("ACTIVE TIME"))todayActiveTime=v;else if(label.equals("WALKING"))todayWalkDistance=v;else if(label.equals("RUNNING"))todayRunDistance=v;return v;}
     private TextView value(LinearLayout parent,String label,String val){LinearLayout c=col();LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1);parent.addView(c,p);c.addView(tx(label,9,muted,true));TextView v=tx(val,17,ink,false);v.setTypeface(Typeface.create("monospace",0));LinearLayout.LayoutParams vp=lp(-1,34);vp.topMargin=dp(5);c.addView(v,vp);return v;}
     private Button button(String s,int color,int textColor){Button b=new Button(this);b.setText(s);b.setTextSize(13);b.setAllCaps(false);b.setTextColor(textColor);GradientDrawable base=shape(color,11);base.setStroke(dp(1),line);b.setBackground(ripple(base));b.setOnFocusChangeListener((v,has)->{GradientDrawable d=shape(color,11);d.setStroke(dp(has?2:1),has?focus:line);b.setBackground(ripple(d));});return b;}private Button smallChoice(String s,boolean selected){int selectedColor="Run".equals(s)?violet:lime;Button b=button(s,selected?selectedColor:raised,selected?accentOn:ink);return b;}
-    private void renderHistory(){dayTotals=DaySteps.allDayTotals(this);brand("YOUR ACTIVITY","History","Browse your sessions by day.");LinearLayout month=row();Button prev=button("‹",raised,ink),next=button("›",raised,ink);month.addView(prev,lp(42,40));TextView label=tx(monthName(),15,ink,true);label.setGravity(Gravity.CENTER);month.addView(label,new LinearLayout.LayoutParams(0,dp(40),1));month.addView(next,lp(42,40));content.addView(month);prev.setOnClickListener(v->{shownMonth.add(Calendar.MONTH,-1);renderPage();});next.setOnClickListener(v->{shownMonth.add(Calendar.MONTH,1);renderPage();});
-        LinearLayout cal=card();String[] days={"M","T","W","T","F","S","S"};LinearLayout dr=row();cal.addView(dr);for(String d:days){TextView t=tx(d,10,muted,true);t.setGravity(Gravity.CENTER);dr.addView(t,new LinearLayout.LayoutParams(0,dp(30),1));}Calendar first=(Calendar)shownMonth.clone();first.set(Calendar.DAY_OF_MONTH,1);int offset=(first.get(Calendar.DAY_OF_WEEK)+5)%7;int count=first.getActualMaximum(Calendar.DAY_OF_MONTH);JSONArray h=history();for(int wk=0;wk<6;wk++){LinearLayout rr=row();cal.addView(rr,lp(-1,42));for(int col=0;col<7;col++){int n=wk*7+col-offset+1;TextView d=tx(n>0&&n<=count?String.valueOf(n):"",13,ink,false);d.setGravity(Gravity.CENTER);LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(0,-1,1);rr.addView(d,dp);if(n>0&&n<=count){Calendar date=(Calendar)shownMonth.clone();date.set(Calendar.DAY_OF_MONTH,n);int sessions=countOn(h,dateKey(date),null);boolean today=isSameDate(date,Calendar.getInstance()),selected=isSameDate(date,selectedDate);GradientDrawable dateBg=shape(calendarColor(h,date),12);if(today||selected)dateBg.setStroke(dp(today?2f:1.5f),lime);d.setBackground(dateBg);String spoken=new SimpleDateFormat("EEEE, d MMMM",Locale.getDefault()).format(date.getTime());d.setContentDescription(spoken+". "+sessions+" "+(sessions==1?"session":"sessions")+". Long press to show count.");d.setOnClickListener(v->{selectedDate=(Calendar)date.clone();renderPage();});d.setOnLongClickListener(v->{showSessionCountPopup(d,date,sessions);return true;});}}}
-        LinearLayout legend=card();legend.addView(tx("ACTIVITY KEY",9,muted,true));TextView key=tx("Green · goal reached    Orange · 3,000+ steps    Yellow · under 3,000    Red · run logged    Grey · session without steps",10,muted,false);legend.addView(key);String selectedKey=dateKey(selectedDate);LinearLayout dateSummary=card();dateSummary.addView(tx("SELECTED DAY",9,muted,true));long selectedSteps=todayStepsFor(h,selectedKey);double selectedKm=totalDistanceOn(h,selectedKey);long selectedMs=durationOn(h,selectedKey);detailRow(dateSummary,"STEPS",stepDisplay(h,selectedKey),"DISTANCE",String.format(Locale.US,"%.2f km",selectedKm));detailRow(dateSummary,"DURATION",formatDuration(selectedMs),"EST. CALORIES",Math.round(selectedKm*65)+" kcal");
-        TextView day=tx(new SimpleDateFormat("EEEE, d MMMM",Locale.getDefault()).format(selectedDate.getTime()),14,ink,true);LinearLayout.LayoutParams dp=lp(-1,38);dp.topMargin=dp(12);content.addView(day,dp);boolean found=false;for(int i=h.length()-1;i>=0;i--){JSONObject o=h.optJSONObject(i);if(o!=null&&dateKey(o).equals(dateKey(selectedDate))){sessionRow(o,()->{lastSession=o;page="Detail";renderPage();});found=true;}}if(!found){LinearLayout empty=card();empty.addView(tx("No sessions on this day",13,muted,false));}}
+    private void renderHistory(){
+        dayTotals=DaySteps.allDayTotals(this);brand("YOUR ACTIVITY","History","Tap a day to see its steps and sessions.");
+        JSONArray h=history();int goal=dailyGoal();Calendar now=Calendar.getInstance();
+        LinearLayout month=row();content.addView(month,lp(-1,52));
+        TextView prev=tx("‹",22,ink,false),next=tx("›",22,ink,false);
+        for(TextView b:new TextView[]{prev,next}){b.setGravity(Gravity.CENTER);b.setFocusable(true);b.setBackground(rippleOn(raised,22));}
+        prev.setContentDescription("Previous month");next.setContentDescription("Next month");
+        month.addView(prev,lp(44,44));TextView title=tx(monthName(),18,ink,true);title.setGravity(Gravity.CENTER);month.addView(title,new LinearLayout.LayoutParams(0,-2,1));month.addView(next,lp(44,44));
+        prev.setOnClickListener(v->{shownMonth.add(Calendar.MONTH,-1);renderPage();});next.setOnClickListener(v->{shownMonth.add(Calendar.MONTH,1);renderPage();});
+        Calendar first=(Calendar)shownMonth.clone();first.set(Calendar.DAY_OF_MONTH,1);int days=first.getActualMaximum(Calendar.DAY_OF_MONTH);
+        long monthSteps=0;int goalDays=0,activeDays=0;double monthKm=0;
+        for(int d=1;d<=days;d++){Calendar x=(Calendar)first.clone();x.set(Calendar.DAY_OF_MONTH,d);String k=dateKey(x);Long v=dayTotals.get(k);if(v!=null&&v>0){monthSteps+=v;activeDays++;if(v>=goal)goalDays++;}monthKm+=distanceOnDay(h,k);}
+        LinearLayout stats=row();LinearLayout.LayoutParams stp=lp(-1,-2);stp.topMargin=dp(6);content.addView(stats,stp);
+        monthStat(stats,"STEPS",monthSteps>=10000?String.format(Locale.US,"%.0fk",monthSteps/1000d):String.format(Locale.US,"%,d",monthSteps));
+        monthStat(stats,"GOAL DAYS",goalDays+" / "+activeDays);monthStat(stats,"DISTANCE",String.format(Locale.US,"%.1f km",monthKm));
+        LinearLayout cal=card();LinearLayout dr=row();cal.addView(dr);
+        for(String d:new String[]{"M","T","W","T","F","S","S"}){TextView t=tx(d,11,muted,true);t.setGravity(Gravity.CENTER);dr.addView(t,new LinearLayout.LayoutParams(0,dp(28),1));}
+        int offset=(first.get(Calendar.DAY_OF_WEEK)+5)%7,weeks=(offset+days+6)/7;KadammTheme theme=chartTheme();
+        for(int wk=0;wk<weeks;wk++){
+            LinearLayout rr=row();cal.addView(rr,lp(-1,48));
+            for(int col=0;col<7;col++){
+                int n=wk*7+col-offset+1;
+                if(n<1||n>days){rr.addView(new View(this),new LinearLayout.LayoutParams(0,-1,1));continue;}
+                Calendar date=(Calendar)shownMonth.clone();date.set(Calendar.DAY_OF_MONTH,n);String key=dateKey(date);Long v=dayTotals.get(key);
+                int sessions=countOn(h,key,null);boolean future=date.after(now)&&!isSameDate(date,now);
+                DayCellView cell=new DayCellView(this,theme,n,v==null?-1f:v/(float)Math.max(1,goal),isSameDate(date,now),isSameDate(date,selectedDate),sessions>0,future);
+                cell.setFocusable(true);cell.setContentDescription(new SimpleDateFormat("EEEE, d MMMM",Locale.getDefault()).format(date.getTime())+(v==null?", no step data":String.format(Locale.US,", %,d steps",v))+", "+sessions+(sessions==1?" session":" sessions"));
+                cell.setOnClickListener(x->{selectedDate=(Calendar)date.clone();renderPageNow();});
+                cell.setOnLongClickListener(x->{showSessionCountPopup(cell,date,sessions);return true;});
+                rr.addView(cell,new LinearLayout.LayoutParams(0,-1,1));
+            }
+        }
+        LinearLayout legend=row();LinearLayout.LayoutParams lgp=lp(-1,-2);lgp.topMargin=dp(10);cal.addView(legend,lgp);
+        legend.addView(tx("◔  ring fills toward your goal     ●  goal reached     •  sessions",10,muted,false));
+        int[] st=DaySteps.streaks(dayTotals,goal);
+        TextView streak=tx(String.format(Locale.US,"Current streak %d %s  ·  best %d",st[0],st[0]==1?"day":"days",st[1]),12,lime,true);LinearLayout.LayoutParams srp=lp(-1,-2);srp.topMargin=dp(6);cal.addView(streak,srp);
+        String sk=dateKey(selectedDate);Long sv=dayTotals.get(sk);long sSteps=sk.equals(todayKey())?DaySteps.todayTotal(this):(sv==null?-1:sv);
+        LinearLayout sel=card();LinearLayout sh=row();sel.addView(sh);
+        sh.addView(tx(new SimpleDateFormat("EEEE, d MMMM",Locale.getDefault()).format(selectedDate.getTime()),15,ink,true),new LinearLayout.LayoutParams(0,-2,1));
+        if(isSameDate(selectedDate,now)){TextView badge=tx("TODAY",9,lime,true);badge.setPadding(dp(8),dp(3),dp(8),dp(3));badge.setBackground(shape(blend(panel,lime,darkTheme?.22f:.12f),10));sh.addView(badge);}
+        LinearLayout big=row();LinearLayout.LayoutParams bgp=lp(-1,-2);bgp.topMargin=dp(10);sel.addView(big,bgp);
+        big.addView(tx(sSteps<0?"—":String.format(Locale.US,"%,d",sSteps),30,ink,true));
+        TextView of=tx(sSteps<0?"  no step data":String.format(Locale.US,"  of %,d steps · %d%%",goal,Math.round(sSteps*100f/Math.max(1,goal))),12,muted,false);big.addView(of);
+        ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(Math.max(1,goal));bar.setProgress((int)Math.max(0,Math.min(goal,sSteps)));bar.setProgressTintList(android.content.res.ColorStateList.valueOf(lime));bar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(raised));
+        LinearLayout.LayoutParams bp=lp(-1,8);bp.topMargin=dp(8);bp.bottomMargin=dp(6);sel.addView(bar,bp);
+        double km=totalDistanceOn(h,sk);long ms=durationOn(h,sk);int count=countOn(h,sk,null);
+        detailRow(sel,"DISTANCE",String.format(Locale.US,"%.2f km",km),"ACTIVE TIME",formatDuration(ms));
+        detailRow(sel,"EST. CALORIES",Math.round(km*65)+" kcal","SESSIONS",String.valueOf(count));
+        TextView dayLabel=tx(count==0?"No sessions on this day":count==1?"1 session":count+" sessions",11,muted,true);LinearLayout.LayoutParams dlp=lp(-1,-2);dlp.topMargin=dp(16);content.addView(dayLabel,dlp);
+        for(int i=h.length()-1;i>=0;i--){JSONObject o=h.optJSONObject(i);if(o!=null&&dateKey(o).equals(sk))sessionRow(o,()->{lastSession=o;page="Detail";renderPage();});}
+    }
+    private double distanceOnDay(JSONArray h,String day){double n=0;for(int i=0;i<h.length();i++){JSONObject o=h.optJSONObject(i);if(o!=null&&dateKey(o).equals(day))n+=o.optDouble("distanceKm",0);}return n;}
+    private void monthStat(LinearLayout parent,String label,String value){
+        LinearLayout c=col();c.setPadding(dp(12),dp(10),dp(10),dp(10));GradientDrawable g=shape(panel,16);g.setStroke(dp(1),line);c.setBackground(g);
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-2,1);if(parent.getChildCount()>0)p.leftMargin=dp(8);parent.addView(c,p);
+        c.addView(tx(label,9,muted,true));c.addView(tx(value,17,ink,true));
+    }
     private int tint(int color){return Color.argb(darkTheme?105:75,Color.red(color),Color.green(color),Color.blue(color));}
-    private int calendarColor(JSONArray h,Calendar d){String key=dateKey(d);Long v=dayTotals==null?null:dayTotals.get(key);long count=v==null?0:v;if(count>=dailyGoal())return tint(positive);if(runDistanceOn(h,key)>0)return tint(critical);if(count>=3000)return tint(Color.rgb(249,115,22));if(count>0)return tint(Color.rgb(234,179,8));return countOn(h,key,null)>0?raised:Color.TRANSPARENT;}
+    private int calendarColor(JSONArray h,Calendar d){String key=dateKey(d);Long v=dayTotals==null?null:dayTotals.get(key);long count=v==null?0:v;int goal=dailyGoal();if(count>=goal)return lime;if(count>=goal/2)return Color.argb(darkTheme?150:120,Color.red(lime),Color.green(lime),Color.blue(lime));if(count>0)return Color.argb(darkTheme?70:45,Color.red(lime),Color.green(lime),Color.blue(lime));return countOn(h,key,null)>0?raised:Color.TRANSPARENT;}
     private double runDistanceOn(JSONArray h,String day){return distanceByType(h,day,"Run");}
     private long durationByType(JSONArray h,String day,String type){long n=0;String key=type.toLowerCase(Locale.US)+"DurationMs";for(int i=0;i<h.length();i++){JSONObject s=h.optJSONObject(i);if(s!=null&&dateKey(s).equals(day)){if(s.has(key))n+=s.optLong(key);else if(type.equals(s.optString("type","Walk")))n+=s.optLong("durationMs");}}if(day.equals(todayKey())&&prefs.getBoolean("active",false))n+=prefs.getLong(key,0);return n;}
     private long durationOn(JSONArray h,String day){long n=0;for(int i=0;i<h.length();i++){JSONObject s=h.optJSONObject(i);if(s!=null&&dateKey(s).equals(day))n+=s.optLong("durationMs",0);}return n;}
@@ -238,10 +309,11 @@ public class MainActivity extends Activity {
         goalProgress(sum,"Steps",DaySteps.todayTotal(this),st.getInt("stepGoal",10000),lime,String.format(Locale.US,"%,d / %,d",DaySteps.todayTotal(this),st.getInt("stepGoal",10000)));
         goalProgress(sum,"Distance",Math.round(totalDistanceOn(h,todayKey())*1000),st.getInt("distanceGoalM",5000),orange(),String.format(Locale.US,"%.2f / %.1f km",totalDistanceOn(h,todayKey()),st.getInt("distanceGoalM",5000)/1000f));
         goalProgress(sum,"Move minutes",todayDuration(h)/60000,st.getInt("activeGoalMin",30),violet,String.format(Locale.US,"%d / %d min",todayDuration(h)/60000,st.getInt("activeGoalMin",30)));
-        goalCard("Daily steps","Your main goal. The outer ring fills toward it.","★",lime,"stepGoal",10000,1000,50000,500,new int[]{6000,8000,10000,12000,15000},v->String.format(Locale.US,"%,d steps",v),v->(v/1000)+"k");
+        goalCard("Daily steps","Your main goal. The outer ring fills toward it.","▶",lime,"stepGoal",10000,1000,50000,500,new int[]{6000,8000,10000,12000,15000},v->String.format(Locale.US,"%,d steps",v),v->(v/1000)+"k");
         goalCard("Daily distance","From GPS sessions and indoor estimates.","↗",orange(),"distanceGoalM",5000,500,30000,500,new int[]{3000,5000,8000,10000},v->String.format(Locale.US,"%.1f km",v/1000f),v->(v/1000)+" km");
-        goalCard("Move minutes","Time spent in Kadamm sessions. The inner ring.","◷",violet,"activeGoalMin",30,10,180,5,new int[]{20,30,45,60},v->v+" min",v->v+" min");
+        goalCard("Move minutes","Time spent in Kadamm sessions. The inner ring.","◷",green(),"activeGoalMin",30,10,180,5,new int[]{20,30,45,60},v->v+" min",v->v+" min");
         goalCard("Indoor stride length","Turns treadmill steps into distance. Walk 10 m, count your steps, and divide.","⇅",teal(),"strideLengthCm",72,40,130,1,new int[]{65,72,80},v->String.format(Locale.US,"%.2f m per step",v/100f),v->v+" cm");
+        goalCard("Body weight","Used to estimate the calories of your sessions. Stays on this phone.","◉p",indigo(),"weightKg",70,35,180,1,new int[]{55,65,75,85},v->v+" kg",v->v+" kg");
         Button health=button("Connect health data  →",raised,ink);LinearLayout.LayoutParams hp=lp(-1,50);hp.topMargin=dp(16);content.addView(health,hp);health.setOnClickListener(v->navigate("Health"));
     }
     private void goalProgress(LinearLayout c,String label,long value,int goal,int color,String text){
@@ -254,7 +326,7 @@ public class MainActivity extends Activity {
     private void goalCard(String title,String desc,String icon,int color,String key,int def,int min,int max,int step,int[] presets,java.util.function.IntFunction<String> fmt,java.util.function.IntFunction<String> chip){
         SharedPreferences st=getSharedPreferences("kadamm_settings",MODE_PRIVATE);
         LinearLayout c=card();LinearLayout head=row();c.addView(head);
-        TextView badge=tx(icon,16,darkTheme?Color.rgb(24,25,28):Color.WHITE,true);badge.setGravity(Gravity.CENTER);badge.setBackground(shape(color,20));head.addView(badge,lp(40,40));
+        android.widget.ImageView badge=icon(iconRes(icon),darkTheme?Color.rgb(11,11,13):Color.WHITE,9);badge.setBackground(shape(color,14));head.addView(badge,lp(40,40));
         LinearLayout words=col();LinearLayout.LayoutParams wp=new LinearLayout.LayoutParams(0,-2,1);wp.leftMargin=dp(12);head.addView(words,wp);words.addView(tx(title,16,ink,true));words.addView(tx(desc,11,muted,false));
         LinearLayout vr=row();LinearLayout.LayoutParams vrp=lp(-1,52);vrp.topMargin=dp(12);c.addView(vr,vrp);
         Button minus=button("−",raised,ink);minus.setTextSize(20);vr.addView(minus,lp(52,48));
@@ -270,22 +342,22 @@ public class MainActivity extends Activity {
         minus.setOnClickListener(v->set[0].accept(st.getInt(key,def)-step));plus.setOnClickListener(v->set[0].accept(st.getInt(key,def)+step));paint.run();
     }
     private void showHealthConnectInfo(){navigate("Health");}
-    private void renderProfile(){JSONArray h=history();brand("YOUR SPACE","Guest runner","Your Kadamm profile is ready.");LinearLayout card=card();TextView avatar=tx("K",28,accentOn,true);avatar.setGravity(Gravity.CENTER);avatar.setBackground(shape(lime,32));card.addView(avatar,lp(58,58));TextView name=tx("Kadamm athlete",19,ink,true);LinearLayout.LayoutParams np=lp(-1,34);np.topMargin=dp(13);card.addView(name,np);card.addView(tx("Local profile · Google sign-in coming later",12,muted,false));LinearLayout totals=row();LinearLayout.LayoutParams tp=lp(-1,82);tp.topMargin=dp(18);card.addView(totals,tp);profileStat(totals,"SESSIONS",String.valueOf(h.length()));profileStat(totals,"DISTANCE",String.format(Locale.US,"%.1f km",distanceAll(h)));profileStat(totals,"VERIFIED STEPS",stepsAll(h)>0?String.format(Locale.US,"%,d",stepsAll(h)):"Unavailable");LinearLayout history=card();history.addView(tx("Activity calendar",16,ink,true));TextView go=tx("See your days and sessions  →",13,lime,true);LinearLayout.LayoutParams gp=lp(-1,40);gp.topMargin=dp(8);history.addView(go,gp);go.setOnClickListener(v->{page="History";renderPage();});TextView goalsLink=tx("Goals & targets  →",13,lime,true);card.addView(goalsLink,lp(-1,36));goalsLink.setOnClickListener(v->navigate("Goals"));
+    private void renderProfile(){JSONArray h=history();brand("YOUR SPACE",LocalAccount.name(this)!=null?LocalAccount.name(this):"Guest runner",LocalAccount.email(this)!=null?LocalAccount.email(this):"Sign in to put your name on your activity.");renderAccount();renderRecords();LinearLayout card=card();TextView avatar=tx(initials(),24,accentOn,true);avatar.setGravity(Gravity.CENTER);avatar.setBackground(shape(lime,32));card.addView(avatar,lp(58,58));TextView name=tx(displayName(),19,ink,true);LinearLayout.LayoutParams np=lp(-1,34);np.topMargin=dp(13);card.addView(name,np);card.addView(tx(LocalAccount.email(this)!=null?"Signed in · data stays on this phone":"Guest profile · data stays on this phone",12,muted,false));LinearLayout totals=row();LinearLayout.LayoutParams tp=lp(-1,82);tp.topMargin=dp(18);card.addView(totals,tp);profileStat(totals,"SESSIONS",String.valueOf(h.length()));profileStat(totals,"DISTANCE",String.format(Locale.US,"%.1f km",distanceAll(h)));profileStat(totals,"VERIFIED STEPS",stepsAll(h)>0?String.format(Locale.US,"%,d",stepsAll(h)):"Unavailable");LinearLayout history=card();history.addView(tx("Activity calendar",16,ink,true));TextView go=tx("See your days and sessions  →",13,lime,true);LinearLayout.LayoutParams gp=lp(-1,40);gp.topMargin=dp(8);history.addView(go,gp);go.setOnClickListener(v->{page="History";renderPage();});TextView goalsLink=tx("Goals & targets  →",13,lime,true);card.addView(goalsLink,lp(-1,36));goalsLink.setOnClickListener(v->navigate("Goals"));
         LinearLayout appearance=card();appearance.addView(tx("Appearance",16,ink,true));appearance.addView(tx("Choose how Kadamm looks on this device.",12,muted,false));String selected=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("themeMode","system");LinearLayout choices=row();LinearLayout.LayoutParams cp=lp(-1,42);cp.topMargin=dp(12);appearance.addView(choices,cp);for(String mode:new String[]{"Light","Dark","System"}){boolean active=mode.equalsIgnoreCase(selected);Button b=button(mode,active?lime:raised,active?accentOn:ink);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(0,-1,1);if(choices.getChildCount()>0)bp.leftMargin=dp(7);choices.addView(b,bp);b.setOnClickListener(v->{getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("themeMode",mode.toLowerCase(Locale.US)).apply();applyTheme();renderPage();});}
     }
     private void profileStat(LinearLayout p,String l,String val){LinearLayout c=col();p.addView(c,new LinearLayout.LayoutParams(0,-1,1));c.addView(tx(l,9,muted,true));c.addView(tx(val,16,ink,true));}
-    private void renderDetail(JSONObject o){if(o==null){page="History";renderPage();return;}TextView back=tx("←  HISTORY",11,lime,true);content.addView(back,lp(-1,28));back.setOnClickListener(v->{page="History";renderPage();});String dt=o.optString("date","");brand(dt,sessionTitle(o),"Session summary · "+o.optString("time",""));RouteView rv=new RouteView(this);rv.setTheme(bg,raised,lime,darkTheme);rv.setRoute(o.optString("route","[]"));rv.setBackground(shape(panel,16));LinearLayout.LayoutParams rp=lp(-1,280);content.addView(rv,rp);TextView attribution=tx("© OpenStreetMap contributors · GPS route stored on device",10,muted,false);LinearLayout.LayoutParams ap=lp(-1,28);ap.topMargin=dp(5);content.addView(attribution,ap);LinearLayout c=card();long ms=o.optLong("durationMs",0);double km=o.optDouble("distanceKm",0);double speed=ms>0?km/(ms/3600000d):0;detailRow(c,"DISTANCE",String.format(Locale.US,"%.2f km",km),"DURATION",formatDuration(ms));detailRow(c,"AVG. SPEED",String.format(Locale.US,"%.1f km/h",speed),"AVG. PACE",km>0?String.format(Locale.US,"%d:%02d /km",Math.round(ms/1000d/km)/60,Math.round(ms/1000d/km)%60):"—");detailRow(c,"STEPS",String.format(Locale.US,"%,d",o.optInt("steps")),"EST. CALORIES",String.format(Locale.US,"~%d kcal",o.optInt("calories",(int)Math.round(km*65))));detailRow(c,"MOVING TIME",formatDuration(o.optLong("movingMs",ms)),"ELEV. GAIN",o.has("elevGainM")?String.format(Locale.US,"%.0f m",o.optDouble("elevGainM")):"—");if(o.has("walkDistanceKm")||o.has("runDistanceKm")){long wms=o.optLong("walkDurationMs"),rms=o.optLong("runDurationMs");double wkm=o.optDouble("walkDistanceKm"),rkm=o.optDouble("runDistanceKm");detailRow(c,"WALK",String.format(Locale.US,"%.2f km · %s",wkm,formatDuration(wms)),"RUN",String.format(Locale.US,"%.2f km · %s",rkm,formatDuration(rms)));detailRow(c,"WALK PACE",wkm>0?String.format(Locale.US,"%d:%02d /km",Math.round(wms/1000d/wkm)/60,Math.round(wms/1000d/wkm)%60):"—","RUN PACE",rkm>0?String.format(Locale.US,"%d:%02d /km",Math.round(rms/1000d/rkm)/60,Math.round(rms/1000d/rkm)%60):"—");}if(o.optBoolean("distanceEstimated",false)){TextView estimate=tx("Indoor distance is estimated from your configured stride length.",11,warning,false);c.addView(estimate);TextView correction=tx("Correct with treadmill distance",13,lime,true);c.addView(correction,lp(-1,42));correction.setOnClickListener(v->correctDistance(o));}TextView note=tx(o.optString("activityLabel","").isEmpty()?"Session saved on this device":o.optString("activityLabel")+" · saved on this device",11,muted,false);LinearLayout.LayoutParams np=lp(-1,26);np.topMargin=dp(9);c.addView(note,np);sessionActions(o);}
-    private void correctDistance(JSONObject session){android.widget.EditText input=new android.widget.EditText(this);input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);input.setText(String.format(Locale.US,"%.2f",session.optDouble("distanceKm")));dialog().setTitle("Correct distance").setMessage("Enter the distance shown on the treadmill, in kilometres.").setView(input).setNegativeButton("Cancel",null).setPositiveButton("Save",(dialog,which)->{try{double km=Double.parseDouble(input.getText().toString().trim());if(km<0||km>500){toast("Enter a distance from 0 to 500 km");return;}session.put("distanceKm",km);session.put("calories",Math.round(km*65));session.put("distanceEstimated",false);session.put("distanceCorrected",true);saveSession(historyPrefs,session);lastSession=session;renderPage();}catch(Exception e){toast("Enter a valid distance");}}).show();}
+    private void renderDetail(JSONObject o){if(o==null){page="History";renderPage();return;}TextView back=tx("←  HISTORY",11,lime,true);content.addView(back,lp(-1,28));back.setOnClickListener(v->{page="History";renderPage();});String dt=o.optString("date","");brand(dt,sessionTitle(o),"Session summary · "+o.optString("time",""));RouteView rv=new RouteView(this);rv.setInteractive(true);rv.setTheme(bg,raised,lime,darkTheme);rv.setRoute(o.optString("route","[]"));rv.setClipToOutline(true);rv.setBackground(shape(panel,16));FrameLayout mapBox=new FrameLayout(this);LinearLayout.LayoutParams rp=lp(-1,320);content.addView(mapBox,rp);mapBox.addView(rv,new FrameLayout.LayoutParams(-1,-1));android.widget.ImageView fit=icon(R.drawable.ic_my_location,ink,10);fit.setBackground(rippleOn(panel,12));fit.setContentDescription("Show the whole route");fit.setOnClickListener(v->rv.resetView());FrameLayout.LayoutParams fitp=new FrameLayout.LayoutParams(dp(40),dp(40),Gravity.TOP|Gravity.END);fitp.setMargins(0,dp(10),dp(10),0);mapBox.addView(fit,fitp);if(o.optDouble("runDistanceKm",0)>0||o.optString("route","").contains("\"t\":\"r\"")){LinearLayout key=row();LinearLayout.LayoutParams kp=lp(-1,28);kp.topMargin=dp(6);content.addView(key,kp);key.addView(tx("●",14,lime,true));key.addView(tx(String.format(Locale.US,"  Walk %.2f km      ",o.optDouble("walkDistanceKm",0)),12,ink,true));key.addView(tx("●",14,Color.rgb(234,67,53),true));key.addView(tx(String.format(Locale.US,"  Run %.2f km",o.optDouble("runDistanceKm",0)),12,ink,true));}TextView attribution=tx("© OpenStreetMap contributors · drag, pinch or double-tap to explore",10,muted,false);LinearLayout.LayoutParams ap=lp(-1,28);ap.topMargin=dp(5);content.addView(attribution,ap);LinearLayout c=card();long ms=o.optLong("durationMs",0);double km=o.optDouble("distanceKm",0);double speed=ms>0?km/(ms/3600000d):0;detailRow(c,"DISTANCE",String.format(Locale.US,"%.2f km",km),"DURATION",formatDuration(ms));detailRow(c,"AVG. SPEED",String.format(Locale.US,"%.1f km/h",speed),"AVG. PACE",km>0?String.format(Locale.US,"%d:%02d /km",Math.round(ms/1000d/km)/60,Math.round(ms/1000d/km)%60):"—");detailRow(c,"STEPS",String.format(Locale.US,"%,d",o.optInt("steps")),"EST. CALORIES",String.format(Locale.US,"~%d kcal",o.optInt("calories",(int)Math.round(km*65))));detailRow(c,"MOVING TIME",formatDuration(o.optLong("movingMs",ms)),"ELEV. GAIN",o.has("elevGainM")?String.format(Locale.US,"%.0f m",o.optDouble("elevGainM")):"—");if(o.has("walkDistanceKm")||o.has("runDistanceKm")){long wms=o.optLong("walkDurationMs"),rms=o.optLong("runDurationMs");double wkm=o.optDouble("walkDistanceKm"),rkm=o.optDouble("runDistanceKm");detailRow(c,"WALK",String.format(Locale.US,"%.2f km · %s",wkm,formatDuration(wms)),"RUN",String.format(Locale.US,"%.2f km · %s",rkm,formatDuration(rms)));detailRow(c,"WALK PACE",wkm>0?String.format(Locale.US,"%d:%02d /km",Math.round(wms/1000d/wkm)/60,Math.round(wms/1000d/wkm)%60):"—","RUN PACE",rkm>0?String.format(Locale.US,"%d:%02d /km",Math.round(rms/1000d/rkm)/60,Math.round(rms/1000d/rkm)%60):"—");}if(o.optBoolean("distanceEstimated",false)){TextView estimate=tx("Indoor distance is estimated from your configured stride length.",11,warning,false);c.addView(estimate);TextView correction=tx("Correct with treadmill distance",13,lime,true);c.addView(correction,lp(-1,42));correction.setOnClickListener(v->correctDistance(o));}TextView note=tx(o.optString("activityLabel","").isEmpty()?"Session saved on this device":o.optString("activityLabel")+" · saved on this device",11,muted,false);LinearLayout.LayoutParams np=lp(-1,26);np.topMargin=dp(9);c.addView(note,np);if(o.has("hcSteps")){TextView hc=tx(String.format(Locale.US,"Health Connect during this session: %,d steps",o.optLong("hcSteps"))+(o.has("hcActiveKcal")?String.format(Locale.US," · %d active kcal",o.optLong("hcActiveKcal")):""),11,positive,true);LinearLayout.LayoutParams hcp=lp(-1,-2);hcp.topMargin=dp(4);c.addView(hc,hcp);}renderSessionInsights(o);sessionActions(o);}
+    private void correctDistance(JSONObject session){android.widget.EditText input=new android.widget.EditText(this);input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);input.setText(String.format(Locale.US,"%.2f",session.optDouble("distanceKm")));dialog().setTitle("Correct distance").setMessage("Enter the distance shown on the treadmill, in kilometres.").setView(input).setNegativeButton("Cancel",null).setPositiveButton("Save",(dialog,which)->{try{double km=Double.parseDouble(input.getText().toString().trim());if(km<0||km>500){toast("Enter a distance from 0 to 500 km");return;}double ratio=session.optDouble("distanceKm",0)>0?km/session.optDouble("distanceKm",0):1;session.put("walkDistanceKm",session.optDouble("walkDistanceKm",km)*ratio);session.put("runDistanceKm",session.optDouble("runDistanceKm",0)*ratio);session.put("distanceKm",km);session.put("calories",Calories.estimate(this,session.optDouble("walkDistanceKm",km),session.optLong("walkDurationMs",session.optLong("durationMs")),session.optDouble("runDistanceKm",0),session.optLong("runDurationMs",0),session.optLong("steps",0)));session.put("distanceEstimated",false);session.put("distanceCorrected",true);saveSession(historyPrefs,session);lastSession=session;renderPage();}catch(Exception e){toast("Enter a valid distance");}}).show();}
     private void detailRow(LinearLayout c,String a,String av,String b,String bv){LinearLayout r=row();LinearLayout.LayoutParams p=lp(-1,54);c.addView(r,p);LinearLayout x=col(),y=col();r.addView(x,new LinearLayout.LayoutParams(0,-1,1));r.addView(y,new LinearLayout.LayoutParams(0,-1,1));x.addView(tx(a,9,muted,true));x.addView(tx(av,17,ink,true));y.addView(tx(b,9,muted,true));y.addView(tx(bv,17,ink,true));}
     private void sessionRow(JSONObject o,Runnable click){if(o==null)return;LinearLayout r=row();r.setPadding(dp(14),dp(12),dp(12),dp(12));r.setBackground(panelShape(14));LinearLayout.LayoutParams p=lp(-1,82);p.topMargin=dp(8);content.addView(r,p);LinearLayout desc=col();r.addView(desc,new LinearLayout.LayoutParams(0,-1,1));desc.addView(tx(sessionLabel(o)+"  ·  "+formatDuration(o.optLong("durationMs")),14,ink,true));double km=o.optDouble("distanceKm",0);long ms=o.optLong("durationMs",0);long sec=km>0?Math.round(ms/1000d/km):0;desc.addView(tx(String.format(Locale.US,"%.2f km  ·  %s  ·  %,d steps",km,o.optString("time",""),o.optInt("steps")),10,muted,false));desc.addView(tx(String.format(Locale.US,"%d:%02d /km  ·  ~%d kcal",sec/60,sec%60,o.optInt("calories",(int)Math.round(km*65))),10,muted,false));String savedRoute=o.optString("route", "[]");if(!"[]".equals(savedRoute)){RouteView preview=new RouteView(this);preview.setTheme(bg,raised,lime,darkTheme);preview.setRoute(savedRoute);LinearLayout.LayoutParams pv=lp(58,58);pv.setMargins(dp(5),0,dp(5),0);r.addView(preview,pv);}r.addView(tx("›",25,muted,false));r.setOnClickListener(v->click.run());}
     private void finishActivity(){if(!prefs.getBoolean("active",false)){toast("No activity to finish");return;}dialog().setTitle("Finish activity?").setMessage("Save this route and its session statistics to History?").setNegativeButton("Keep tracking",null).setPositiveButton("Finish",(d,w)->{closeLive();command(RecorderService.ACTION_STOP);new Handler(Looper.getMainLooper()).postDelayed(()->{JSONArray h=history();lastSession=h.optJSONObject(h.length()-1);if(lastSession!=null){page="Detail";renderPage();}else renderPage();},500);}).show();}
     private void discardActivity(){if(!prefs.getBoolean("active",false)){toast("No activity to discard");return;}dialog().setTitle("Discard activity?").setMessage("This session and its route will be deleted without saving.").setNegativeButton("Keep tracking",null).setPositiveButton("Discard",(d,w)->{command(RecorderService.ACTION_DISCARD);toast("Activity discarded");renderPage();}).show();}
     private void setManualType(String type){Intent i=new Intent(this,RecorderService.class);i.setAction(RecorderService.ACTION_SET_TYPE);i.putExtra("type",type);startService(i);toast("Activity type set to "+type);renderPage();}
     private void onRecord(){if(prefs.getBoolean("active",false)){command(RecorderService.ACTION_TOGGLE);return;}prefs.edit().putString("activityType",activityType).apply();ArrayList<String> r=new ArrayList<>();boolean indoor="indoor".equals(prefs.getString("activityMode","outdoor"));if(!indoor){boolean gpsOn=false;try{gpsOn=((LocationManager)getSystemService(LOCATION_SERVICE)).isProviderEnabled(LocationManager.GPS_PROVIDER);}catch(Exception ignored){}if(!gpsOn){dialog().setTitle("Turn on location").setMessage("Outdoor tracking needs GPS to draw your route. Turn on Location, then start again, or switch to Indoor / treadmill.").setNegativeButton("Not now",null).setPositiveButton("Open settings",(d,w)->{try{startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));}catch(Exception ignored){}}).show();return;}}if(!indoor&&checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)r.add(Manifest.permission.ACCESS_FINE_LOCATION);if(!indoor&&checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED)r.add(Manifest.permission.ACCESS_COARSE_LOCATION);if(Build.VERSION.SDK_INT>=29&&checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)!=PackageManager.PERMISSION_GRANTED)r.add(Manifest.permission.ACTIVITY_RECOGNITION);if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)r.add(Manifest.permission.POST_NOTIFICATIONS);if(!r.isEmpty()){requestPermissions(r.toArray(new String[0]),PERMISSIONS);return;}command(RecorderService.ACTION_START);openLive();askBackground();}
-    @Override public void onRequestPermissionsResult(int q,String[] ps,int[] rs){super.onRequestPermissionsResult(q,ps,rs);if(q==STEP_PERMISSION){if(DaySteps.permitted(this)){startStepCounting();toast("Step counting is on");}else if(Build.VERSION.SDK_INT>=29)getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putBoolean("stepPermDenied",true).apply();renderPage();return;}startStepCounting();if(q==PERMISSIONS&&"indoor".equals(prefs.getString("activityMode","outdoor"))&&!DaySteps.permitted(this)){toast("Indoor tracking needs Physical activity access to count steps");return;}if(q==PERMISSIONS&&("indoor".equals(prefs.getString("activityMode","outdoor"))||checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED||checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED)){command(RecorderService.ACTION_START);openLive();askBackground();}}
+    @Override public void onRequestPermissionsResult(int q,String[] ps,int[] rs){super.onRequestPermissionsResult(q,ps,rs);if(q==NOTIFY_PERMISSION){renderPageNow();return;}if(q==STEP_PERMISSION){if(DaySteps.permitted(this)){startStepCounting();toast("Step counting is on");}else if(Build.VERSION.SDK_INT>=29)getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putBoolean("stepPermDenied",true).apply();renderPage();return;}startStepCounting();if(q==PERMISSIONS&&"indoor".equals(prefs.getString("activityMode","outdoor"))&&!DaySteps.permitted(this)){toast("Indoor tracking needs Physical activity access to count steps");return;}if(q==PERMISSIONS&&("indoor".equals(prefs.getString("activityMode","outdoor"))||checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED||checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED)){command(RecorderService.ACTION_START);openLive();askBackground();}}
     private void command(String action){Intent i=new Intent(this,RecorderService.class);i.setAction(action);if(ACTION_START.equals(action)){if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);}else startService(i);}
     private static final String ACTION_START=RecorderService.ACTION_START;
-    private void updateLive(){if(prefs==null)return;if(resumed)refreshHealth(false);updateLiveOverlay();boolean active=prefs.getBoolean("active",false),paused=prefs.getBoolean("paused",false);JSONArray all=history();if(timer!=null){long ms=prefs.getLong("elapsed",0);timer.setText(formatDuration(ms));double km=prefs.getFloat("distance",0);distance.setText(String.format(Locale.US,"%.2f km",km));long ps=km>0?Math.round(ms/1000d/km):0;pace.setText(km>0?String.format(Locale.US,"%d:%02d /km",ps/60,ps%60):"— /km");steps.setText(String.format(Locale.US,"%,d",prefs.getInt("steps",0)));if(liveSpeed!=null){float kmh=active&&!paused?prefs.getFloat("speedKmh",0):0;liveSpeed.setText(kmh>0?String.format(Locale.US,"%.1f km/h",kmh):"— km/h");liveElev.setText(active&&prefs.getBoolean("hasElevation",false)?String.format(Locale.US,"%.0f m",prefs.getFloat("elevGainM",0)):"— m");liveKcal.setText(String.format(Locale.US,"~%d kcal",Math.round(km*65)));}boolean moving=prefs.getBoolean("moving",false);long fixAge=android.os.SystemClock.elapsedRealtime()-prefs.getLong("lastFixElapsed",0);boolean indoor="indoor".equals(prefs.getString("activityMode","outdoor"));boolean gps=indoor||(prefs.getBoolean("gpsFix",false)&&fixAge<12000);start.setText(active?(paused?"▶  Resume":"Ⅱ  Pause"):"▶  Start activity");String type=prefs.getString("currentType",activityType);status.setText(active?(paused?"● PAUSED":!indoor&&!gps?"● GPS SIGNAL WEAK":!moving?(indoor?"● WAITING FOR STEPS":"● YOU’RE NOT WALKING"):"● YOU’RE "+(type.equals("Run")?"RUNNING":"WALKING")):"● READY");status.setTextColor(active&&paused?muted:active&&!gps&&!indoor?warning:active&&!moving?warning:active?positive:lime);if(active&&!paused&&moving!=previousMoving){toast(moving?"You're moving · Kadamm is recording your activity":"You're not moving · pause or start moving to continue");}previousMoving=moving;route.setRoute(prefs.getString("route","[]"));route.setEmptyMessage(indoor?"Indoor session · distance comes from your steps":"Your route draws here once GPS locks on");if(gps&&!indoor)route.setCurrentLocation(prefs.getFloat("latitude",0),prefs.getFloat("longitude",0),prefs.getFloat("accuracy",0));else if(!active&&!indoor&&hasIdle)route.setCurrentLocation(idleLat,idleLon,idleAcc);else route.clearCurrentLocation();if(accuracyLabel!=null)accuracyLabel.setText(indoor?"Indoor mode · distance estimated from phone steps":gps?String.format(Locale.US,"GPS accuracy · ±%.0f m",prefs.getFloat("accuracy",0)):!active?(hasIdle?"Last known location · GPS locks on when you start":"Location appears here when you start"):"GPS signal weak or unavailable · last route point kept");if(activityModeLabel!=null)activityModeLabel.setText(prefs.getBoolean("manualType",false)?"Manual type · "+type:(indoor?"Indoor step tracking · ":"Automatic detection · currently ")+type);}updateHero(all);if(dailyDistanceProgress!=null){int target=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("distanceGoalM",5000);double meters=totalDistanceOn(all,todayKey())*1000;dailyDistanceProgress.setMax(target);dailyDistanceProgress.setProgress((int)Math.min(target,meters));dailyDistanceProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(meters>=target?positive:violet));dailyDistanceValue.setText(String.format(Locale.US,"%.2f / %.1f km",meters/1000f,target/1000f));}if(todayCount!=null){todayCount.setText(String.valueOf(countOn(all,todayKey(),"Walk")+(active&&"Walk".equals(prefs.getString("currentType","Walk"))?1:0)));todayDistance.setText(String.format(Locale.US,"%.2f",totalDistanceOn(all,todayKey())));}}
+    private void updateLive(){if(prefs==null)return;if(resumed)refreshHealth(false);updateLiveOverlay();boolean active=prefs.getBoolean("active",false),paused=prefs.getBoolean("paused",false);JSONArray all=history();if(timer!=null){long ms=prefs.getLong("elapsed",0);timer.setText(formatDuration(ms));double km=prefs.getFloat("distance",0);distance.setText(String.format(Locale.US,"%.2f km",km));long ps=km>0?Math.round(ms/1000d/km):0;pace.setText(km>0?String.format(Locale.US,"%d:%02d /km",ps/60,ps%60):"— /km");steps.setText(String.format(Locale.US,"%,d",prefs.getInt("steps",0)));if(liveSpeed!=null){float kmh=active&&!paused?prefs.getFloat("speedKmh",0):0;liveSpeed.setText(kmh>0?String.format(Locale.US,"%.1f km/h",kmh):"— km/h");liveElev.setText(active&&prefs.getBoolean("hasElevation",false)?String.format(Locale.US,"%.0f m",prefs.getFloat("elevGainM",0)):"— m");liveKcal.setText(String.format(Locale.US,"~%d kcal",Calories.live(this)));}boolean moving=prefs.getBoolean("moving",false);long fixAge=android.os.SystemClock.elapsedRealtime()-prefs.getLong("lastFixElapsed",0);boolean indoor="indoor".equals(prefs.getString("activityMode","outdoor"));boolean gps=indoor||(prefs.getBoolean("gpsFix",false)&&fixAge<12000);start.setText(active?(paused?"▶  Resume":"Ⅱ  Pause"):"▶  Start activity");String type=prefs.getString("currentType",activityType);status.setText(active?(paused?"● PAUSED":!indoor&&!gps?"● GPS SIGNAL WEAK":!moving?(indoor?"● WAITING FOR STEPS":"● YOU’RE NOT WALKING"):"● YOU’RE "+(type.equals("Run")?"RUNNING":"WALKING")):"● READY");status.setTextColor(active&&paused?muted:active&&!gps&&!indoor?warning:active&&!moving?warning:active?positive:lime);if(active&&!paused&&moving!=previousMoving){toast(moving?"You're moving · Kadamm is recording your activity":"You're not moving · pause or start moving to continue");}previousMoving=moving;route.setRoute(prefs.getString("route","[]"));route.setEmptyMessage(indoor?"Indoor session · distance comes from your steps":"Your route draws here once GPS locks on");if(gps&&!indoor)route.setCurrentLocation(prefs.getFloat("latitude",0),prefs.getFloat("longitude",0),prefs.getFloat("accuracy",0));else if(!active&&!indoor&&hasIdle)route.setCurrentLocation(idleLat,idleLon,idleAcc);else route.clearCurrentLocation();if(accuracyLabel!=null)accuracyLabel.setText(indoor?"Indoor mode · distance estimated from phone steps":gps?String.format(Locale.US,"GPS accuracy · ±%.0f m",prefs.getFloat("accuracy",0)):!active?(hasIdle?"Last known location · GPS locks on when you start":"Location appears here when you start"):"GPS signal weak or unavailable · last route point kept");if(activityModeLabel!=null)activityModeLabel.setText(prefs.getBoolean("manualType",false)?"Manual type · "+type:(indoor?"Indoor step tracking · ":"Automatic detection · currently ")+type);}updateHero(all);if(dailyDistanceProgress!=null){int target=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("distanceGoalM",5000);double meters=totalDistanceOn(all,todayKey())*1000;dailyDistanceProgress.setMax(target);dailyDistanceProgress.setProgress((int)Math.min(target,meters));dailyDistanceProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(meters>=target?positive:violet));dailyDistanceValue.setText(String.format(Locale.US,"%.2f / %.1f km",meters/1000f,target/1000f));}if(todayCount!=null){todayCount.setText(String.valueOf(countOn(all,todayKey(),"Walk")+(active&&"Walk".equals(prefs.getString("currentType","Walk"))?1:0)));todayDistance.setText(String.format(Locale.US,"%.2f",totalDistanceOn(all,todayKey())));}}
     private JSONArray history(){try{return new JSONArray(historyPrefs.getString("sessions","[]"));}catch(Exception e){return new JSONArray();}}
     static void saveSession(SharedPreferences hp,JSONObject s){try{JSONArray old=new JSONArray(hp.getString("sessions","[]"));JSONArray a=new JSONArray();boolean replaced=false;for(int i=0;i<old.length();i++){JSONObject row=old.optJSONObject(i);if(row!=null&&row.optLong("id",-1)==s.optLong("id",-2)){a.put(s);replaced=true;}else a.put(row);}if(!replaced)a.put(s);hp.edit().putString("sessions",a.toString()).apply();}catch(Exception ignored){}}
     private String todayKey(){return new SimpleDateFormat("yyyy-MM-dd",Locale.US).format(new Date());}private String dateKey(Calendar c){return new SimpleDateFormat("yyyy-MM-dd",Locale.US).format(c.getTime());}private String dateKey(JSONObject o){return o.optString("day",o.optString("date",""));}
@@ -300,7 +372,7 @@ public class MainActivity extends Activity {
         top.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
         String source=DaySteps.todaySource(this);boolean live="phone".equals(source)||"health".equals(source);
         TextView chip=tx(live?"●  Steps live":"○  Set up steps",10,live?positive:warning,true);chip.setPadding(dp(11),0,dp(11),0);chip.setGravity(Gravity.CENTER);chip.setBackground(rippleOn(raised,14));chip.setFocusable(true);chip.setContentDescription("Step sources");chip.setOnClickListener(v->navigate("Health"));top.addView(chip,lp(-2,28));
-        TextView gear=tx("⚙︎",19,muted,false);gear.setGravity(Gravity.CENTER);gear.setContentDescription("Goals and targets");gear.setFocusable(true);gear.setBackground(rippleOn(Color.TRANSPARENT,24));gear.setOnClickListener(v->navigate("Goals"));LinearLayout.LayoutParams gp=lp(48,48);gp.leftMargin=dp(4);top.addView(gear,gp);
+        android.widget.ImageView gear=icon(R.drawable.ic_settings,muted,12);gear.setContentDescription("Goals and targets");gear.setFocusable(true);gear.setBackground(rippleOn(Color.TRANSPARENT,24));gear.setOnClickListener(v->navigate("Goals"));LinearLayout.LayoutParams gp=lp(48,48);gp.leftMargin=dp(4);top.addView(gear,gp);
         int hour=Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         TextView e=tx(new SimpleDateFormat("EEEE, d MMMM",Locale.getDefault()).format(new Date()).toUpperCase(Locale.getDefault()),10,muted,true);e.setLetterSpacing(.08f);LinearLayout.LayoutParams ep=lp(-1,-2);ep.topMargin=dp(6);content.addView(e,ep);
         content.addView(tx(hour<12?"Good morning":hour<17?"Good afternoon":"Good evening",28,ink,true));
@@ -315,7 +387,7 @@ public class MainActivity extends Activity {
     }
     private void renderHero(JSONArray hist){
         LinearLayout c=card();dailyGoalCard=c;c.setBackground(panelShape(20));
-        LinearLayout head=row();head.addView(tx("DAILY STEP GOAL",10,muted,true),new LinearLayout.LayoutParams(0,dp(20),1));heroSource=tx("",10,violet,true);head.addView(heroSource);c.addView(head);
+        LinearLayout head=row();head.addView(tx("DAILY STEP GOAL",10,muted,true),new LinearLayout.LayoutParams(0,dp(20),1));heroSource=tx("",10,positive,true);head.addView(heroSource);c.addView(head);
         LinearLayout body=row();LinearLayout.LayoutParams bp=lp(-1,-2);bp.topMargin=dp(10);c.addView(body,bp);
         ring=new ProgressRingView(this,chartTheme());body.addView(ring,lp(152,152));
         LinearLayout side=col();LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(0,-2,1);sp.leftMargin=dp(16);body.addView(side,sp);
@@ -333,7 +405,7 @@ public class MainActivity extends Activity {
         ring.setProgress(n,goal,data);
         heroPercent.setText(data?String.format(Locale.US,pct>=100||pct==Math.floor(pct)?"%.0f%%":"%.1f%%",pct):"—");heroPercent.setTextColor(data?(pct>=100?positive:ink):muted);
         heroRemaining.setText(!data?"Steps not counted yet":n>=goal?(n>goal?String.format(Locale.US,"+%,d beyond goal",n-goal):"Goal reached"):String.format(Locale.US,"%,d steps to go",goal-n));
-        long moveMin=todayDuration(all)/60000;int moveGoal=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("activeGoalMin",30);ring.setInner(moveMin/(float)Math.max(1,moveGoal));heroDistance.setText(String.format(Locale.US,"●  %d of %d move min",moveMin,moveGoal));
+        long moveMin=todayDuration(all)/60000;SharedPreferences hpm=getSharedPreferences("kadamm_health",MODE_PRIVATE);if(todayKey().equals(hpm.getString("healthDate",""))&&hpm.getBoolean("healthConnected",false))moveMin=Math.max(moveMin,hpm.getInt("healthActiveMin",0));int moveGoal=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("activeGoalMin",30);ring.setInner(moveMin/(float)Math.max(1,moveGoal));heroDistance.setText(String.format(Locale.US,"●  %d of %d move min",moveMin,moveGoal));
         String source=DaySteps.todaySource(this);heroSource.setText("phone".equals(source)?"PHONE SENSOR":"health".equals(source)?"HEALTH CONNECT":"sessions".equals(source)?"SESSIONS ONLY":"");
         heroStart.setText(active?"View live session":"▶  Start activity");if(heroSessions!=null)heroSessions.setText(String.format(Locale.US,"In Kadamm sessions: %,d steps · ~%d kcal",DaySteps.sessionOn(this,todayKey()),DaySteps.sessionCaloriesToday(this)));
         if(heroNote!=null)heroNote.setText(!data?"Let's get your steps counting.":pct>=100?"Goal done. Anything from here is a bonus.":pct>=80?"Nearly there. One short walk finishes it.":pct>=50?"Over halfway. Keep the rhythm going.":pct>=10?"Good start. Keep the momentum.":"Every step counts. Let's get moving.");
@@ -350,19 +422,35 @@ public class MainActivity extends Activity {
         if(todayCaloriesValue!=null)todayCaloriesValue.setText("~"+todayCalories(all));
     }
     private int hue(int light,int dark){return darkTheme?dark:light;}
+    private android.widget.ImageView icon(int res,int tint,int padDp){android.widget.ImageView v=new android.widget.ImageView(this);v.setImageResource(res);v.setImageTintList(android.content.res.ColorStateList.valueOf(tint));v.setPadding(dp(padDp),dp(padDp),dp(padDp),dp(padDp));v.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);return v;}
+    /** Vector icon for each symbol used across the app. */
+    private int iconRes(String g){
+        switch(g){
+            case "Goals":return R.drawable.ic_flag;case "Routes":return R.drawable.ic_place;case "Notifications":return R.drawable.ic_bell;case "Health":return R.drawable.ic_heart;
+            case "Today":case "◷home":return R.drawable.ic_home;case "History":case "▦":return R.drawable.ic_calendar;case "Profile":case "◉p":return R.drawable.ic_person;
+            case "↗":return R.drawable.ic_place;case "⚡\uFE0E":return R.drawable.ic_flame;case "◷":return R.drawable.ic_timer;case "▶":return R.drawable.ic_walk;case "◉":return R.drawable.ic_walk;
+            case "»":return R.drawable.ic_run;case "★":return R.drawable.ic_bolt;case "≈":return R.drawable.ic_chart;case "◎":return R.drawable.ic_flag;case "＋":return R.drawable.ic_heart;case "⇅":return R.drawable.ic_ruler;
+            default:return R.drawable.ic_home;
+        }
+    }
     private int blend(int a,int b,float t){return Color.rgb((int)(Color.red(a)+(Color.red(b)-Color.red(a))*t),(int)(Color.green(a)+(Color.green(b)-Color.green(a))*t),(int)(Color.blue(a)+(Color.blue(b)-Color.blue(a))*t));}
+    // Tile colours stay inside the logo palette: blue, light blue, and black/white.
+    // Glance tile colours: each metric keeps its own soft hue.
     private int purple(){return hue(Color.rgb(147,52,230),Color.rgb(197,138,249));}
-    private int orange(){return hue(Color.rgb(242,153,0),Color.rgb(253,186,85));}
-    private int teal(){return hue(Color.rgb(18,150,170),Color.rgb(120,217,236));}
-    private int flame(){return hue(Color.rgb(232,113,10),Color.rgb(252,173,112));}
+    private int orange(){return hue(Color.rgb(232,113,10),Color.rgb(252,173,112));}
+    private int teal(){return hue(Color.rgb(18,158,175),Color.rgb(120,217,236));}
+    private int flame(){return hue(Color.rgb(242,153,0),Color.rgb(253,214,99));}
+    private int green(){return hue(Color.rgb(30,142,62),Color.rgb(129,201,149));}
+    private int pink(){return hue(Color.rgb(208,24,132),Color.rgb(255,139,203));}
+    private int indigo(){return hue(Color.rgb(63,81,181),Color.rgb(159,168,218));}
     private LinearLayout bentoRow(){LinearLayout r=row();LinearLayout.LayoutParams p=lp(-1,118);p.topMargin=dp(10);content.addView(r,p);return r;}
     /** A dashboard tile with its own colour: tinted gradient surface, icon badge, value and unit. */
     private TextView tile(LinearLayout parent,String label,String value,String unit,int color,String icon){
         LinearLayout c=col();c.setPadding(dp(14),dp(14),dp(12),dp(12));
-        GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(panel,color,darkTheme?.20f:.13f),blend(panel,color,darkTheme?.06f:.03f)});g.setCornerRadius(dp(20));g.setStroke(dp(1),blend(line,color,.30f));c.setBackground(g);
+        GradientDrawable g=shape(blend(panel,color,darkTheme?.15f:.08f),20);g.setStroke(dp(1),blend(line,color,darkTheme?.28f:.22f));c.setBackground(g);
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1);if(parent.getChildCount()>0)p.leftMargin=dp(10);parent.addView(c,p);
         LinearLayout head=row();c.addView(head);
-        TextView ic=tx(icon,13,darkTheme?Color.rgb(24,25,28):Color.WHITE,true);ic.setGravity(Gravity.CENTER);ic.setBackground(shape(color,14));head.addView(ic,lp(28,28));
+        android.widget.ImageView ic=icon(iconRes(icon),darkTheme?Color.rgb(11,11,13):Color.WHITE,6);ic.setBackground(shape(color,10));head.addView(ic,lp(30,30));
         TextView l=tx(label,10,muted,true);l.setLetterSpacing(.06f);LinearLayout.LayoutParams lpp=lp(-2,-2);lpp.leftMargin=dp(8);head.addView(l,lpp);
         TextView v=tx(value,24,ink,true);LinearLayout.LayoutParams vp=lp(-1,-2);vp.topMargin=dp(10);c.addView(v,vp);
         c.addView(tx(unit,10,muted,false));return v;
@@ -377,11 +465,11 @@ public class MainActivity extends Activity {
         if(hc&&hp.contains("healthActiveKcal")){todayCaloriesValue=null;tile(r1,"CALORIES",String.format(Locale.US,"%,d",Math.round(hp.getFloat("healthActiveKcal",0))),"active kcal today",orange(),"⚡\uFE0E");}
         else if(hc&&hp.contains("healthKcal")){todayCaloriesValue=null;tile(r1,"CALORIES",String.format(Locale.US,"%,d",Math.round(hp.getFloat("healthKcal",0))),"kcal burned incl. resting",orange(),"⚡\uFE0E");}
         else todayCaloriesValue=tile(r1,"CALORIES","~"+todayCalories(hist),"kcal · session estimate",orange(),"⚡\uFE0E");
-        LinearLayout r2=bentoRow();todayActiveTime=tile(r2,"ACTIVE TIME",formatDuration(todayDuration(hist)),"in sessions today",violet,"◷");tile(r2,"SESSIONS",String.valueOf(sessions),walks+" walk · "+runs+" run",purple(),"▶");
-        LinearLayout r3=bentoRow();tile(r3,"WALKING",String.format(Locale.US,"%.2f km",distanceByType(hist,today,"Walk")),formatDuration(durationByType(hist,today,"Walk"))+" today",teal(),"◉");tile(r3,"RUNNING",String.format(Locale.US,"%.2f km",distanceByType(hist,today,"Run")),formatDuration(durationByType(hist,today,"Run"))+" today",purple(),"»");
+        LinearLayout r2=bentoRow();if(hc&&hp.contains("healthActiveMin")){todayActiveTime=null;int am=hp.getInt("healthActiveMin",0);tile(r2,"ACTIVE TIME",am>=60?String.format(Locale.US,"%dh %02dm",am/60,am%60):am+" min",String.format(Locale.US,"all day · %d min in sessions",todayDuration(hist)/60000),green(),"◷");}else todayActiveTime=tile(r2,"ACTIVE TIME",formatDuration(todayDuration(hist)),"in sessions today",green(),"◷");tile(r2,"SESSIONS",String.valueOf(sessions),walks+" walk · "+runs+" run",purple(),"▶");
+        LinearLayout r3=bentoRow();tile(r3,"WALKING",String.format(Locale.US,"%.2f km",distanceByType(hist,today,"Walk")),formatDuration(durationByType(hist,today,"Walk"))+" today",teal(),"◉");tile(r3,"RUNNING",String.format(Locale.US,"%.2f km",distanceByType(hist,today,"Run")),formatDuration(durationByType(hist,today,"Run"))+" today",pink(),"»");
         int[] st=DaySteps.streaks(dayTotals,dailyGoal());long sum=0;int days=0;
         for(int i=0;i<7;i++){Calendar d=Calendar.getInstance();d.add(Calendar.DAY_OF_YEAR,-i);Long v=dayTotals.get(dateKey(d));if(v!=null&&v>0){sum+=v;days++;}}
-        LinearLayout r4=bentoRow();tile(r4,"STREAK",st[0]+(st[0]==1?" day":" days"),"best "+st[1]+" · goal days "+st[2],flame(),"★");tile(r4,"DAILY AVG",days==0?"—":String.format(Locale.US,"%,d",sum/days),"steps · last 7 days",lime,"≈");
+        LinearLayout r4=bentoRow();tile(r4,"STREAK",st[0]+(st[0]==1?" day":" days"),"best "+st[1]+" · goal days "+st[2],flame(),"★");tile(r4,"DAILY AVG",days==0?"—":String.format(Locale.US,"%,d",sum/days),"steps · last 7 days",indigo(),"≈");
     }
     private void renderDistanceGoal(JSONArray hist){
         LinearLayout distGoal=card();distGoal.addView(tx("DAILY DISTANCE TARGET",10,muted,true));int distTarget=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("distanceGoalM",5000);
@@ -427,7 +515,7 @@ public class MainActivity extends Activity {
     }
     @Override protected void onResume(){
         super.onResume();resumed=true;startStepCounting();refreshHealth(true);
-        if(content!=null&&(("Today".equals(page)&&stepSetupShown&&DaySteps.permitted(this))||"Health".equals(page)))renderPageNow();
+        if(content!=null&&(("Today".equals(page)&&stepSetupShown&&DaySteps.permitted(this))||"Health".equals(page)||"Notifications".equals(page)))renderPageNow();
     }
     @Override protected void onPause(){
         resumed=false;if(stepListening){((SensorManager)getSystemService(SENSOR_SERVICE)).unregisterListener(stepListener);stepListening=false;}
@@ -442,6 +530,13 @@ public class MainActivity extends Activity {
         Button share=button("Share",lime,accentOn),rename=button("Rename",raised,ink),delete=button("Delete",raised,critical);
         r.addView(share,new LinearLayout.LayoutParams(0,-1,1));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-1,1);rp.leftMargin=dp(8);r.addView(rename,rp);LinearLayout.LayoutParams dlp=new LinearLayout.LayoutParams(0,-1,1);dlp.leftMargin=dp(8);r.addView(delete,dlp);
         share.setOnClickListener(v->shareSession(o));
+        if(Insights.points(o.optString("route","[]")).size()>=5&&o.optDouble("distanceKm",0)>=.1){
+            boolean saved=false;JSONArray rs=Insights.routes(this);for(int i=0;i<rs.length();i++)if(rs.optJSONObject(i).optLong("fromSession")==o.optLong("id"))saved=true;
+            if(!saved){Button save=button("Save as route",raised,ink);LinearLayout.LayoutParams svp=lp(-1,46);svp.topMargin=dp(8);content.addView(save,svp);
+                save.setOnClickListener(v->{android.widget.EditText input=new android.widget.EditText(this);input.setSingleLine(true);input.setHint("Morning lap");
+                    dialog().setTitle("Save as route").setMessage("Kadamm will recognise this route when you walk or run it again and compare your times.").setView(input).setNegativeButton("Cancel",null)
+                        .setPositiveButton("Save",(d,w)->{String n=input.getText().toString().trim();Insights.saveRoute(this,n.isEmpty()?"Route "+(Insights.routes(this).length()+1):(n.length()>40?n.substring(0,40):n),o);toast("Route saved");renderPageNow();}).show();});}
+        }
         rename.setOnClickListener(v->{
             android.widget.EditText input=new android.widget.EditText(this);input.setSingleLine(true);input.setText(o.optString("name",""));input.setHint("Morning walk");
             dialog().setTitle("Name this activity").setView(input).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{try{String name=input.getText().toString().trim();if(name.length()>40)name=name.substring(0,40);o.put("name",name);saveSession(historyPrefs,o);lastSession=o;renderPage();}catch(Exception ignored){}}).show();
@@ -457,27 +552,37 @@ public class MainActivity extends Activity {
         if(o.optBoolean("stepsAvailable",false))s.append(String.format(Locale.US," · %,d steps",o.optInt("steps")));
         return s.append(String.format(Locale.US," · ~%d kcal",o.optInt("calories",(int)Math.round(km*65)))).append("\nTracked with Kadamm").toString();
     }
-    /** Renders the route-and-stats image off the main thread, previews it, then shares the PNG. */
+    /** Renders the route-and-stats image off the main thread, previews it with a Light/Dark choice, then shares the PNG. */
     private void shareSession(JSONObject o){
         toast("Preparing your activity image…");String text=shareText(o),title=sessionTitle(o);
         new Thread(()->{
             try{
-                ShareCard.render(this,o,title);                       // first pass asks for any missing map tiles
+                ShareCard.render(this,o,title,true);ShareCard.render(this,o,title,false);   // first passes ask for missing map tiles
                 for(int i=0;i<40&&RouteView.pendingTiles()>0;i++)Thread.sleep(100);
-                android.graphics.Bitmap img=ShareCard.render(this,o,title);
-                java.io.File dir=new java.io.File(getCacheDir(),"share");dir.mkdirs();java.io.File file=new java.io.File(dir,"kadamm-activity.png");
-                try(java.io.FileOutputStream out=new java.io.FileOutputStream(file)){img.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}
-                Uri uri=androidx.core.content.FileProvider.getUriForFile(this,getPackageName()+".files",file);
-                runOnUiThread(()->{
-                    android.widget.ImageView preview=new android.widget.ImageView(this);preview.setImageBitmap(img);preview.setAdjustViewBounds(true);preview.setPadding(dp(16),dp(12),dp(16),0);
-                    dialog().setView(preview).setNegativeButton("Close",null).setPositiveButton("Share",(d,w)->{
-                        try{startActivity(Intent.createChooser(new Intent(Intent.ACTION_SEND).setType("image/png").putExtra(Intent.EXTRA_STREAM,uri).putExtra(Intent.EXTRA_TEXT,text).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),"Share activity"));}catch(Exception e){toast("No app available to share with");}
-                    }).show();
-                });
+                android.graphics.Bitmap[] img={ShareCard.render(this,o,title,true),ShareCard.render(this,o,title,false)};
+                runOnUiThread(()->showSharePreview(img,text));
             }catch(Exception e){
                 runOnUiThread(()->{try{startActivity(Intent.createChooser(new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,text),"Share activity"));}catch(Exception ignored){}});
             }
         },"KadammShare").start();
+    }
+    private void showSharePreview(android.graphics.Bitmap[] img,String text){
+        int[] pick={darkTheme?0:1};
+        LinearLayout box=col();box.setPadding(dp(16),dp(14),dp(16),0);
+        LinearLayout seg=row();box.addView(seg,lp(-1,40));
+        android.widget.ImageView preview=new android.widget.ImageView(this);preview.setAdjustViewBounds(true);LinearLayout.LayoutParams pp=lp(-1,-2);pp.topMargin=dp(12);box.addView(preview,pp);
+        Button[] modes={button("Dark",raised,ink),button("Light",raised,ink)};
+        Runnable paint=()->{preview.setImageBitmap(img[pick[0]]);for(int i=0;i<2;i++){boolean on=i==pick[0];modes[i].setTextColor(on?accentOn:ink);modes[i].setBackground(ripple(shape(on?lime:raised,20)));}};
+        for(int i=0;i<2;i++){int m=i;LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(0,-1,1);if(i>0)bp.leftMargin=dp(8);seg.addView(modes[i],bp);modes[i].setOnClickListener(v->{pick[0]=m;paint.run();});}
+        paint.run();
+        dialog().setView(box).setNegativeButton("Close",null).setPositiveButton("Share",(d,w)->{
+            try{
+                java.io.File dir=new java.io.File(getCacheDir(),"share");dir.mkdirs();java.io.File file=new java.io.File(dir,"kadamm-activity.png");
+                try(java.io.FileOutputStream out=new java.io.FileOutputStream(file)){img[pick[0]].compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}
+                Uri uri=androidx.core.content.FileProvider.getUriForFile(this,getPackageName()+".files",file);
+                startActivity(Intent.createChooser(new Intent(Intent.ACTION_SEND).setType("image/png").putExtra(Intent.EXTRA_STREAM,uri).putExtra(Intent.EXTRA_TEXT,text).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),"Share activity"));
+            }catch(Exception e){toast("No app available to share with");}
+        }).show();
     }
 
     // ---- Live session screen ----
@@ -485,21 +590,23 @@ public class MainActivity extends Activity {
     private void openLive(){
         if(liveLayer==null)buildLive();
         if(liveLayer.getVisibility()==View.VISIBLE)return;
+        if(Build.VERSION.SDK_INT>=27)setShowWhenLocked(true);
         liveOpenedAt=android.os.SystemClock.elapsedRealtime();liveLayer.setVisibility(View.VISIBLE);liveLayer.setAlpha(0f);liveLayer.setTranslationY(dp(48));
         liveLayer.animate().alpha(1f).translationY(0).setDuration(reducedMotion()?0:240).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
         getWindow().setStatusBarColor(ShareCard.BLACK);root.setBackgroundColor(ShareCard.BLACK);getWindow().getDecorView().setSystemUiVisibility(0);updateLiveOverlay();
     }
     private void closeLive(){
         if(liveLayer==null||liveLayer.getVisibility()!=View.VISIBLE)return;
+        if(Build.VERSION.SDK_INT>=27)setShowWhenLocked(false);
         liveLayer.animate().alpha(0f).translationY(dp(48)).setDuration(reducedMotion()?0:180).withEndAction(()->liveLayer.setVisibility(View.GONE)).start();applyTheme();
     }
     private void buildLive(){
         int dark=ShareCard.BLACK,card=Color.argb(245,22,22,26),sub=Color.rgb(154,160,166),white=Color.rgb(245,245,247);
         liveLayer=new FrameLayout(this);liveLayer.setBackgroundColor(dark);liveLayer.setClickable(true);liveLayer.setVisibility(View.GONE);root.addView(liveLayer,new FrameLayout.LayoutParams(-1,-1));
-        liveMap=new RouteView(this);liveMap.setTheme(dark,Color.rgb(38,38,42),ShareCard.ROUTE,true);liveLayer.addView(liveMap,new FrameLayout.LayoutParams(-1,-1));
+        liveMap=new RouteView(this);liveMap.setInteractive(true);liveMap.setTheme(dark,Color.rgb(38,38,42),ShareCard.ROUTE,true);liveLayer.addView(liveMap,new FrameLayout.LayoutParams(-1,-1));
         TextView down=tx("‹",30,white,true);down.setRotation(-90);down.setGravity(Gravity.CENTER);down.setBackground(ripple(shape(Color.argb(235,22,22,26),24)));down.setContentDescription("Minimise live session");down.setOnClickListener(v->closeLive());
         FrameLayout.LayoutParams dlp=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.START);dlp.setMargins(dp(16),dp(16),0,0);liveLayer.addView(down,dlp);
-        TextView follow=tx("◎",20,white,true);follow.setGravity(Gravity.CENTER);follow.setBackground(ripple(shape(Color.argb(235,22,22,26),24)));follow.setContentDescription("Follow my location");follow.setOnClickListener(v->liveMap.setFollowLocation(true));
+        android.widget.ImageView follow=icon(R.drawable.ic_my_location,white,12);follow.setBackground(ripple(shape(Color.argb(235,22,22,26),24)));follow.setContentDescription("Follow my location");follow.setOnClickListener(v->liveMap.setFollowLocation(true));
         FrameLayout.LayoutParams flp=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.END);flp.setMargins(0,dp(16),dp(16),0);liveLayer.addView(follow,flp);
         LinearLayout panel=col();liveLayer.addView(panel,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
         LinearLayout sc=col();sc.setPadding(dp(18),dp(14),dp(18),dp(16));sc.setBackground(shape(card,22));LinearLayout.LayoutParams scp=lp(-1,-2);scp.setMargins(dp(14),0,dp(14),dp(12));panel.addView(sc,scp);
@@ -529,7 +636,7 @@ public class MainActivity extends Activity {
         lvTitle.setText((indoor?"Indoor ":"")+("Run".equals(prefs.getString("currentType","Walk"))?"Run":"Walk")+(paused?"  ·  Paused":""));
         lvStatus.setText(paused?"●  Paused":indoor?"●  Counting steps":gps?String.format(Locale.US,"●  GPS ±%.0f m",prefs.getFloat("accuracy",0)):"●  Finding GPS");lvStatus.setTextColor(paused?Color.rgb(154,160,166):indoor||gps?positive:warning);
         lvTime.setText(formatDuration(ms));lvPace.setText(ps>0?String.format(Locale.US,"%d:%02d",ps/60,ps%60):"—:—");lvDist.setText(String.format(Locale.US,"%.2f",km));
-        lvSteps.setText(String.format(Locale.US,"%,d",prefs.getInt("steps",0)));lvKcal.setText(String.valueOf(Math.round(km*65)));float kmh=paused?0:prefs.getFloat("speedKmh",0);lvSpeed.setText(kmh>0?String.format(Locale.US,"%.1f",kmh):"—");
+        lvSteps.setText(String.format(Locale.US,"%,d",prefs.getInt("steps",0)));lvKcal.setText(String.valueOf(Calories.live(this)));float kmh=paused?0:prefs.getFloat("speedKmh",0);lvSpeed.setText(kmh>0?String.format(Locale.US,"%.1f",kmh):"—");
         lvMain.setText(paused?"Resume":"Pause");lvFinish.setVisibility(paused?View.VISIBLE:View.GONE);
         liveMap.setEmptyMessage(indoor?"Indoor session · distance comes from your steps":"Finding GPS…");liveMap.setRoute(prefs.getString("route","[]"));
         if(!indoor&&gps)liveMap.setCurrentLocation(prefs.getFloat("latitude",0),prefs.getFloat("longitude",0),prefs.getFloat("accuracy",0));else if(!indoor&&hasIdle)liveMap.setCurrentLocation(idleLat,idleLon,idleAcc);
@@ -543,7 +650,241 @@ public class MainActivity extends Activity {
                 .setPositiveButton("Allow",(d,w)->{try{startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:"+getPackageName())));}catch(Exception ignored){}}).show();
         }catch(Exception ignored){}
     }
+    // ---- Full-screen map (from the dashboard) ----
+    private FrameLayout mapLayer;private RouteView bigMap;
+    /** The dashboard map stays still so the page scrolls; this view is the one to drag, pinch and explore. */
+    private void openMapView(){
+        if(mapLayer==null){
+            mapLayer=new FrameLayout(this);mapLayer.setClickable(true);root.addView(mapLayer,new FrameLayout.LayoutParams(-1,-1));
+            bigMap=new RouteView(this);bigMap.setInteractive(true);mapLayer.addView(bigMap,new FrameLayout.LayoutParams(-1,-1));
+            android.widget.ImageView close=icon(R.drawable.ic_close,ink,12);close.setBackground(rippleOn(panel,24));close.setContentDescription("Close map");close.setOnClickListener(v->closeMapView());
+            FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.START);cp.setMargins(dp(16),dp(16),0,0);mapLayer.addView(close,cp);
+            android.widget.ImageView me=icon(R.drawable.ic_my_location,ink,12);me.setBackground(rippleOn(panel,24));me.setContentDescription("Centre on my location");me.setOnClickListener(v->bigMap.setFollowLocation(true));
+            FrameLayout.LayoutParams mp=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.END);mp.setMargins(0,dp(16),dp(16),0);mapLayer.addView(me,mp);
+            TextView hint=tx("Drag to move · pinch or double-tap to zoom",12,ink,true);hint.setPadding(dp(14),dp(8),dp(14),dp(8));hint.setBackground(shape(panel,16));
+            FrameLayout.LayoutParams hp=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);hp.bottomMargin=dp(24);mapLayer.addView(hint,hp);
+        }
+        bigMap.setTheme(bg,raised,lime,darkTheme);bigMap.setRoute(prefs.getBoolean("active",false)?prefs.getString("route","[]"):"[]");
+        if(prefs.getBoolean("active",false)&&prefs.getBoolean("gpsFix",false))bigMap.setCurrentLocation(prefs.getFloat("latitude",0),prefs.getFloat("longitude",0),prefs.getFloat("accuracy",0));else if(hasIdle)bigMap.setCurrentLocation(idleLat,idleLon,idleAcc);
+        bigMap.setFollowLocation(true);mapLayer.setVisibility(View.VISIBLE);mapLayer.setAlpha(0f);mapLayer.animate().alpha(1f).setDuration(reducedMotion()?0:180).start();
+    }
+    private void closeMapView(){if(mapLayer!=null&&mapLayer.getVisibility()==View.VISIBLE)mapLayer.animate().alpha(0f).setDuration(reducedMotion()?0:150).withEndAction(()->mapLayer.setVisibility(View.GONE)).start();}
+    // ---- Account ----
+    private String displayName(){String n=LocalAccount.name(this);return n!=null?n:"Kadamm athlete";}
+    private String initials(){String n=LocalAccount.name(this);if(n==null)return "KA";String[] p=n.trim().split("\\s+");String out=p[0].substring(0,1)+(p.length>1?p[p.length-1].substring(0,1):"");return out.toUpperCase(Locale.getDefault());}
+    private void renderAccount(){
+        LinearLayout c=card();c.addView(tx("Account",16,ink,true));String email=LocalAccount.email(this);
+        if(email!=null){
+            c.addView(tx("Signed in as "+email+" · saved on this phone",12,muted,false));
+            Button out=button("Log out",raised,ink);LinearLayout.LayoutParams op=lp(-1,46);op.topMargin=dp(12);c.addView(out,op);
+            out.setOnClickListener(v->dialog().setTitle("Log out?").setMessage("Your activity stays on this phone. Log back in with your email and password.").setNegativeButton("Cancel",null).setPositiveButton("Log out",(d,w)->{LocalAccount.logOut(this);closeDrawer();showAuth(true);}).show());
+        }else{
+            c.addView(tx("Create a Kadamm account to put your name on your activity. Everything stays on this phone.",12,muted,false));
+            Button in=button(LocalAccount.exists(this)?"Log in":"Sign up",lime,accentOn);in.setTextSize(15);LinearLayout.LayoutParams ip=lp(-1,50);ip.topMargin=dp(12);c.addView(in,ip);
+            in.setOnClickListener(v->showAuth(LocalAccount.exists(this)));
+        }
+    }
+
+    // ---- Sign up / log in (local account) ----
+    private FrameLayout authLayer;
+    private void showAuth(boolean loginFirst){
+        if(authLayer!=null)root.removeView(authLayer);
+        authLayer=new FrameLayout(this);authLayer.setBackgroundColor(bg);authLayer.setClickable(true);root.addView(authLayer,new FrameLayout.LayoutParams(-1,-1));
+        android.widget.ScrollView sv=new android.widget.ScrollView(this);sv.setFillViewport(true);authLayer.addView(sv,new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout f=col();f.setGravity(Gravity.CENTER_HORIZONTAL);f.setPadding(dp(24),dp(40),dp(24),dp(28));sv.addView(f);
+        android.widget.ImageView logo=new android.widget.ImageView(this);logo.setImageResource(logoRes());f.addView(logo,lp(76,76));
+        TextView title=tx("Welcome to Kadamm",26,ink,true);title.setGravity(Gravity.CENTER);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(18);f.addView(title,tp);
+        TextView sub=tx("Every walk and run, on your phone.",14,muted,false);sub.setGravity(Gravity.CENTER);f.addView(sub,lp(-1,-2));
+        boolean[] login={loginFirst&&LocalAccount.exists(this)};
+        LinearLayout seg=row();seg.setPadding(dp(4),dp(4),dp(4),dp(4));seg.setBackground(shape(raised,14));LinearLayout.LayoutParams sp=lp(-1,52);sp.topMargin=dp(28);f.addView(seg,sp);
+        TextView signTab=tx("Sign up",14,ink,true),logTab=tx("Log in",14,ink,true);
+        for(TextView t:new TextView[]{signTab,logTab}){t.setGravity(Gravity.CENTER);t.setFocusable(true);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1);seg.addView(t,p);}
+        android.widget.EditText name=field("Your name",android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PERSON_NAME|android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        android.widget.EditText email=field("Email",android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        android.widget.EditText pass=field("Password (8+ characters)",android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        android.widget.EditText confirm=field("Confirm password",android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        email.setText(LocalAccount.savedEmail(this));
+        for(android.widget.EditText e:new android.widget.EditText[]{name,email,pass,confirm}){LinearLayout.LayoutParams p=lp(-1,54);p.topMargin=dp(12);f.addView(e,p);}
+        TextView error=tx("",13,critical,false);LinearLayout.LayoutParams ep=lp(-1,-2);ep.topMargin=dp(10);f.addView(error,ep);
+        Button go=button("Create account",lime,accentOn);go.setTextSize(16);LinearLayout.LayoutParams gp=lp(-1,54);gp.topMargin=dp(14);f.addView(go,gp);
+        TextView note=tx("Your account and activity are stored only on this phone.",11,muted,false);note.setGravity(Gravity.CENTER);LinearLayout.LayoutParams np=lp(-1,-2);np.topMargin=dp(14);f.addView(note,np);
+        TextView guest=tx("Continue as guest",14,lime,true);guest.setGravity(Gravity.CENTER);guest.setFocusable(true);guest.setBackground(rippleOn(Color.TRANSPARENT,12));LinearLayout.LayoutParams gup=lp(-1,48);gup.topMargin=dp(6);f.addView(guest,gup);
+        Runnable mode=()->{
+            boolean l=login[0];name.setVisibility(l?View.GONE:View.VISIBLE);confirm.setVisibility(l?View.GONE:View.VISIBLE);go.setText(l?"Log in":"Create account");error.setText("");
+            signTab.setBackground(l?null:shape(panel,11));logTab.setBackground(l?shape(panel,11):null);signTab.setTextColor(l?muted:ink);logTab.setTextColor(l?ink:muted);
+        };
+        signTab.setOnClickListener(v->{login[0]=false;mode.run();});logTab.setOnClickListener(v->{login[0]=true;mode.run();});mode.run();
+        android.text.TextWatcher clear=new android.text.TextWatcher(){public void beforeTextChanged(CharSequence a,int b,int c2,int d){}public void onTextChanged(CharSequence a,int b,int c2,int d){error.setText("");}public void afterTextChanged(android.text.Editable e){}};
+        for(android.widget.EditText e:new android.widget.EditText[]{name,email,pass,confirm})e.addTextChangedListener(clear);
+        go.setOnClickListener(v->{
+            String err=login[0]?LocalAccount.logIn(this,email.getText().toString(),pass.getText().toString()):LocalAccount.signUp(this,name.getText().toString(),email.getText().toString(),pass.getText().toString(),confirm.getText().toString());
+            if(err!=null){error.setText(err);if(!reducedMotion())error.animate().translationX(dp(6)).setDuration(60).withEndAction(()->error.animate().translationX(0).setDuration(60).start()).start();return;}
+            pass.setText("");confirm.setText("");finishAuth();
+        });
+        guest.setOnClickListener(v->{LocalAccount.continueAsGuest(this);finishAuth();});
+        authLayer.setAlpha(0f);authLayer.animate().alpha(1f).setDuration(reducedMotion()?0:200).start();
+    }
+    private android.widget.EditText field(String hint,int type){
+        android.widget.EditText e=new android.widget.EditText(this);e.setHint(hint);e.setInputType(type);e.setSingleLine(true);e.setTextSize(15);e.setTextColor(ink);e.setHintTextColor(muted);
+        e.setPadding(dp(16),0,dp(16),0);GradientDrawable g=shape(panel,14);g.setStroke(dp(1),line);e.setBackground(g);
+        e.setOnFocusChangeListener((v,has)->{GradientDrawable d=shape(panel,14);d.setStroke(dp(has?2:1),has?lime:line);e.setBackground(d);});return e;
+    }
+    private void finishAuth(){
+        android.view.inputmethod.InputMethodManager im=(android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);if(im!=null&&authLayer!=null)im.hideSoftInputFromWindow(authLayer.getWindowToken(),0);
+        FrameLayout gone=authLayer;authLayer=null;page="Today";renderPageNow();
+        playIntro(()->{if(gone!=null)root.removeView(gone);});
+    }
+
+    // ---- Opening animation: the logo appears, then a circle grows out of it and fills the screen ----
+    private void playIntro(Runnable covered){
+        if(reducedMotion()){if(covered!=null)covered.run();return;}
+        // Start from exactly what the system splash showed (it follows the phone's dark mode), so the hand-off is invisible.
+        boolean night=(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        FrameLayout layer=new FrameLayout(this);layer.setBackgroundColor(night?Color.rgb(11,11,13):Color.rgb(247,247,248));layer.setClickable(true);root.addView(layer,new FrameLayout.LayoutParams(-1,-1));
+        root.setBackgroundColor(night?Color.rgb(11,11,13):Color.rgb(247,247,248));
+        View circle=new View(this);circle.setBackground(shape(Color.rgb(26,115,232),1000));int size=dp(112);layer.addView(circle,new FrameLayout.LayoutParams(size,size,Gravity.CENTER));
+        android.widget.ImageView logo=new android.widget.ImageView(this);logo.setImageResource(night?R.drawable.ic_kadamm_logo_dark:R.drawable.ic_kadamm_logo);logo.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        logo.setOutlineProvider(new android.view.ViewOutlineProvider(){@Override public void getOutline(View v,android.graphics.Outline o){o.setOval(0,0,v.getWidth(),v.getHeight());}});logo.setClipToOutline(true);
+        layer.addView(logo,new FrameLayout.LayoutParams(size,size,Gravity.CENTER));
+        circle.setScaleX(.2f);circle.setScaleY(.2f);circle.setAlpha(0f);logo.setScaleX(.6f);logo.setScaleY(.6f);logo.setAlpha(0f);
+        float cover=(float)Math.hypot(getResources().getDisplayMetrics().widthPixels,getResources().getDisplayMetrics().heightPixels)/size*1.05f;
+        logo.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(320).setInterpolator(new android.view.animation.OvershootInterpolator(1.6f)).withEndAction(()->{
+            circle.setAlpha(1f);
+            circle.animate().scaleX(cover).scaleY(cover).setStartDelay(120).setDuration(520).setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator()).withEndAction(()->{
+                if(covered!=null)covered.run();root.setBackgroundColor(bg);
+                layer.animate().alpha(0f).setDuration(260).withEndAction(()->root.removeView(layer)).start();
+            }).start();
+            logo.animate().alpha(0f).scaleX(1.15f).scaleY(1.15f).setStartDelay(260).setDuration(260).start();
+        }).start();
+    }
+
+    /** Tapping the live notification (also from the lock screen) brings up the live session screen. */
+    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(intent!=null&&intent.getBooleanExtra("openLive",false)&&prefs.getBoolean("active",false))openLive();}
+    // ---- Session summary: records, route attempts, charts ----
+    private void renderSessionInsights(JSONObject o){
+        java.util.List<Insights.Record> recs=Insights.records(history(),DaySteps.allDayTotals(this));java.util.List<String> mine=new java.util.ArrayList<>();
+        for(Insights.Record r:recs)if(r.sessionId==o.optLong("id"))mine.add(r.label+" · "+r.value);
+        if(!mine.isEmpty()){
+            LinearLayout pr=card();GradientDrawable g=shape(blend(panel,flame(),darkTheme?.18f:.10f),16);g.setStroke(dp(1),blend(line,flame(),.4f));pr.setBackground(g);
+            pr.addView(tx("PERSONAL RECORD",10,flame(),true));for(String m:mine)pr.addView(tx(m,16,ink,true));
+            boolean fresh=!o.optBoolean("celebrated",false)&&System.currentTimeMillis()-o.optLong("endTimeMs",0)<7L*86400000L;
+            if(fresh&&!reducedMotion()){
+                try{o.put("celebrated",true);saveSession(historyPrefs,o);}catch(Exception ignored){}
+                pr.setScaleX(.85f);pr.setScaleY(.85f);pr.animate().scaleX(1f).scaleY(1f).setDuration(420).setInterpolator(new android.view.animation.OvershootInterpolator(2f)).start();
+                ConfettiView confetti=new ConfettiView(this);root.addView(confetti,new FrameLayout.LayoutParams(-1,-1));confetti.play();
+            }
+        }
+        JSONArray rs=Insights.routes(this);JSONArray hist=history();
+        for(int i=0;i<rs.length();i++){
+            JSONObject route=rs.optJSONObject(i);if(route==null||!Insights.matches(route,o))continue;
+            java.util.List<JSONObject> tries=Insights.attempts(route,hist);int index=0;long best=Long.MAX_VALUE;
+            for(int k=0;k<tries.size();k++){long d=tries.get(k).optLong("durationMs");best=Math.min(best,d);if(tries.get(k).optLong("id")==o.optLong("id"))index=k+1;}
+            long mineMs=o.optLong("durationMs");LinearLayout rc=card();
+            rc.addView(tx("ROUTE · "+route.optString("name").toUpperCase(Locale.getDefault()),10,lime,true));
+            rc.addView(tx(formatDuration(mineMs)+(mineMs==best?"  ·  best time":"  ·  "+(mineMs>best?"+":"")+formatDuration(Math.abs(mineMs-best))+" vs best"),17,mineMs==best?positive:ink,true));
+            rc.addView(tx("Attempt "+index+" of "+tries.size()+" · best "+formatDuration(best),11,muted,false));
+        }
+        java.util.List<double[]> track=Insights.track(o.optString("route","[]"));
+        java.util.List<double[]> pace=Insights.pace(track),elev=Insights.elevation(track);
+        if(pace.size()>=2){
+            LinearLayout pc=card();LinearLayout ph=row();pc.addView(ph);ph.addView(tx("Pace",15,ink,true),new LinearLayout.LayoutParams(0,-2,1));
+            ph.addView(tx("●",12,lime,true));ph.addView(tx(" walk   ",10,muted,false));ph.addView(tx("●",12,SessionChartView.RUN,true));ph.addView(tx(" run",10,muted,false));
+            pc.addView(new SessionChartView(this,chartTheme(),pace,true),lp(-1,150));
+        }
+        if(elev.size()>=2){
+            LinearLayout ec=card();LinearLayout eh=row();ec.addView(eh);eh.addView(tx("Elevation",15,ink,true),new LinearLayout.LayoutParams(0,-2,1));
+            eh.addView(tx(o.has("elevGainM")?String.format(Locale.US,"+%.0f m gain",o.optDouble("elevGainM")):"",11,muted,false));
+            ec.addView(new SessionChartView(this,chartTheme(),elev,false),lp(-1,130));
+        }
+        if(pace.size()<2&&Insights.points(o.optString("route","[]")).size()>=2){TextView n=tx("Pace and elevation charts appear for sessions recorded with Kadamm 6.0 or later.",11,muted,false);LinearLayout.LayoutParams np=lp(-1,-2);np.topMargin=dp(8);content.addView(n,np);}
+    }
+    private void renderRecords(){
+        java.util.List<Insights.Record> recs=Insights.records(history(),DaySteps.allDayTotals(this));if(recs.isEmpty())return;
+        LinearLayout c=card();LinearLayout h=row();c.addView(h);
+        android.widget.ImageView ic=icon(R.drawable.ic_bolt,darkTheme?Color.rgb(11,11,13):Color.WHITE,7);ic.setBackground(shape(flame(),10));h.addView(ic,lp(32,32));
+        TextView t=tx("Personal records",16,ink,true);LinearLayout.LayoutParams tp=lp(-2,-2);tp.leftMargin=dp(10);h.addView(t,tp);
+        for(Insights.Record r:recs){
+            LinearLayout rr=row();rr.setPadding(0,dp(10),0,dp(4));rr.setBackground(rippleOn(Color.TRANSPARENT,8));c.addView(rr,lp(-1,-2));
+            LinearLayout l=col();rr.addView(l,new LinearLayout.LayoutParams(0,-2,1));l.addView(tx(r.label,13,ink,true));l.addView(tx(r.date,11,muted,false));
+            rr.addView(tx(r.value,17,flame(),true));
+            if(r.sessionId!=0){JSONObject target=null;JSONArray hh=history();for(int i=0;i<hh.length();i++)if(hh.optJSONObject(i).optLong("id")==r.sessionId)target=hh.optJSONObject(i);
+                JSONObject go=target;if(go!=null)rr.setOnClickListener(v->{lastSession=go;page="Detail";renderPage();});}
+        }
+    }
+    // ---- Routes ----
+    private void renderRoutes(){
+        brand("YOUR ROUTES","Routes","Save a session as a route, then beat your time on it.");
+        JSONArray rs=Insights.routes(this),hist=history();
+        if(rs.length()==0){LinearLayout e=card();e.addView(tx("No saved routes yet",15,ink,true));e.addView(tx("Open a session with a GPS route and tap Save as route. Next time you walk or run it, Kadamm shows your time against your best.",12,muted,false));return;}
+        for(int i=rs.length()-1;i>=0;i--){
+            JSONObject route=rs.optJSONObject(i);if(route==null)continue;java.util.List<JSONObject> tries=Insights.attempts(route,hist);
+            long best=Long.MAX_VALUE;for(JSONObject t:tries)best=Math.min(best,t.optLong("durationMs"));
+            LinearLayout c=card();LinearLayout h=row();c.addView(h);
+            LinearLayout l=col();h.addView(l,new LinearLayout.LayoutParams(0,-2,1));l.addView(tx(route.optString("name"),17,ink,true));
+            l.addView(tx(String.format(Locale.US,"%.2f km · %d %s",route.optDouble("distanceKm"),tries.size(),tries.size()==1?"attempt":"attempts"),12,muted,false));
+            if(best<Long.MAX_VALUE)h.addView(tx(formatDuration(best),18,lime,true));
+            RouteView map=new RouteView(this);map.setTheme(bg,raised,lime,darkTheme);map.setFollowLocation(false);map.setRoute(route.optString("route","[]"));LinearLayout.LayoutParams mp=lp(-1,140);mp.topMargin=dp(10);c.addView(map,mp);
+            for(int k=tries.size()-1;k>=0&&k>=tries.size()-5;k--){
+                JSONObject t=tries.get(k);long d=t.optLong("durationMs");LinearLayout ar=row();ar.setPadding(0,dp(8),0,dp(2));ar.setBackground(rippleOn(Color.TRANSPARENT,8));c.addView(ar,lp(-1,-2));
+                ar.addView(tx(t.optString("date")+" · "+t.optString("time"),12,ink,false),new LinearLayout.LayoutParams(0,-2,1));
+                ar.addView(tx(formatDuration(d)+(d==best?"  best":"  +"+formatDuration(d-best)),12,d==best?positive:muted,true));
+                ar.setOnClickListener(v->{lastSession=t;page="Detail";renderPage();});
+            }
+            LinearLayout acts=row();LinearLayout.LayoutParams ap=lp(-1,42);ap.topMargin=dp(10);c.addView(acts,ap);
+            Button ren=button("Rename",raised,ink),del=button("Delete",raised,critical);acts.addView(ren,new LinearLayout.LayoutParams(0,-1,1));LinearLayout.LayoutParams dlp=new LinearLayout.LayoutParams(0,-1,1);dlp.leftMargin=dp(8);acts.addView(del,dlp);
+            long id=route.optLong("id");
+            ren.setOnClickListener(v->{android.widget.EditText in=new android.widget.EditText(this);in.setSingleLine(true);in.setText(route.optString("name"));dialog().setTitle("Rename route").setView(in).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{String n=in.getText().toString().trim();if(!n.isEmpty())Insights.renameRoute(this,id,n.length()>40?n.substring(0,40):n);renderPageNow();}).show();});
+            del.setOnClickListener(v->dialog().setTitle("Delete this route?").setMessage("Your sessions stay; only the saved route and its comparisons go.").setNegativeButton("Keep",null).setPositiveButton("Delete",(d,w)->{Insights.deleteRoute(this,id);renderPageNow();}).show());
+        }
+    }
+    // ---- Notification settings ----
+    private static final int NOTIFY_PERMISSION=102;
+    private boolean notificationsAllowed(){
+        android.app.NotificationManager nm=getSystemService(android.app.NotificationManager.class);
+        return (Build.VERSION.SDK_INT<33||checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)&&(nm==null||nm.areNotificationsEnabled());
+    }
+    private void openAppNotificationSettings(){try{startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()));}catch(Exception e){toast("Open Settings > Apps > Kadamm > Notifications");}}
+    private void renderNotifications(){
+        brand("SETTINGS","Notifications","Choose what Kadamm tells you, and when.");
+        boolean on=notificationsAllowed();
+        LinearLayout st=card();LinearLayout h=row();st.addView(h);
+        android.widget.ImageView ic=icon(R.drawable.ic_bell,darkTheme?Color.rgb(11,11,13):Color.WHITE,9);ic.setBackground(shape(on?positive:warning,14));h.addView(ic,lp(40,40));
+        LinearLayout w=col();LinearLayout.LayoutParams wp=new LinearLayout.LayoutParams(0,-2,1);wp.leftMargin=dp(12);h.addView(w,wp);
+        w.addView(tx(on?"Notifications are on":"Notifications are off",16,on?positive:warning,true));
+        w.addView(tx(on?"Kadamm can show your live session and the reminders you choose below.":"Without them you won't see the live session card, goal alerts or reminders. Tracking still works.",11,muted,false));
+        if(!on){Button allow=button("Allow notifications",lime,accentOn);allow.setTextSize(15);LinearLayout.LayoutParams ap=lp(-1,48);ap.topMargin=dp(12);st.addView(allow,ap);
+            allow.setOnClickListener(v->{SharedPreferences s0=getSharedPreferences("kadamm_settings",MODE_PRIVATE);
+                if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED&&(!s0.getBoolean("notifyAsked",false)||shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS))){s0.edit().putBoolean("notifyAsked",true).apply();requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFY_PERMISSION);}
+                else openAppNotificationSettings();});}
+        LinearLayout ses=card();ses.addView(tx("DURING A SESSION",10,muted,true));
+        LinearLayout live=row();live.setPadding(0,dp(10),0,0);ses.addView(live,lp(-1,-2));LinearLayout ll=col();live.addView(ll,new LinearLayout.LayoutParams(0,-2,1));
+        ll.addView(tx("Live session card",14,ink,true));ll.addView(tx("Time, distance, pace and Pause/Finish. Android requires it while recording.",11,muted,false));live.addView(tx("Always",11,positive,true));
+        reminderSwitch(ses,"Show details on the lock screen","Off: the lock screen shows only that a session is running","notifyLockPublic");
+        LinearLayout goals=card();goals.addView(tx("GOALS",10,muted,true));
+        reminderSwitch(goals,"Daily goal reached","Once a day, when you hit your step goal","notifyGoal");
+        reminderSwitch(goals,"You're making progress","Once a day, at 60% of your goal","notifyProgress");
+        LinearLayout rem=card();rem.addView(tx("REMINDERS",10,muted,true));
+        reminderSwitch(rem,"Time to move","After an hour without steps, 8 am to 9 pm, at most every 2 hours","remindInactive");
+        reminderSwitch(rem,"Evening: almost there","After 7 pm when 2,000 steps or fewer are left","remindEvening");
+        TextView more=tx("Sounds and vibration in Android settings  →",13,lime,true);more.setGravity(Gravity.CENTER_VERTICAL);more.setFocusable(true);more.setBackground(rippleOn(Color.TRANSPARENT,10));LinearLayout.LayoutParams mp=lp(-1,48);mp.topMargin=dp(10);content.addView(more,mp);more.setOnClickListener(v->openAppNotificationSettings());
+    }
+    // ---- Reminders ----
+    private void renderReminderSettings(){
+        LinearLayout c=card();LinearLayout h=row();c.addView(h);
+        android.widget.ImageView ic=icon(R.drawable.ic_timer,darkTheme?Color.rgb(11,11,13):Color.WHITE,9);ic.setBackground(shape(teal(),14));h.addView(ic,lp(40,40));
+        LinearLayout w=col();LinearLayout.LayoutParams wp=new LinearLayout.LayoutParams(0,-2,1);wp.leftMargin=dp(12);h.addView(w,wp);w.addView(tx("Reminders",16,ink,true));w.addView(tx("Gentle nudges, never during a session.",11,muted,false));
+        reminderSwitch(c,"Inactive for an hour","Between 8 am and 9 pm, at most every 2 hours","remindInactive");
+        reminderSwitch(c,"Evening: almost there","After 7 pm when 2,000 steps or fewer are left","remindEvening");
+    }
+    private void reminderSwitch(LinearLayout c,String title,String sub,String key){
+        LinearLayout r=row();r.setPadding(0,dp(10),0,0);c.addView(r,lp(-1,-2));LinearLayout l=col();r.addView(l,new LinearLayout.LayoutParams(0,-2,1));l.addView(tx(title,14,ink,true));l.addView(tx(sub,11,muted,false));
+        android.widget.Switch sw=new android.widget.Switch(this);sw.setChecked(getSharedPreferences("kadamm_settings",MODE_PRIVATE).getBoolean(key,true));
+        sw.setThumbTintList(android.content.res.ColorStateList.valueOf(lime));sw.setContentDescription(title);r.addView(sw);
+        sw.setOnCheckedChangeListener((b,on)->getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putBoolean(key,on).apply());
+    }
     @Override public void onBackPressed(){
+        if(authLayer!=null){super.onBackPressed();return;}
+        if(mapLayer!=null&&mapLayer.getVisibility()==View.VISIBLE){closeMapView();return;}
         if(liveLayer!=null&&liveLayer.getVisibility()==View.VISIBLE){closeLive();return;}
         if(drawerLayer!=null&&drawerLayer.getVisibility()==View.VISIBLE){closeDrawer();return;}
         if("Detail".equals(page)){navigate("History");return;}

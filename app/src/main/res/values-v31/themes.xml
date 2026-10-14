@@ -1,0 +1,7 @@
+<resources>
+    <!-- Android 12+ system splash: the round launcher icon on the same colour the opening animation starts from. -->
+    <style name="Kadamm" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/kadamm_window</item>
+        <item name="android:windowSplashScreenBackground">@color/kadamm_window</item>
+    </style>
+</resources>
