@@ -85,7 +85,7 @@ final class DaySteps {
             }
             e.putLong("lastCounter",counter).putLong("lastAt",now).putLong("lastElapsed",elapsed).apply();
         }
-        if(changed)checkGoal(c);
+        if(changed){checkGoal(c);StepsWidget.refresh(c);}
     }
 
     /** Splits a delta across local days in proportion to the time spent in each. */
@@ -148,6 +148,14 @@ final class DaySteps {
         SharedPreferences live=c.getSharedPreferences("stride_state",Context.MODE_PRIVATE);
         if(day.equals(todayKey())&&live.getBoolean("active",false))n+=live.getInt("steps",0);
         return n;
+    }
+    /** Minutes spent in Kadamm sessions today, including the one in progress. */
+    static long activeMinutesToday(Context c){
+        long ms=0;String today=todayKey();JSONArray all=sessions(c);
+        for(int i=0;i<all.length();i++){JSONObject s=all.optJSONObject(i);if(s!=null&&today.equals(s.optString("day","")))ms+=s.optLong("durationMs",0);}
+        SharedPreferences live=c.getSharedPreferences("stride_state",Context.MODE_PRIVATE);
+        if(live.getBoolean("active",false))ms+=live.getLong("elapsed",0);
+        return ms/60000;
     }
     /** Today's Health Connect steps from outside Kadamm sessions, or -1 when nothing was synced today. */
     static long healthImportedToday(Context c){

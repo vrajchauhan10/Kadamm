@@ -18,13 +18,16 @@ final class ProgressRingView extends View {
     private final KadammTheme theme;
     private float shown=0,target=-1;
     private long steps=0;private int goal=10000;private boolean available=false;
-    private ValueAnimator animator;
+    private ValueAnimator animator;private float inner=0;
+
+    /** Inner ring: move minutes as a fraction of their goal. */
+    void setInner(float fraction){fraction=Math.max(0,Math.min(1,fraction));if(fraction!=inner){inner=fraction;invalidate();}}
 
     ProgressRingView(Context c,KadammTheme theme){super(c);this.theme=theme;}
 
     /** Goal-progress colour, shared with the rest of the dashboard. */
     static int colorFor(KadammTheme t,double percent){
-        return percent>=100?t.positive:percent>=80?t.warning:percent>=50?t.accentSecondary:t.accent;
+        return percent>=100?t.positive:t.accent;
     }
 
     void setProgress(long steps,int goal,boolean available){
@@ -54,18 +57,21 @@ final class ProgressRingView extends View {
         int color=colorFor(theme,shown*100);
         if(shown>0){p.setColor(color);c.drawArc(oval,-90,Math.max(1.5f,Math.min(1f,shown)*360f),false,p);}
 
+        float r2=r-stroke-dp(4);oval.set(cx-r2,cy-r2,cx+r2,cy+r2);p.setStrokeWidth(dp(8));
+        p.setColor(theme.surfaceRaised);c.drawArc(oval,0,360,false,p);
+        if(inner>0){p.setColor(theme.accentSecondary);c.drawArc(oval,-90,Math.max(1.5f,inner*360f),false,p);}
         p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);
         // The number counts up with the arc, and lands exactly on the real value.
         long display=!available?0:target>0?Math.round(steps*Math.min(1f,shown/target)):steps;
         if(animator==null||!animator.isRunning())display=steps;
         String big=available?String.format(Locale.US,"%,d",display):"—";
         p.setColor(theme.text);p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
-        float size=dp(30);p.setTextSize(size);
-        float room=r*2-stroke-dp(14);
+        float size=dp(26);p.setTextSize(size);
+        float room=r2*2-dp(8)-dp(16);
         while(p.measureText(big)>room&&size>dp(14)){size-=dp(1);p.setTextSize(size);}
         c.drawText(big,cx,cy+size*.18f,p);
         p.setTypeface(Typeface.DEFAULT);p.setColor(theme.textMuted);p.setTextSize(dp(11));
-        c.drawText(available?String.format(Locale.US,"of %,d steps",goal):"steps",cx,cy+size*.18f+dp(18),p);
+        c.drawText("steps",cx,cy+size*.18f+dp(16),p);
         p.setTextSize(dp(9));p.setLetterSpacing(.12f);
         c.drawText("TODAY",cx,cy-size*.72f,p);
         p.setLetterSpacing(0f);p.setTextAlign(Paint.Align.LEFT);

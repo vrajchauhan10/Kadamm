@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.1 (versionCode 13)
+
+- Fixed the app appearing frozen: if Android killed the recorder while a session was active, the saved state stayed "active" forever, so the timer never moved and Pause/Finish did nothing. On launch Kadamm now resumes a session interrupted in the last 10 minutes and saves an older one to History. A system restart of the recorder no longer starts a blank session.
+- Fixed outdoor walking distance staying at 0.00 km: the movement reference was reset on every GPS fix, so a walker never crossed the 4 m threshold.
+- GPS: only fixes within 20 m accuracy are used, positions are Kalman-smoothed, sustained accurate movement counts without step evidence, and elevation gain, current speed and moving time are recorded. A prompt appears when Location is off.
+- Health Connect also reads distance, calories burned, heart rate and sleep (each optional), shows them on the dashboard, and has a Sync now control with last-synced time. Consent and rationale screens follow the app theme; dialogs match Light/Dark.
+- New palette (blue, green, orange), a second ring for move minutes with its own goal, heart-rate and sleep cards.
+- Drawer redesigned: full-width 52 dp rows with ripple and an active indicator; the Kadamm wordmark is a 48 dp button.
+- Main tabs follow the finger when swiping and slide between pages; buttons and rows have press feedback.
+- Home-screen widget with the step and move-minute rings.
+- StrictMode (network and slow calls on the main thread) is enabled in debug builds.
+- `tests/e2e.py` runs on-device checks for launch, drawer, swipe, health screens, sync, permission states, widget and recording.
+
 ## 5.0 (versionCode 12)
 
 - Kadamm now counts steps all day on its own, using the phone's hardware step counter. Daily steps no longer depend on Samsung Health sharing with Health Connect. A background job reads the counter every 15 minutes, so the total stays current while the app is closed and survives a reboot.

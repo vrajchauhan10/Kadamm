@@ -4,3 +4,4 @@ build/
 local.properties
 tools/
 .DS_Store
+tests/screens/

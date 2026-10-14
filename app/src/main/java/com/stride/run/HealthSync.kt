@@ -5,7 +5,11 @@ import android.os.Handler
 import android.os.Looper
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.DistanceRecord
+import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -24,6 +28,14 @@ import java.time.ZoneId
 /** Health Connect step sync, shared by the connection screen and the dashboard's silent refresh. */
 object HealthSync {
     val readSteps = setOf(HealthPermission.getReadPermission(StepsRecord::class))
+    /** Steps are required to count as connected; the rest are optional extras for the dashboard. */
+    val allPermissions = readSteps + setOf(
+        HealthPermission.getReadPermission(DistanceRecord::class),
+        HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
+        HealthPermission.getReadPermission(HeartRateRecord::class),
+        HealthPermission.getReadPermission(SleepSessionRecord::class)
+    )
+    @JvmStatic fun isRunning() = running
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     @Volatile private var running = false
 
@@ -118,6 +130,34 @@ object HealthSync {
         } catch (_: Exception) {
             // Daily history is a bonus for the calendar; today's total above is what matters.
         }
+
+        // Optional metrics: each is read only when its permission was granted, and cleared otherwise.
+        val granted = try { hc.permissionController.getGrantedPermissions() } catch (_: Exception) { emptySet() }
+        val edit = prefs.edit()
+        val dayRange = TimeRangeFilter.between(start, end)
+        fun has(record: kotlin.reflect.KClass<out androidx.health.connect.client.records.Record>) =
+            granted.contains(HealthPermission.getReadPermission(record))
+        edit.remove("healthDistanceM").remove("healthKcal").remove("healthHrAvg").remove("healthHrMin").remove("healthHrMax").remove("healthSleepMin")
+        try {
+            if (has(DistanceRecord::class)) hc.aggregate(AggregateRequest(setOf(DistanceRecord.DISTANCE_TOTAL), dayRange))[DistanceRecord.DISTANCE_TOTAL]
+                ?.let { edit.putFloat("healthDistanceM", it.inMeters.toFloat()) }
+            if (has(TotalCaloriesBurnedRecord::class)) hc.aggregate(AggregateRequest(setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL), dayRange))[TotalCaloriesBurnedRecord.ENERGY_TOTAL]
+                ?.let { edit.putFloat("healthKcal", it.inKilocalories.toFloat()) }
+            if (has(HeartRateRecord::class)) {
+                val hr = hc.aggregate(AggregateRequest(setOf(HeartRateRecord.BPM_AVG, HeartRateRecord.BPM_MIN, HeartRateRecord.BPM_MAX), dayRange))
+                hr[HeartRateRecord.BPM_AVG]?.let { edit.putLong("healthHrAvg", it) }
+                hr[HeartRateRecord.BPM_MIN]?.let { edit.putLong("healthHrMin", it) }
+                hr[HeartRateRecord.BPM_MAX]?.let { edit.putLong("healthHrMax", it) }
+            }
+            if (has(SleepSessionRecord::class)) {
+                // Last night: anything recorded since 6 pm yesterday.
+                val night = TimeRangeFilter.between(today.minusDays(1).atTime(18, 0).atZone(zone).toInstant(), end)
+                hc.aggregate(AggregateRequest(setOf(SleepSessionRecord.SLEEP_DURATION_TOTAL), night))[SleepSessionRecord.SLEEP_DURATION_TOTAL]
+                    ?.let { edit.putLong("healthSleepMin", it.toMinutes()) }
+            }
+        } catch (_: Exception) {
+        }
+        edit.putString("healthGranted", granted.joinToString(",") { it.substringAfterLast("READ_") }).apply()
 
         val verified = outside + sessionSteps
         prefs.edit()

@@ -6,6 +6,7 @@ Native Android walk/run tracker (app id `com.stride.run`, originally "Stride"). 
 
 - `./build.sh` builds offline with the toolchain in `tools/android-build` (JDK 17, Android SDK 35, Gradle 8.9; not in git) and writes `releases/kadamm-v<version>.apk`.
 - `./build.sh install` also installs on the USB-connected phone. adb is `tools/android-build/sdk/platform-tools/adb`.
+- `python3 tests/e2e.py [name ...]` runs the on-device UI checks (screenshots in `tests/screens/`). It refuses to tap unless Kadamm is in the foreground, so do not run it while the phone is being used.
 - The test phone is a Samsung SM-S721B on Android 16. Verify UI changes on it; there is no emulator.
 
 ## Releasing a change
@@ -24,3 +25,12 @@ Every round of changes gets a new version: bump `version.properties`, set `APP_V
 
 - Never show estimated or made-up sensor data as real; show an unavailable state instead.
 - Step sources are combined by taking the most complete count, never by adding them.
+
+## Working rules
+
+- Android app, tested on a physical device over USB (adb).
+- Work autonomously. Do not ask questions unless blocked. Make reasonable assumptions and list them at the end.
+- Read only the files needed. Use grep/glob before opening files. Never re-read unchanged files.
+- Edit with small diffs, never rewrite whole files.
+- Keep replies short: no explanations of obvious steps, no code echoes.
+- Verify every fix on the device (adb install, logcat, screenshots) before moving on.

@@ -20,6 +20,7 @@ class HealthConnectActivity : ComponentActivity() {
     private lateinit var theme: KadammTheme
     private var client: HealthConnectClient? = null
     private var refreshAfterSamsungHealth = false
+    private var askedExtras = false
 
     private val permissionLauncher = registerForActivityResult(
         PermissionController.createRequestPermissionResultContract()
@@ -49,6 +50,7 @@ class HealthConnectActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         theme = KadammTheme.resolve(this, getSharedPreferences("kadamm_settings", MODE_PRIVATE).getString("themeMode", "system"))
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(theme.background))
         window.statusBarColor = theme.background
         window.navigationBarColor = theme.background
         window.decorView.systemUiVisibility =
@@ -65,7 +67,7 @@ class HealthConnectActivity : ComponentActivity() {
             setTextColor(theme.accent)
         })
         layout.addView(TextView(this).apply {
-            text = "Bring in your daily steps"
+            text = "Bring in your health data"
             textSize = 26f
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             setTextColor(theme.text)
@@ -84,7 +86,7 @@ class HealthConnectActivity : ComponentActivity() {
         layout.addView(statusText)
         layout.addView(action("Connect / refresh steps", true) { connect() })
         layout.addView(TextView(this).apply {
-            text = "Samsung Health keeps its step count private until you switch on sharing: Samsung Health > Settings > Health Connect > allow Steps. Kadamm only ever reads steps, and nothing leaves this phone."
+            text = "Samsung Health keeps its step count private until you switch on sharing: Samsung Health > Settings > Health Connect > allow Steps. Kadamm only reads steps, distance, calories, heart rate and sleep, and nothing leaves this phone."
             textSize = 13f
             setTextColor(theme.textMuted)
             setPadding(0, dp(18f), 0, dp(2f))
@@ -135,8 +137,10 @@ class HealthConnectActivity : ComponentActivity() {
             return
         }
         lifecycleScope.launch {
-            if (hc.permissionController.getGrantedPermissions().containsAll(HealthSync.readSteps)) syncSteps()
-            else permissionLauncher.launch(HealthSync.readSteps)
+            val granted = hc.permissionController.getGrantedPermissions()
+            // Already connected for steps: one more tap offers the optional metrics, then refreshes.
+            if (granted.containsAll(HealthSync.readSteps) && (granted.containsAll(HealthSync.allPermissions) || askedExtras)) syncSteps()
+            else { askedExtras = true; permissionLauncher.launch(HealthSync.allPermissions) }
         }
     }
 
