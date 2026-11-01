@@ -185,6 +185,44 @@ final class DaySteps {
         n+=Calories.live(c);
         return n;
     }
+    /** Move minutes today: Kadamm sessions, or Health Connect's active minutes when that is more. */
+    static long moveMinutesToday(Context c){
+        long n=activeMinutesToday(c);SharedPreferences h=c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE);
+        if(healthImportedToday(c)>=0)n=Math.max(n,h.getInt("healthActiveMin",0));return n;
+    }
+    /** Today's steps taken outside Kadamm sessions: everyday walking around. */
+    static long stepsOutsideSessionsToday(Context c){return Math.max(0,todayTotal(c)-sessionOn(c,todayKey()));}
+    /** Kilometres for a number of everyday walking steps, from the configured stride length. */
+    static double stepKm(Context c,long steps){return steps*c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getInt("strideLengthCm",72)/100000d;}
+    /** Session distance today, including the session in progress. */
+    static double sessionKmToday(Context c){
+        double km=0;String today=todayKey();JSONArray all=sessions(c);
+        for(int i=0;i<all.length();i++){JSONObject s=all.optJSONObject(i);if(s!=null&&today.equals(s.optString("day","")))km+=s.optDouble("distanceKm",0);}
+        SharedPreferences live=c.getSharedPreferences("stride_state",Context.MODE_PRIVATE);if(live.getBoolean("active",false))km+=live.getFloat("distance",0);
+        return km;
+    }
+    /**
+     * Today's whole-day distance as {km, estimated (1/0)}. Health Connect's measured distance when it has one,
+     * never less than the sessions; otherwise sessions plus everyday steps at your stride length, marked estimated.
+     */
+    static double[] distanceToday(Context c){
+        double sessions=sessionKmToday(c);SharedPreferences h=c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE);
+        if(healthImportedToday(c)>=0&&h.contains("healthDistanceM")){double hc=h.getFloat("healthDistanceM",0)/1000d;if(hc>=sessions)return new double[]{hc,0};}
+        long outside=stepsOutsideSessionsToday(c);
+        return new double[]{sessions+stepKm(c,outside),outside>0?1:0};
+    }
+    /**
+     * Today's active calories: what moving burned, without the resting metabolism that Health Connect's
+     * "total calories" includes (that figure is over 1,000 kcal by midday even sitting still). Sessions use their
+     * MET estimate; everyday steps cost about 0.5 kcal per kg per km of walking, the same net rate {@link Calories}
+     * gives a 5 km/h walk. Health Connect's active-calories figure is used when it is higher.
+     */
+    static long activeKcalToday(Context c){
+        double est=sessionCaloriesToday(c)+stepKm(c,stepsOutsideSessionsToday(c))*Calories.weightKg(c)*.5;
+        SharedPreferences h=c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE);
+        if(healthImportedToday(c)>=0&&h.contains("healthActiveKcal"))est=Math.max(est,h.getFloat("healthActiveKcal",0));
+        return Math.round(est);
+    }
     /** "phone", "health", "sessions" or "none": where today's figure comes from. */
     static String todaySource(Context c){
         String today=todayKey();long live=healthLiveToday(c),phone=phoneOn(c,today);
@@ -264,10 +302,6 @@ final class DaySteps {
         NotificationManager nm=c.getSystemService(NotificationManager.class);
         if(nm==null)return;
         if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(GOAL_CHANNEL,"Daily goal",NotificationManager.IMPORTANCE_DEFAULT));
-        PendingIntent open=PendingIntent.getActivity(c,3,new Intent(c,MainActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-        Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(c,GOAL_CHANNEL):new Notification.Builder(c);
-        b.setContentTitle(title).setContentText(text).setStyle(new Notification.BigTextStyle().bigText(text))
-            .setSmallIcon(R.drawable.ic_stat_kadamm).setColor(android.graphics.Color.rgb(26,115,232)).setContentIntent(open).setAutoCancel(true);
-        nm.notify(GOAL_NOTIFICATION,b.build());
+        nm.notify(GOAL_NOTIFICATION,Reminders.rich(c,GOAL_CHANNEL,GOAL_NOTIFICATION,title,text,"Today",true).build());
     }
 }

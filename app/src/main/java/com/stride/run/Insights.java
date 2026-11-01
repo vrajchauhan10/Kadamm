@@ -91,12 +91,14 @@ final class Insights {
     }
     static String clock(double sec){long s=Math.round(sec);return s>=3600?String.format(Locale.US,"%d:%02d:%02d",s/3600,(s/60)%60,s%60):String.format(Locale.US,"%d:%02d",s/60,s%60);}
 
-    /** Fastest 1 km and 5 km, longest distance, longest session and most steps in a day. */
+    /** A ride, not a walk or run: 15+ km/h on average with far fewer steps than the distance needs. Same rule as the session note. */
+    static boolean vehicle(JSONObject o){double h=o.optLong("durationMs",0)/3600000d,km=o.optDouble("distanceKm",0);return h>0&&km/h>=15&&o.optLong("steps",0)<km*300;}
+    /** Fastest 1 km and 5 km, longest distance, longest session and most steps in a day. Vehicle rides are left out. */
     static List<Record> records(JSONArray hist,Map<String,Long> days){
         List<Record> out=new ArrayList<>();
         JSONObject f1=null,f5=null,far=null,lng=null;double b1=-1,b5=-1;
         for(int i=0;i<hist.length();i++){
-            JSONObject o=hist.optJSONObject(i);if(o==null)continue;
+            JSONObject o=hist.optJSONObject(i);if(o==null||vehicle(o))continue;
             double t1=fastest(o,1),t5=fastest(o,5);
             if(t1>0&&(b1<0||t1<b1)){b1=t1;f1=o;}
             if(t5>0&&(b5<0||t5<b5)){b5=t5;f5=o;}

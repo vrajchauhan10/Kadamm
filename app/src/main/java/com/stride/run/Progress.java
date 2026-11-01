@@ -58,13 +58,17 @@ final class Progress {
     /** The same number of days immediately before {@code p}, for comparison. */
     static Period before(Period p){Calendar e=(Calendar)p.start.clone(),s=(Calendar)p.start.clone();s.add(Calendar.DAY_OF_YEAR,-p.days);return between(s,e,"");}
     static final class Summary {
-        long steps,activeMs,bestSteps;double km;int sessions,goalDays,daysWithSteps;String bestDay="";long[] daily;String[] labels;
+        long steps,activeMs,bestSteps;double km;int sessions,goalDays,daysWithSteps,elapsed,future;String bestDay="";long[] daily;String[] labels,names;
     }
     static Summary summarize(Period p,JSONArray hist,Map<String,Long> totals,int goal){
-        Summary s=new Summary();s.daily=new long[p.days];s.labels=new String[p.days];
-        Calendar d=(Calendar)p.start.clone();
+        Summary s=new Summary();s.daily=new long[p.days];s.labels=new String[p.days];s.names=new String[p.days];
+        Calendar d=(Calendar)p.start.clone();String today=DaySteps.todayKey();
         for(int i=0;i<p.days;i++,d.add(Calendar.DAY_OF_YEAR,1)){
             String key=DaySteps.key(d.getTimeInMillis());Long v=totals.get(key);long n=v==null?0:v;
+            s.names[i]=new SimpleDateFormat("EEE d MMM",Locale.getDefault()).format(d.getTime());
+            // Days after today are not counted: they would pull averages and goal-day ratios down.
+            if(key.compareTo(today)>0){s.future++;s.labels[i]=p.month?String.valueOf(d.get(Calendar.DAY_OF_MONTH)):new SimpleDateFormat("EEE",Locale.getDefault()).format(d.getTime()).substring(0,1);continue;}
+            s.elapsed++;
             s.daily[i]=n;s.steps+=n;if(n>0)s.daysWithSteps++;if(n>=goal&&n>0)s.goalDays++;
             if(n>s.bestSteps){s.bestSteps=n;s.bestDay=new SimpleDateFormat("EEE d MMM",Locale.getDefault()).format(d.getTime());}
             s.labels[i]=p.month?String.valueOf(d.get(Calendar.DAY_OF_MONTH)):new SimpleDateFormat("EEE",Locale.getDefault()).format(d.getTime()).substring(0,1);

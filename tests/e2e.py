@@ -258,6 +258,9 @@ def test_recording():
             sh("cmd location providers set-test-provider-enabled gps true")
             sh(f"cmd location providers set-test-provider-location gps --location {lat0},{lon0} --accuracy 4")
         tap("Start activity")
+        assert wait("Where are you moving?"), "outdoor/indoor chooser did not open"
+        shot("09_start_chooser")
+        tap("Start outdoor activity")
         time.sleep(3)
         try:
             if visible("Keep tracking in the background"):

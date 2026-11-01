@@ -1,5 +1,29 @@
 # Changelog
 
+## 7.5 (versionCode 31)
+
+- Share anywhere: one share sheet with WhatsApp (and WhatsApp Business when installed), More apps and Copy. It opens from a share button on Today's step card, the goal streak card and Personal records, each with a ready-written summary of your numbers.
+- Share Kadamm: from the menu or Profile, send the app itself (the installed APK) to a friend on WhatsApp or any app, with a short note on how to install it.
+- Session and report images: the preview now has WhatsApp, Save to Photos (Pictures/Kadamm, Android 10+) and More apps buttons instead of a single Share button.
+- The report image and its caption use the same whole-period distance as the Reports screen.
+
+## 7.4 (versionCode 30)
+
+- Calories fixed: Today showed Health Connect's total calories, which includes your resting metabolism (over 1,000 kcal by midday sitting still). Kadamm now shows active calories only: session estimates plus everyday steps at about 0.5 kcal per kg per km, or Health Connect's active figure when it is higher. The same number is used on Today, the widgets and the drawer.
+- Distance is now the whole day everywhere (Today, Goals, drawer, widgets, History): Health Connect's measured distance, or sessions plus everyday steps at your stride length, marked "est. from steps". History's day card shows real session calories instead of 65 kcal per km.
+- Today at a glance redesigned: gradient tiles with a small chart each (distance and calories against targets, active time against your move goal, session minutes for 7 days, a walk/run split bar, streak against your best, and a 7-day bar chart for the daily average). The daily average now covers the last 7 finished days, so today's partial count no longer drags it down. The separate distance-target card is folded into the Distance tile.
+- Goal streak card: a 14-day chain where linked ticks are your streak, today's open day dashed, longest streak, goal days, next badge, and what today needs.
+- Start: one Start button always asks Outdoor or Indoor in a bottom sheet; walking or running is detected automatically. While a session runs, Walking/Running chips let you correct the type.
+- Maps: no more direction arrows or 0.2/0.4 km labels. Routes have a gradient line, a green start pin, and a small dot at each whole kilometre ("1 km" pills on large maps), measured on the recorded track so laps are counted and pills never overlap.
+- Reports: touch or drag across the bars to see a bubble with the day and its exact steps. A week or month still in progress is compared with the same number of days of the one before; goal days and the daily average count only days that have happened. Distance shows the step-based estimate alongside session distance.
+- History: the calendar is a bubble chart. A dashed ring is your goal; the bubble grows with your steps; a finished day is a solid green bubble with a tick, with a halo at 150%.
+- Profile: personal records are a trophy shelf of medal cards, with two new records (longest streak, best week). Vehicle rides (15+ km/h with few steps) no longer count for records.
+- Notifications: reminders and goal alerts carry a step ring with your percentage, today's steps against the goal, and View today / Start a walk buttons (Open report for the weekly report).
+- Home-screen widgets: gradient progress ring with "% of goal", goal line and gradient bars on the week widget, and the corrected distance, calories and move minutes.
+- Swipe down to close: pull any page other than Today, History and Profile down from the top to go back; pull the live screen or the start sheet down to close it.
+- crafted by V: the maker's mark from Aalap (Great Vibes and Parisienne) sits at the bottom of every page and in the menu.
+- Opening a page now always starts at its top.
+
 ## 7.3 (versionCode 29)
 
 - Auto-tracking (menu > Auto-tracking, or from the Track card): Android's activity recognition starts a session with the map when you begin walking or running, even with Kadamm closed. Needs location "Allow all the time" for the route. Automatic sessions are marked "Auto"; ones under 3 minutes, 200 m and 300 steps are dropped.

@@ -1,6 +1,6 @@
 # Kadamm project context
 
-Baseline reference, written from the code at v7.3 (versionCode 29, commit edb530f, 2026-11-01). `CLAUDE.md` has the build and release rules; this file maps the code.
+Baseline reference, written from the code at v7.3 (versionCode 29, commit edb530f, 2026-11-01), updated for 7.5. `CLAUDE.md` has the build and release rules; this file maps the code.
 
 ## Overview
 
@@ -32,7 +32,7 @@ Kadamm is a native Android walk/run tracker (application id `com.stride.run`, or
 |---|---|
 | `MainActivity.java` (~1240 lines, ~90k tokens, mostly dense one-liners) | Every screen, navigation, drawer, swipe pager, auth overlay, intro animation, live overlay, full-screen map, share, backup/restore, permissions, reports, achievements |
 | `RecorderService.java` | Session state machine (start, pause/toggle, stop, discard, set type, restore), GPS smoothing, altitude, cadence-based walk/run detection, step sensor, auto-finish, live notification (Android 16 Live Update / Now Bar promotion) |
-| `DaySteps.java` | Hardware step counter → per-day deltas (`kadamm_steps.days`); **the single place that decides a day's total** (`todayTotal`, `allDayTotals`); streaks; goal notifications |
+| `DaySteps.java` | Hardware step counter → per-day deltas (`kadamm_steps.days`); **the single place that decides a day's total** (`todayTotal`, `allDayTotals`), today's distance (`distanceToday`), active calories (`activeKcalToday`, never HC total calories) and move minutes (`moveMinutesToday`); streaks; goal notifications |
 | `HealthSync.kt` | Health Connect read: per-source aggregation (takes the highest single source, not the HC sum), past days, active minutes, per-session windows (re-read up to 6 h after a session ends) |
 | `HealthConnectActivity.kt`, `HealthConnectRationaleActivity.kt` | HC consent UI and rationale |
 | `AutoTrack.java` | Activity Recognition transitions → starts `RecorderService` with `auto=true`; `autoStopMin` setting |
@@ -44,8 +44,9 @@ Kadamm is a native Android walk/run tracker (application id `com.stride.run`, or
 | `Calories.java` | MET-based calorie estimate (weight from settings) |
 | `LocalAccount.java` | Local sign-up and sign-in |
 | `KadammTheme.java` | The only color palette: semantic tokens for light/dark |
-| Views | `RouteView` (OSM tile map, route, markers; pan/zoom; static `gestureActive`), `ProgressRingView`, `WeeklyActivityView`, `ActivityChartView`, `BarChartView`, `SessionChartView`, `DayCellView`, `ConfettiView`, `SeekBarControl` |
-| Image cards | `ShareCard` (session share image), `ReportCard` (report image); shared through the FileProvider `com.stride.run.files` |
+| `PullDown.java` | Swipe-down-to-close gesture used by sub-pages, the live screen and the start sheet |
+| Views | `MiniChartView` (tile visuals: progress, mini bars, split, streak chain), `RouteView` (OSM tile map, route, markers; pan/zoom; static `gestureActive`), `ProgressRingView`, `WeeklyActivityView`, `ActivityChartView`, `BarChartView`, `SessionChartView`, `DayCellView`, `ConfettiView`, `SeekBarControl` |
+| Sharing | `ShareCard` (session image), `ReportCard` (report image); `MainActivity.shareSheet` (WhatsApp / More apps / Copy for any text or file), `showSharePreview` (images: WhatsApp, Save to Photos, More), `shareApp` (sends the installed APK). Files go through the FileProvider `com.stride.run.files` (`cache/share/`); the manifest `<queries>` lists WhatsApp so it can be detected |
 | Widgets | `StepsWidget`, `WeekWidget` (RemoteViews from `res/layout/widget_*.xml`) |
 
 ## Navigation and UI
@@ -109,7 +110,8 @@ Potential risks:
 - `ACCESS_BACKGROUND_LOCATION`, `POST_PROMOTED_NOTIFICATIONS` and the Samsung-specific behaviour depend on OEM and OS version, and are only verified on the SM-S721B / Android 16.
 - The local account is a convenience lock, not a security boundary: the data is not encrypted and is not tied to the account.
 - Builds use the debug signing key (intended, to keep installed data across updates).
-- Release APKs (~95 MB total) are committed to git.
+- Release APKs (~100 MB total) are committed to git.
+- `res/font/great_vibes.ttf` and `parisienne.ttf` (from Aalap) draw the "crafted by V" signature added at the end of every page by `renderPageNow`.
 
 ## Baseline status (2026-11-01)
 

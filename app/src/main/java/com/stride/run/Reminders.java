@@ -129,9 +129,36 @@ final class Reminders {
     private static void postTo(Context c,int id,String title,String text,String page){
         NotificationManager nm=c.getSystemService(NotificationManager.class);if(nm==null)return;
         if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CHANNEL,"Reminders",NotificationManager.IMPORTANCE_DEFAULT));
-        PendingIntent open=PendingIntent.getActivity(c,6+id,new Intent(c,MainActivity.class).putExtra("page",page),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-        Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(c,CHANNEL):new Notification.Builder(c);
-        b.setSmallIcon(R.drawable.ic_stat_kadamm).setColor(Color.rgb(26,115,232)).setContentTitle(title).setContentText(text).setStyle(new Notification.BigTextStyle().bigText(text)).setContentIntent(open).setAutoCancel(true);
-        nm.notify(id,b.build());
+        nm.notify(id,rich(c,CHANNEL,id,title,text,page,!"Reports".equals(page)).build());
+    }
+    /**
+     * A Kadamm notification with today's progress built in: a step ring with the percentage as the large icon,
+     * steps against the goal under the expanded text, and one-tap actions to open the app or start a walk.
+     */
+    static Notification.Builder rich(Context c,String channel,int id,String title,String text,String page,boolean walkAction){
+        int goal=c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getInt("stepGoal",10000);long steps=DaySteps.todayTotal(c);boolean done=steps>=goal;
+        PendingIntent open=PendingIntent.getActivity(c,6+id,new Intent(c,MainActivity.class).putExtra("page",page==null?"Today":page),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(c,channel):new Notification.Builder(c);
+        b.setSmallIcon(R.drawable.ic_stat_kadamm).setColor(done?Color.rgb(30,142,62):Color.rgb(26,115,232)).setContentTitle(title).setContentText(text)
+            .setStyle(new Notification.BigTextStyle().bigText(text+String.format(Locale.US,"\n\n%,d of %,d steps today",steps,goal))).setContentIntent(open).setAutoCancel(true)
+            .setLargeIcon(ring(c,steps,goal));
+        if("Reports".equals(page))b.addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(c,R.drawable.ic_chart),"Open report",open).build());
+        else b.addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(c,R.drawable.ic_home),"View today",open).build());
+        if(walkAction&&!done){PendingIntent walk=PendingIntent.getActivity(c,60+id,new Intent(c,MainActivity.class).putExtra("page","Today").putExtra("startWalk",true),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+            b.addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(c,R.drawable.ic_walk),"Start a walk",walk).build());}
+        return b;
+    }
+    /** The large icon: a ring filled toward the goal with the percentage inside, or a green tick once it's reached. */
+    static android.graphics.Bitmap ring(Context c,long steps,int goal){
+        int size=192;android.graphics.Bitmap bm=android.graphics.Bitmap.createBitmap(size,size,android.graphics.Bitmap.Config.ARGB_8888);android.graphics.Canvas cv=new android.graphics.Canvas(bm);
+        android.graphics.Paint p=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);float f=Math.min(1f,steps/(float)Math.max(1,goal));boolean done=steps>=goal;
+        int col=done?Color.rgb(30,142,62):Color.rgb(26,115,232);
+        p.setColor(Color.rgb(17,17,20));cv.drawCircle(size/2f,size/2f,size/2f,p);
+        android.graphics.RectF o=new android.graphics.RectF(26,26,size-26,size-26);p.setStyle(android.graphics.Paint.Style.STROKE);p.setStrokeWidth(18);p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+        p.setColor(Color.argb(70,255,255,255));cv.drawArc(o,0,360,false,p);p.setColor(done?Color.rgb(129,201,149):Color.rgb(77,144,254));if(f>0)cv.drawArc(o,-90,Math.max(6,f*360),false,p);
+        p.setStyle(android.graphics.Paint.Style.FILL);p.setColor(Color.WHITE);p.setTextAlign(android.graphics.Paint.Align.CENTER);p.setTypeface(android.graphics.Typeface.create("sans-serif-medium",0));
+        if(done){p.setStyle(android.graphics.Paint.Style.STROKE);p.setStrokeWidth(13);cv.drawLine(66,98,86,118,p);cv.drawLine(86,118,128,74,p);}
+        else{p.setTextSize(44);cv.drawText(Math.round(f*100)+"%",size/2f,size/2f+15,p);}
+        return bm;
     }
 }

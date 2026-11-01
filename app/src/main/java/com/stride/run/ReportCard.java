@@ -26,8 +26,8 @@ final class ReportCard {
         p.setColor(BLUE);p.setTypeface(med);p.setTextSize(150);String big=String.format(Locale.US,"%,d",s.steps);cv.drawText(big,60,500,p);
         p.setColor(MUTED);p.setTypeface(Typeface.DEFAULT);p.setTextSize(38);
         String change=prev.steps>0?String.format(Locale.US,"steps · %+d%% vs before",Math.round((s.steps-prev.steps)*100.0/prev.steps)):"steps";cv.drawText(change,66,560,p);
-        String[][] st={{"DISTANCE",String.format(Locale.US,"%.1f km",s.km)},{"ACTIVE TIME",String.format(Locale.US,"%dh %02dm",s.activeMs/3600000,(s.activeMs/60000)%60)},{"GOAL DAYS",s.goalDays+" / "+per.days},
-            {"SESSIONS",String.valueOf(s.sessions)},{"DAILY AVERAGE",String.format(Locale.US,"%,d",s.daysWithSteps==0?0:s.steps/s.daysWithSteps)},{"BEST DAY",String.format(Locale.US,"%,d",s.bestSteps)}};
+        String[][] st={{"DISTANCE",String.format(Locale.US,"%.1f km",Math.max(s.km,DaySteps.stepKm(c,s.steps)))},{"ACTIVE TIME",String.format(Locale.US,"%dh %02dm",s.activeMs/3600000,(s.activeMs/60000)%60)},{"GOAL DAYS",s.goalDays+" / "+s.elapsed},
+            {"SESSIONS",String.valueOf(s.sessions)},{"DAILY AVERAGE",String.format(Locale.US,"%,d",s.steps/Math.max(1,s.elapsed))},{"BEST DAY",String.format(Locale.US,"%,d",s.bestSteps)}};
         p.setColor(LINE);p.setStrokeWidth(2);cv.drawLine(64,620,w-64,620,p);
         float colW=(w-128)/3f;
         for(int i=0;i<st.length;i++){float x=64+(i%3)*colW,y=690+(i/3)*150;p.setColor(MUTED);p.setTextSize(28);p.setLetterSpacing(.1f);cv.drawText(st[i][0],x,y,p);p.setLetterSpacing(0f);p.setColor(TEXT);p.setTypeface(med);p.setTextSize(58);cv.drawText(st[i][1],x,y+72,p);p.setTypeface(Typeface.DEFAULT);}
