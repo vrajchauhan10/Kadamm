@@ -162,7 +162,7 @@ def test_swipe():
     assert wait("Tap a day to see its steps"), "swipe left did not reach History"
     shot("04_history")
     sh("input swipe 900 1200 150 1200 180"); time.sleep(1)
-    assert wait("YOUR SPACE"), "swipe left did not reach Profile"
+    assert wait("ALL TIME"), "swipe left did not reach Profile"
     shot("05_profile")
     sh("input swipe 150 1200 900 1200 180"); time.sleep(1)
     assert wait("Tap a day to see its steps"), "swipe right did not return to History"

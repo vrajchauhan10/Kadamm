@@ -15,7 +15,13 @@ import java.util.Locale;
 /** Shareable image of a weekly or monthly report, in the same style as the activity share card. */
 final class ReportCard {
     private ReportCard() {}
+    /** The report as a full 9:16 frame: the report card centred, with the maker's mark at the foot. */
     static Bitmap render(Context c,Progress.Period per,Progress.Summary s,Progress.Summary prev,int goal,boolean dark){
+        Bitmap body=card(c,per,s,prev,goal,dark);int bg=dark?ShareCard.BLACK:Color.WHITE;
+        Bitmap b=Bitmap.createBitmap(1080,1920,Bitmap.Config.ARGB_8888);Canvas cv=new Canvas(b);cv.drawColor(bg);cv.drawBitmap(body,0,(1920-body.getHeight())/2f-40,null);
+        ShareCard.signature(c,cv,1080-64,1920-60,dark?Color.rgb(154,160,166):Color.rgb(95,99,104));return b;
+    }
+    private static Bitmap card(Context c,Progress.Period per,Progress.Summary s,Progress.Summary prev,int goal,boolean dark){
         int w=1080,h=1350;final int BG=dark?ShareCard.BLACK:Color.WHITE,TEXT=dark?Color.WHITE:Color.rgb(11,11,13),MUTED=dark?Color.rgb(154,160,166):Color.rgb(95,99,104),LINE=dark?Color.rgb(42,42,46):Color.rgb(227,227,230),BLUE=dark?ShareCard.ROUTE:ShareCard.BLUE;
         Bitmap b=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);Canvas cv=new Canvas(b);Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);cv.drawColor(BG);
         Typeface med=Typeface.create("sans-serif-medium",Typeface.NORMAL);

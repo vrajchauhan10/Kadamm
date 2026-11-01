@@ -1,5 +1,17 @@
 # Changelog
 
+## 8.0 (versionCode 33) — major release
+
+- Goal celebration: the first time Kadamm is on screen after you reach your step goal, a full-screen confetti shower with a trophy card ("10,000 steps!", steps beyond the goal, your streak) and Share / Keep going. Once a day, on any screen, including the live map and while the mini bar shows.
+- Live mini bar: minimising the live screen (down arrow or swipe down) slides it into a bar above the tabs, like a music player: walking or running, time, distance, steps to your goal with a progress line, and Pause/Resume. Tap the bar and the map grows back up out of it.
+- Profile redesigned: you first (photo with a camera badge, name with an edit button, email, member since, streak, badges and explored km), then all-time totals, personal records, shortcuts (Places, Achievements, Goals, Calendar, Share Kadamm), account and appearance.
+- Edit your name and add a profile photo (cropped to a circle); the photo also shows in the menu and on Today's header.
+- Accounts now live in a SQLite database on the phone (kadamm.db). Several accounts can share a phone; your existing account moved over with the same password. New: change password, switch or add account.
+- Login page: accounts already on the phone to tap and log in, a show/hide password toggle, and a strength meter when signing up.
+- Places you walk: "Streets you've walked" names the streets you've covered with the ground covered on each and the area it's in. Names come from Android's geocoder, looked up once per 100 m and kept on the phone.
+- Route maps: the "1 km / 2 km" labels are gone. Each kilometre is a small ringed dot on the line, and a finished route ends in a green ring counter showing its total kilometres (session maps, the share image and previews). The live map keeps the dots and shows your position instead of the counter.
+- Share images are full 9:16 frames (1080 × 1920): the session map fills the top two-thirds with a large distance, time and pace below; reports get the same frame. Both carry the crafted by V mark.
+
 ## 7.6 (versionCode 32)
 
 - Places you walk (menu, and Profile): every route you've recorded on one map, opening on the area you walk most, with "Show all" for the rest. Streets count once, in 25 m squares, so only new ground grows it: unique km, how much of your walking was on new ground, new streets this week and month, and an explorer level with the km to the next one. Vehicle rides are left out.

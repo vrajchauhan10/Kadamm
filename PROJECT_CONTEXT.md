@@ -1,6 +1,6 @@
 # Kadamm project context
 
-Baseline reference, written from the code at v7.3 (versionCode 29, commit edb530f, 2026-11-01), updated for 7.6. `CLAUDE.md` has the build and release rules; this file maps the code.
+Baseline reference, written from the code at v7.3 (versionCode 29, commit edb530f, 2026-11-01), updated for 8.0. `CLAUDE.md` has the build and release rules; this file maps the code.
 
 ## Overview
 
@@ -42,7 +42,8 @@ Kadamm is a native Android walk/run tracker (application id `com.stride.run`, or
 | `Insights.java` | Route analysis (pace, elevation, splits, records) and saved routes (`kadamm_routes`) |
 | `Progress.java` | Date ranges for reports, period summaries, 16 badges, challenges (`kadamm_badges`) |
 | `Calories.java` | MET-based calorie estimate (weight from settings) |
-| `LocalAccount.java` | Local sign-up and sign-in |
+| `LocalAccount.java` | Accounts in SQLite (`kadamm.db`, table `accounts`: name, email, salted PBKDF2 hash, photo path); prefs `kadamm_account` hold who is signed in. Migrates the pre-8.0 prefs account |
+| `Streets.java` | Street names for Places via `Geocoder`, cached per 100 m square in prefs `kadamm_streets` |
 | `KadammTheme.java` | The only color palette: semantic tokens for light/dark |
 | `PullDown.java` | Swipe-down-to-close gesture used by sub-pages, the live screen and the start sheet |
 | Places | `Insights.coverage` (25 m squares, unique km, home area) and `MainActivity.renderPlaces`; `RouteView.setOverview/setFocus` draw many routes at once |
@@ -69,7 +70,7 @@ All data is in SharedPreferences, mostly JSON strings:
 | `kadamm_steps` (`DaySteps.PREFS`) | `days` {day: steps} from the phone counter, `lastCounter`, `startedAt`… |
 | `kadamm_health` | `healthConnected`, `healthDate`, `healthDayTotal`, `healthDays` {day: steps}, `healthPhoneAtSync`, `healthSyncedAt`, `hcBackground`, `healthActiveMin` |
 | `kadamm_settings` | `stepGoal` (10000), `themeMode`, `strideLengthCm`, `weightKg`, notification switches and times, `autoTrack`, `autoStopMin`, challenge targets, permission-asked flags |
-| `kadamm_account` | `name`, `email`, `salt`, `hash`, `loggedIn`, `guest` |
+| `kadamm_account` | `accountId`, `email` (last used), `loggedIn`, `guest`; account rows are in `kadamm.db` |
 | `kadamm_routes`, `kadamm_badges`, `kadamm_messages` | Saved routes, badges already seen, notifications sent today |
 
 - Step rule: the day total is `max(phone counter, Health Connect live, session steps)`, never a sum (`DaySteps.todayTotal`, `allDayTotals`, `merge`).
