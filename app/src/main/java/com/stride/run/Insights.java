@@ -158,4 +158,51 @@ final class Insights {
         out.sort((a,b)->Long.compare(a.optLong("id"),b.optLong("id")));return out;
     }
     static String ago(long ms){return new SimpleDateFormat("d MMM",Locale.getDefault()).format(new Date(ms));}
+
+    // ---- Places you walk ----
+    static final class Coverage {
+        /** Every saved route joined into one, each session starting a new stretch. */
+        String route="[]";
+        int sessions;double uniqueKm,weekKm,monthKm,totalKm;
+        /** {minLat,maxLat,minLon,maxLon} of the 3 km area with the most covered streets; null with no routes. */
+        double[] home;int areas;
+    }
+    private static final double CELL=25;
+    /**
+     * The streets you have covered: every route (vehicle rides left out) is walked in 10 m steps and each 25 m
+     * square it touches is counted once, so walking the same street again adds nothing. A square's date is the
+     * first session that reached it, which gives "new this week" and "new this month".
+     */
+    static Coverage coverage(JSONArray hist){
+        Coverage cv=new Coverage();java.util.HashMap<Long,Long> first=new java.util.HashMap<>();JSONArray all=new JSONArray();
+        long now=System.currentTimeMillis();
+        for(int i=0;i<hist.length();i++){
+            JSONObject o=hist.optJSONObject(i);if(o==null||vehicle(o))continue;
+            JSONArray r;try{r=new JSONArray(o.optString("route","[]"));}catch(Exception e){continue;}
+            if(r.length()<2)continue;cv.sessions++;cv.totalKm+=o.optDouble("distanceKm",0);
+            long when=o.optLong("startTimeMs",o.optLong("id",0));
+            JSONObject prev=null;
+            for(int k=0;k<r.length();k++){
+                JSONObject q=r.optJSONObject(k);if(q==null)continue;
+                try{JSONObject c=new JSONObject(q.toString());if(k==0)c.put("break",true);all.put(c);}catch(Exception ignored){}
+                if(prev!=null&&!q.optBoolean("break",false)){
+                    double d=metres(prev.optDouble("lat"),prev.optDouble("lon"),q.optDouble("lat"),q.optDouble("lon"));
+                    if(d<200){int n=Math.max(1,(int)Math.ceil(d/10));for(int t=0;t<=n;t++){double f=t/(double)n;mark(first,prev.optDouble("lat")+(q.optDouble("lat")-prev.optDouble("lat"))*f,prev.optDouble("lon")+(q.optDouble("lon")-prev.optDouble("lon"))*f,when);}}
+                }
+                prev=q;
+            }
+        }
+        for(long t:first.values()){cv.uniqueKm+=CELL/1000;if(now-t<7L*86400000)cv.weekKm+=CELL/1000;if(now-t<30L*86400000)cv.monthKm+=CELL/1000;}
+        // Home area: bucket covered squares into 3 km tiles and fit the busiest one (with a little margin).
+        java.util.HashMap<Long,double[]> tiles=new java.util.HashMap<>();
+        for(int i=0;i<all.length();i++){JSONObject q=all.optJSONObject(i);if(q==null)continue;double la=q.optDouble("lat"),lo=q.optDouble("lon");long k=Math.round(la*111320/3000)*1000003L+Math.round(lo*111320*Math.cos(Math.toRadians(la))/3000);
+            double[] b=tiles.get(k);if(b==null)tiles.put(k,new double[]{la,la,lo,lo,1});else{b[0]=Math.min(b[0],la);b[1]=Math.max(b[1],la);b[2]=Math.min(b[2],lo);b[3]=Math.max(b[3],lo);b[4]++;}}
+        double[] best=null;for(double[] b:tiles.values())if(best==null||b[4]>best[4])best=b;cv.areas=tiles.size();
+        if(best!=null){double m=.0015;cv.home=new double[]{best[0]-m,best[1]+m,best[2]-m,best[3]+m};}
+        cv.route=all.toString();return cv;
+    }
+    private static void mark(java.util.HashMap<Long,Long> first,double lat,double lon,long when){
+        long y=Math.round(lat*111320/CELL),x=Math.round(lon*111320*Math.cos(Math.toRadians(lat))/CELL),key=y*4000003L+x;
+        Long old=first.get(key);if(old==null||when<old)first.put(key,when);
+    }
 }

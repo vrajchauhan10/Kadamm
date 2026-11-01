@@ -1,6 +1,6 @@
 # Kadamm project context
 
-Baseline reference, written from the code at v7.3 (versionCode 29, commit edb530f, 2026-11-01), updated for 7.5. `CLAUDE.md` has the build and release rules; this file maps the code.
+Baseline reference, written from the code at v7.3 (versionCode 29, commit edb530f, 2026-11-01), updated for 7.6. `CLAUDE.md` has the build and release rules; this file maps the code.
 
 ## Overview
 
@@ -45,7 +45,8 @@ Kadamm is a native Android walk/run tracker (application id `com.stride.run`, or
 | `LocalAccount.java` | Local sign-up and sign-in |
 | `KadammTheme.java` | The only color palette: semantic tokens for light/dark |
 | `PullDown.java` | Swipe-down-to-close gesture used by sub-pages, the live screen and the start sheet |
-| Views | `MiniChartView` (tile visuals: progress, mini bars, split, streak chain), `RouteView` (OSM tile map, route, markers; pan/zoom; static `gestureActive`), `ProgressRingView`, `WeeklyActivityView`, `ActivityChartView`, `BarChartView`, `SessionChartView`, `DayCellView`, `ConfettiView`, `SeekBarControl` |
+| Places | `Insights.coverage` (25 m squares, unique km, home area) and `MainActivity.renderPlaces`; `RouteView.setOverview/setFocus` draw many routes at once |
+| Views | `LandscapeView` (History month landscape), `DayCellView` (streak-chain day cell), `MiniChartView` (tile visuals: progress, mini bars, split, streak chain), `RouteView` (OSM tile map, route, markers; pan/zoom; static `gestureActive`), `ProgressRingView`, `WeeklyActivityView`, `ActivityChartView`, `BarChartView`, `SessionChartView`, `DayCellView`, `ConfettiView`, `SeekBarControl` |
 | Sharing | `ShareCard` (session image), `ReportCard` (report image); `MainActivity.shareSheet` (WhatsApp / More apps / Copy for any text or file), `showSharePreview` (images: WhatsApp, Save to Photos, More), `shareApp` (sends the installed APK). Files go through the FileProvider `com.stride.run.files` (`cache/share/`); the manifest `<queries>` lists WhatsApp so it can be detected |
 | Widgets | `StepsWidget`, `WeekWidget` (RemoteViews from `res/layout/widget_*.xml`) |
 

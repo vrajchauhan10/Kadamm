@@ -1,5 +1,10 @@
 # Changelog
 
+## 7.6 (versionCode 32)
+
+- Places you walk (menu, and Profile): every route you've recorded on one map, opening on the area you walk most, with "Show all" for the rest. Streets count once, in 25 m squares, so only new ground grows it: unique km, how much of your walking was on new ground, new streets this week and month, and an explorer level with the km to the next one. Vehicle rides are left out.
+- History calendar redesigned: goal days are green capsules that join into one bar when they follow each other (a streak reads as a chain), other days are dark pills with a small progress bar, and the line under the calendar adds the month's longest chain. Above it, "Month at a glance" draws the month as a landscape with the goal as a dashed horizon; peaks above it are green, and touching it shows any day's steps.
+
 ## 7.5 (versionCode 31)
 
 - Share anywhere: one share sheet with WhatsApp (and WhatsApp Business when installed), More apps and Copy. It opens from a share button on Today's step card, the goal streak card and Personal records, each with a ready-written summary of your numbers.

@@ -143,11 +143,12 @@ def test_launch():
 def test_drawer():
     home()
     tap("Kadamm menu", at="right")          # edge of the wordmark button, not the text
-    assert wait("Goals & targets"), "drawer did not open"
+    assert wait("Places you walk"), "drawer did not open"
     shot("02_drawer")
     tap("History", at="right", exact=True)   # far right of the row, away from the label
     assert wait("Tap a day to see its steps"), "History row edge tap did nothing"
     tap("Kadamm menu")
+    assert scroll_to("Goals & targets"), "Goals row not reachable in the drawer"
     tap("Goals & targets", at="right")
     assert wait("Move minutes"), "Goals row edge tap did nothing"
     shot("03_goals")
