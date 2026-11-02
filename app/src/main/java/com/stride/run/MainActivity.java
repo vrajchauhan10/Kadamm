@@ -822,7 +822,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         play.setOnClickListener(v->{
             if(replayAnim!=null){stop.run();return;}
             float from=rv.replay()<0||rv.replay()>=1?0:rv.replay();rv.resetView();hud.setVisibility(View.VISIBLE);
-            replayAnim=android.animation.ValueAnimator.ofFloat(from,1f);replayAnim.setDuration((long)(9000*(1-from)/sp[0]));replayAnim.setInterpolator(new android.view.animation.LinearInterpolator());
+            replayAnim=android.animation.ValueAnimator.ofFloat(from,1f);replayAnim.setDuration((long)(13500*(1-from)/sp[0]));replayAnim.setInterpolator(new android.view.animation.LinearInterpolator());
             replayAnim.addUpdateListener(a->{float f=(float)a.getAnimatedValue();rv.setReplay(f);seek.setProgress(Math.round(f*1000));caption.run();});
             replayAnim.addListener(new android.animation.AnimatorListenerAdapter(){@Override public void onAnimationEnd(android.animation.Animator a){if(replayAnim==a){replayAnim=null;play.setText("↺");play.setContentDescription("Replay again");}}});
             play.setText("Ⅱ");play.setContentDescription("Pause replay");replayAnim.start();
@@ -832,12 +832,12 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
 
     /** Asks for dark or light, encodes the replay video with a progress bar, then opens the share sheet. */
     private void shareReplay(JSONObject o){
-        dialog().setTitle("Share replay video").setMessage("A 10-second video of this route being walked, ready for WhatsApp or your story.").setNegativeButton("Light",(d,w)->makeReplay(o,false)).setPositiveButton("Dark",(d,w)->makeReplay(o,true)).setNeutralButton("Cancel",null).show();
+        makeReplay(o,darkTheme);   // the video follows the app's theme
     }
     private void makeReplay(JSONObject o,boolean dark){
         LinearLayout box=col();box.setPadding(dp(22),dp(14),dp(22),dp(6));TextView msg=tx("Drawing your route… 0%",14,ink,false);box.addView(msg);
         ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(100);bar.setProgressTintList(android.content.res.ColorStateList.valueOf(lime));LinearLayout.LayoutParams bp=lp(-1,10);bp.topMargin=dp(12);box.addView(bar,bp);
-        AlertDialog wait=dialog().setTitle(dark?"Dark replay video":"Light replay video").setView(box).setCancelable(false).create();wait.show();
+        AlertDialog wait=dialog().setTitle("Replay video").setView(box).setCancelable(false).create();wait.show();
         ReplayVideo.export(this,o,sessionTitle(o),dark,pc->{bar.setProgress(pc);msg.setText("Drawing your route… "+pc+"%");},file->{
             wait.dismiss();if(file==null){toast("Couldn't make the video on this phone");return;}
             Uri uri=androidx.core.content.FileProvider.getUriForFile(this,getPackageName()+".files",file);
