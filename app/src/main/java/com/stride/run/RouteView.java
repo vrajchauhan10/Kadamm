@@ -54,8 +54,8 @@ public class RouteView extends View {
     /** Whole-kilometre milestones; off for tiny previews. */
     void setMarkers(boolean on){markers=on;invalidate();}
     /**
-     * One small ringed dot at each whole kilometre of the recorded distance, no labels; the total shows at the finish
-     * in a ring counter (see {@link #finishCounter}). No direction arrows and no sub-kilometre labels, so the line stays clean.
+     * One small ringed dot at each whole kilometre of the recorded distance, each kilometre in its own colour
+     * (see {@link #KM_COLORS}) and no labels; the legend names them. No direction arrows and no sub-kilometre labels, so the line stays clean.
      */
     private void drawMarkers(Canvas c,int z,double centerX,double centerY,double scale,float w,float h){
         // Measured on the raw track: the drawn line is simplified, which drops repeated laps along one street.
@@ -69,24 +69,85 @@ public class RouteView extends View {
             while(run+seg>=nextMark){
                 double f=(nextMark-run)/Math.max(.001,seg);
                 float ax=(float)((tileX(a[1],z)*TILE-centerX)*scale+w/2),ay=(float)((tileY(a[0],z)*TILE-centerY)*scale+h/2),bx=(float)((tileX(b[1],z)*TILE-centerX)*scale+w/2),by=(float)((tileY(b[0],z)*TILE-centerY)*scale+h/2);
-                float mx=(float)(ax+(bx-ax)*f),my=(float)(ay+(by-ay)*f);int col=b[3]>0?runColor:routeColor;
+                float mx=(float)(ax+(bx-ax)*f),my=(float)(ay+(by-ay)*f);int col=kmColor((int)(nextMark/1000));
                 paint.setStyle(Paint.Style.FILL);paint.setColor(Color.WHITE);c.drawCircle(mx,my,dp(4.5f)*lineScale,paint);paint.setColor(col);c.drawCircle(mx,my,dp(3)*lineScale,paint);
                 nextMark+=1000;
             }
             run+=seg;
         }
-        trackKm=run/1000;paint.setStyle(Paint.Style.FILL);
+        trackKm=run/1000;kmShown=(int)(run/1000);paint.setStyle(Paint.Style.FILL);
     }
     private double trackKm;
-    /** The finish as a ring counter: the route's total kilometres inside a green ring. */
-    private void finishCounter(Canvas c,float x,float y){
-        float r=dp(15)*lineScale;paint.setStyle(Paint.Style.FILL);paint.setColor(darkMode?Color.rgb(18,18,22):Color.WHITE);c.drawCircle(x,y,r,paint);
-        paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(3)*lineScale);paint.setColor(Color.rgb(52,168,83));c.drawCircle(x,y,r,paint);paint.setStyle(Paint.Style.FILL);
-        String km=trackKm>=10?String.valueOf(Math.round(trackKm)):String.format(java.util.Locale.US,"%.1f",trackKm);
-        android.graphics.Paint tp=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);tp.setTypeface(android.graphics.Typeface.create("sans-serif-medium",0));tp.setTextAlign(android.graphics.Paint.Align.CENTER);tp.setColor(darkMode?Color.rgb(245,245,247):Color.rgb(11,11,13));
-        tp.setTextSize(dp(km.length()>3?8.5f:10.5f)*lineScale);c.drawText(km,x,y+tp.getTextSize()*.36f,tp);
-        tp.setTextSize(dp(7)*lineScale);tp.setColor(darkMode?Color.rgb(154,160,166):Color.rgb(95,99,104));c.drawText("km",x,y+r+dp(9)*lineScale,tp);
+    /** One colour per kilometre, repeating after eight; the legend uses the same order. */
+    static final int[] KM_COLORS={Color.rgb(93,202,165),Color.rgb(250,199,117),Color.rgb(237,147,177),Color.rgb(127,119,221),Color.rgb(151,196,89),Color.rgb(133,183,235),Color.rgb(240,153,123),Color.rgb(239,159,39)};
+    static int kmColor(int km){return KM_COLORS[(Math.max(1,km)-1)%KM_COLORS.length];}
+    private int kmShown;private boolean legend;
+    /** A small panel in the top-right corner matching each dot colour to its kilometre. */
+    void setLegend(boolean on){legend=on;invalidate();}
+    private void drawLegend(Canvas c,float w,int reached,int total){
+        if(total<1)return;int rows=Math.min(total,8);boolean more=total>8;float s=Math.min(lineScale,1.1f),rowH=dp(17)*s,pad=dp(8)*s,pw=dp(78)*s,ph=pad*2+rowH*(rows+1)+(more?rowH:0);
+        float x=w-pw-dp(10)*s,y=dp(10)*s;paint.setStyle(Paint.Style.FILL);paint.setColor(darkMode?Color.argb(235,22,22,26):Color.argb(240,255,255,255));c.drawRoundRect(new RectF(x,y,x+pw,y+ph),dp(10)*s,dp(10)*s,paint);
+        android.graphics.Paint tp=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);tp.setTextSize(dp(10)*s);tp.setColor(darkMode?Color.rgb(154,160,166):Color.rgb(95,99,104));c.drawText("Kilometres",x+pad,y+pad+rowH*.7f,tp);
+        tp.setTypeface(android.graphics.Typeface.create("sans-serif-medium",0));
+        for(int k=1;k<=rows;k++){float ry=y+pad+rowH*k+rowH*.5f;int a=k<=reached?255:90;paint.setColor(kmColor(k));paint.setAlpha(a);c.drawCircle(x+pad+dp(4)*s,ry,dp(4.5f)*s,paint);paint.setAlpha(255);
+            tp.setColor(darkMode?Color.rgb(245,245,247):Color.rgb(11,11,13));tp.setAlpha(a);c.drawText("km "+k,x+pad+dp(14)*s,ry+tp.getTextSize()*.36f,tp);}
+        if(more){tp.setAlpha(170);c.drawText("+ "+(total-8)+" more",x+pad,y+pad+rowH*(rows+1)+rowH*.7f,tp);}
     }
+    /** Start: green round pin. Stop: green square pin. */
+    private void startPin(Canvas c,float x,float y){float s=lineScale;paint.setStyle(Paint.Style.FILL);paint.setColor(Color.WHITE);c.drawCircle(x,y,dp(8)*s,paint);paint.setColor(Color.rgb(52,168,83));c.drawCircle(x,y,dp(5.5f)*s,paint);}
+    private void stopPin(Canvas c,float x,float y){float s=lineScale,o=dp(8)*s,i=dp(5)*s;paint.setStyle(Paint.Style.FILL);paint.setColor(Color.WHITE);c.drawRoundRect(new RectF(x-o,y-o,x+o,y+o),dp(3)*s,dp(3)*s,paint);paint.setColor(Color.rgb(52,168,83));c.drawRoundRect(new RectF(x-i,y-i,x+i,y+i),dp(1.5f)*s,dp(1.5f)*s,paint);}
+
+    // ---- Replay: the route drawn as it was walked ----
+    private float replay=-1;private String replayFor;private java.util.List<double[]> rp=new ArrayList<>();private double rpTotalS,rpTotalM;
+    /** 0 to 1 through the session by recorded time; -1 turns replay off and shows the whole route. */
+    void setReplay(float f){replay=f;invalidate();}
+    float replay(){return replay;}
+    /** Distance walked and whether running, at the current replay point: {metres, run 1/0, seconds}. */
+    double[] replayState(){prepareReplay();return stateAt(replay<0?1:replay);}
+    /** Raw track with a light five-point average: {lat, lon, run, metres so far, seconds, new stretch}. */
+    private void prepareReplay(){
+        if(route.equals(replayFor))return;replayFor=route;rp=new ArrayList<>();
+        try{JSONArray a=new JSONArray(route);double m=0;double[] prev=null;
+            for(int i=0;i<a.length();i++){JSONObject q=a.optJSONObject(i);if(q==null)continue;double la=0,lo=0;int n=0;
+                for(int j=Math.max(0,i-2);j<=Math.min(a.length()-1,i+2);j++){JSONObject r=a.optJSONObject(j);if(r==null||(j!=i&&r.optBoolean("break",false)))continue;la+=r.optDouble("lat");lo+=r.optDouble("lon");n++;}
+                if(i==0||i==a.length()-1){la=q.optDouble("lat");lo=q.optDouble("lon");n=1;}
+                boolean gap=q.optBoolean("break",false);if(prev!=null&&!gap)m+=Insights.metres(prev[0],prev[1],q.optDouble("lat"),q.optDouble("lon"));
+                prev=new double[]{q.optDouble("lat"),q.optDouble("lon")};
+                rp.add(new double[]{la/n,lo/n,"r".equals(q.optString("t"))?1:0,m,q.optDouble("s",i),gap?1:0});}
+            rpTotalM=m;rpTotalS=rp.isEmpty()?0:rp.get(rp.size()-1)[4];
+        }catch(Exception ignored){}
+    }
+    /** Index (with fraction) of the replay point for a time fraction; GPS time keeps slow stretches slow. */
+    private double indexAt(float f){
+        if(rp.size()<2)return 0;double t0=rp.get(0)[4],t=t0+Math.max(0,Math.min(1,f))*(rpTotalS-t0);
+        for(int i=1;i<rp.size();i++)if(rp.get(i)[4]>=t){double a=rp.get(i-1)[4],b=rp.get(i)[4];return i-1+(b>a?Math.max(0,Math.min(1,(t-a)/(b-a))):1);}
+        return rp.size()-1;
+    }
+    private double[] stateAt(float f){if(rp.size()<2)return new double[]{0,0,0};double ix=indexAt(f);int i=(int)Math.floor(ix);int j=Math.min(rp.size()-1,i+1);double fr=ix-i;double[] a=rp.get(i),b=rp.get(j);return new double[]{a[3]+(b[3]-a[3])*fr,b[2],a[4]+(b[4]-a[4])*fr};}
+    private void drawReplay(Canvas c,int z,double centerX,double centerY,double scale,float w,float h){
+        prepareReplay();if(rp.size()<2)return;double ix=indexAt(Math.max(0,Math.min(1,replay)));int end=(int)Math.floor(ix);double fr=ix-end;
+        float[] xs=new float[rp.size()],ys=new float[rp.size()];
+        for(int i=0;i<rp.size();i++){xs[i]=(float)((tileX(rp.get(i)[1],z)*TILE-centerX)*scale+w/2);ys[i]=(float)((tileY(rp.get(i)[0],z)*TILE-centerY)*scale+h/2);}
+        float cx=xs[end],cy=ys[end];if(end+1<rp.size()&&rp.get(end+1)[5]==0){cx+=(xs[end+1]-xs[end])*fr;cy+=(ys[end+1]-ys[end])*fr;}
+        paint.setStyle(Paint.Style.STROKE);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);
+        for(int pass=0;pass<2;pass++){
+            for(int i=1;i<=Math.min(end+1,rp.size()-1);i++){if(rp.get(i)[5]>0)continue;float x2=xs[i],y2=ys[i];if(i==end+1){x2=cx;y2=cy;}
+                if(pass==0){paint.setStrokeWidth(dp(8)*lineScale);paint.setColor(darkMode?Color.argb(190,0,0,0):Color.argb(235,255,255,255));}
+                else{paint.setStrokeWidth(dp(4.8f)*lineScale);paint.setColor(rp.get(i)[2]>0?runColor:routeColor);}
+                c.drawLine(xs[i-1],ys[i-1],x2,y2,paint);}
+        }
+        // Kilometre dots that have been reached.
+        double walked=stateAt(Math.max(0,Math.min(1,replay)))[0];int reached=(int)(walked/1000);
+        for(int k=1;k<=reached;k++){double target=k*1000;for(int i=1;i<rp.size();i++)if(rp.get(i)[3]>=target){double a=rp.get(i-1)[3],b=rp.get(i)[3],f2=b>a?(target-a)/(b-a):0;float mx=(float)(xs[i-1]+(xs[i]-xs[i-1])*f2),my=(float)(ys[i-1]+(ys[i]-ys[i-1])*f2);
+            paint.setStyle(Paint.Style.FILL);paint.setColor(Color.WHITE);c.drawCircle(mx,my,dp(5)*lineScale,paint);paint.setColor(kmColor(k));c.drawCircle(mx,my,dp(3.5f)*lineScale,paint);break;}}
+        startPin(c,xs[0],ys[0]);
+        if(replay>=1){stopPin(c,xs[rp.size()-1],ys[rp.size()-1]);}
+        else{boolean run=rp.get(Math.min(rp.size()-1,end+1))[2]>0;int col=run?runColor:routeColor;paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.argb(60,Color.red(col),Color.green(col),Color.blue(col)));c.drawCircle(cx,cy,dp(15)*lineScale,paint);
+            paint.setColor(Color.WHITE);c.drawCircle(cx,cy,dp(8)*lineScale,paint);paint.setColor(col);c.drawCircle(cx,cy,dp(5)*lineScale,paint);}
+        if(legend)drawLegend(c,w,reached,(int)(rpTotalM/1000));
+    }
+
     /** Thicker lines and markers, for large renders such as the share image. */
     void setLineScale(float scale){lineScale=scale;invalidate();}
     /** Lets the user drag, pinch and double-tap to explore. Small previews stay static. */
@@ -183,7 +244,7 @@ public class RouteView extends View {
     @Override protected void onDraw(Canvas c){super.onDraw(c);float w=getWidth(),h=getHeight();c.drawColor(mapBackground);JSONArray points;try{points=new JSONArray(route);}catch(Exception e){points=new JSONArray();}if(points.length()==0&&!hasLocation){drawEmpty(c,w,h);return;}
         double minLat=90,maxLat=-90,minLon=180,maxLon=-180;for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p==null)continue;double lat=p.optDouble("lat"),lon=p.optDouble("lon");minLat=Math.min(minLat,lat);maxLat=Math.max(maxLat,lat);minLon=Math.min(minLon,lon);maxLon=Math.max(maxLon,lon);}if(overview&&focus!=null){minLat=focus[0];maxLat=focus[1];minLon=focus[2];maxLon=focus[3];}if(hasLocation){minLat=Math.min(minLat,currentLat);maxLat=Math.max(maxLat,currentLat);minLon=Math.min(minLon,currentLon);maxLon=Math.max(maxLon,currentLon);}double centerLat=followLocation&&hasLocation?currentLat:(minLat+maxLat)/2,centerLon=followLocation&&hasLocation?currentLon:(minLon+maxLon)/2;int z=followLocation&&hasLocation?17:zoomFor(minLat,maxLat,minLon,maxLon,w,h);double world=Math.scalb((double)TILE,z);double centerX=tileX(centerLon,z)*TILE,centerY=tileY(centerLat,z)*TILE;double spanX=Math.max(2,(tileX(maxLon,z)-tileX(minLon,z))*TILE),spanY=Math.max(2,(tileY(minLat,z)-tileY(maxLat,z))*TILE);double scale=followLocation&&hasLocation?1.0:Math.min(2.5,Math.min(w*.78/spanX,h*.78/spanY));if(manual){z=Math.max(3,Math.min(19,(int)Math.floor(mZoom)));scale=Math.pow(2,mZoom-z);centerX=mX*TILE*Math.scalb(1.0,z);centerY=mY*TILE*Math.scalb(1.0,z);}lastZf=z+Math.log(scale)/Math.log(2);lastX=centerX/(TILE*Math.scalb(1.0,z));lastY=centerY/(TILE*Math.scalb(1.0,z));double left=w/2-centerX*scale,top=h/2-centerY*scale,tileScreen=TILE*scale;
         int x0=(int)Math.floor((-left)/tileScreen),x1=(int)Math.floor((w-left)/tileScreen),y0=(int)Math.floor((-top)/tileScreen),y1=(int)Math.floor((h-top)/tileScreen);int limit=(1<<z);for(int ty=y0;ty<=y1;ty++)for(int tx=x0;tx<=x1;tx++){if(tx<0||tx>=limit||ty<0||ty>=limit)continue;String key=z+"/"+tx+"/"+ty;Bitmap b=tiles.get(key);if(b==null){load(key);continue;}float x=(float)(left+tx*tileScreen),y=(float)(top+ty*tileScreen);paint.setColorFilter(darkMode?DARK_MAP:LIGHT_MAP);c.drawBitmap(b,null,new RectF(x,y,x+(float)tileScreen,y+(float)tileScreen),paint);paint.setColorFilter(null);}
-        Path line=new Path(),walkLine=new Path(),runLine=new Path(),gaps=new Path();float px=Float.NaN,py=Float.NaN;for(double[] p:smoothed()){float x=(float)((tileX(p[1],z)*TILE-centerX)*scale+w/2),y=(float)((tileY(p[0],z)*TILE-centerY)*scale+h/2);Path typed=p[3]>0?runLine:walkLine;if(p[2]>0){if(!Float.isNaN(px)&&(x!=px||y!=py)){gaps.moveTo(px,py);gaps.lineTo(x,y);}line.moveTo(x,y);typed.moveTo(x,y);}else{line.lineTo(x,y);typed.lineTo(x,y);}px=x;py=y;}paint.setStyle(Paint.Style.STROKE);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeWidth(dp(2.5f)*lineScale);paint.setColor(darkMode?Color.argb(200,200,200,205):Color.argb(200,95,99,104));paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{dp(4)*lineScale,dp(4)*lineScale},0));if(!overview)c.drawPath(gaps,paint);paint.setPathEffect(null);if(darkMode){paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(11f)*lineScale);paint.setColor(Color.argb(60,Color.red(routeColor),Color.green(routeColor),Color.blue(routeColor)));c.drawPath(walkLine,paint);paint.setColor(Color.argb(60,Color.red(runColor),Color.green(runColor),Color.blue(runColor)));c.drawPath(runLine,paint);}paint.setColor(darkMode?Color.argb(190,0,0,0):Color.argb(235,255,255,255));paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(7.5f)*lineScale);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);c.drawPath(line,paint);paint.setStrokeWidth(dp(4.5f)*lineScale);paint.setColor(routeColor);{JSONObject f0=points.optJSONObject(0),f1=points.optJSONObject(points.length()-1);if(!overview&&f0!=null&&f1!=null&&points.length()>1){float sx=(float)((tileX(f0.optDouble("lon"),z)*TILE-centerX)*scale+w/2),sy=(float)((tileY(f0.optDouble("lat"),z)*TILE-centerY)*scale+h/2),ex=(float)((tileX(f1.optDouble("lon"),z)*TILE-centerX)*scale+w/2),ey=(float)((tileY(f1.optDouble("lat"),z)*TILE-centerY)*scale+h/2);if(Math.hypot(ex-sx,ey-sy)>dp(8))paint.setShader(new android.graphics.LinearGradient(sx,sy,ex,ey,blendTo(routeColor,Color.WHITE,darkMode?.45f:.35f),routeColor,android.graphics.Shader.TileMode.CLAMP));}}c.drawPath(walkLine,paint);paint.setShader(null);paint.setColor(runColor);c.drawPath(runLine,paint);if(markers)drawMarkers(c,z,centerX,centerY,scale,w,h);paint.setStyle(Paint.Style.FILL);JSONObject first=points.optJSONObject(0),last=points.optJSONObject(points.length()-1);if(overview){first=null;last=null;}if(first!=null)dot(c,(float)((tileX(first.optDouble("lon"),z)*TILE-centerX)*scale+w/2),(float)((tileY(first.optDouble("lat"),z)*TILE-centerY)*scale+h/2),Color.rgb(52,168,83));if(last!=null&&points.length()>1){float fx=(float)((tileX(last.optDouble("lon"),z)*TILE-centerX)*scale+w/2),fy=(float)((tileY(last.optDouble("lat"),z)*TILE-centerY)*scale+h/2);if(markers&&!hasLocation&&trackKm>=.05)finishCounter(c,fx,fy);else dot(c,fx,fy,routeColor);}if(hasLocation){float x=(float)((tileX(currentLon,z)*TILE-centerX)*scale+w/2),y=(float)((tileY(currentLat,z)*TILE-centerY)*scale+h/2);double metersPerPixel=156543.03392*Math.cos(Math.toRadians(currentLat))/Math.scalb(1.0,z);float radius=(float)(currentAccuracy/Math.max(.1,metersPerPixel)*scale);paint.setColor(Color.argb(45,33,150,243));c.drawCircle(x,y,Math.max(dp(12),radius),paint);paint.setColor(Color.WHITE);c.drawCircle(x,y,dp(9),paint);paint.setColor(Color.rgb(30,136,229));c.drawCircle(x,y,dp(6),paint);}
+        if(replay>=0){drawReplay(c,z,centerX,centerY,scale,w,h);return;}Path line=new Path(),walkLine=new Path(),runLine=new Path(),gaps=new Path();float px=Float.NaN,py=Float.NaN;for(double[] p:smoothed()){float x=(float)((tileX(p[1],z)*TILE-centerX)*scale+w/2),y=(float)((tileY(p[0],z)*TILE-centerY)*scale+h/2);Path typed=p[3]>0?runLine:walkLine;if(p[2]>0){if(!Float.isNaN(px)&&(x!=px||y!=py)){gaps.moveTo(px,py);gaps.lineTo(x,y);}line.moveTo(x,y);typed.moveTo(x,y);}else{line.lineTo(x,y);typed.lineTo(x,y);}px=x;py=y;}paint.setStyle(Paint.Style.STROKE);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeWidth(dp(2.5f)*lineScale);paint.setColor(darkMode?Color.argb(200,200,200,205):Color.argb(200,95,99,104));paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{dp(4)*lineScale,dp(4)*lineScale},0));if(!overview)c.drawPath(gaps,paint);paint.setPathEffect(null);if(darkMode){paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(11f)*lineScale);paint.setColor(Color.argb(60,Color.red(routeColor),Color.green(routeColor),Color.blue(routeColor)));c.drawPath(walkLine,paint);paint.setColor(Color.argb(60,Color.red(runColor),Color.green(runColor),Color.blue(runColor)));c.drawPath(runLine,paint);}paint.setColor(darkMode?Color.argb(190,0,0,0):Color.argb(235,255,255,255));paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(7.5f)*lineScale);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);c.drawPath(line,paint);paint.setStrokeWidth(dp(4.5f)*lineScale);paint.setColor(routeColor);{JSONObject f0=points.optJSONObject(0),f1=points.optJSONObject(points.length()-1);if(!overview&&f0!=null&&f1!=null&&points.length()>1){float sx=(float)((tileX(f0.optDouble("lon"),z)*TILE-centerX)*scale+w/2),sy=(float)((tileY(f0.optDouble("lat"),z)*TILE-centerY)*scale+h/2),ex=(float)((tileX(f1.optDouble("lon"),z)*TILE-centerX)*scale+w/2),ey=(float)((tileY(f1.optDouble("lat"),z)*TILE-centerY)*scale+h/2);if(Math.hypot(ex-sx,ey-sy)>dp(8))paint.setShader(new android.graphics.LinearGradient(sx,sy,ex,ey,blendTo(routeColor,Color.WHITE,darkMode?.45f:.35f),routeColor,android.graphics.Shader.TileMode.CLAMP));}}c.drawPath(walkLine,paint);paint.setShader(null);paint.setColor(runColor);c.drawPath(runLine,paint);if(markers)drawMarkers(c,z,centerX,centerY,scale,w,h);paint.setStyle(Paint.Style.FILL);JSONObject first=points.optJSONObject(0),last=points.optJSONObject(points.length()-1);if(overview){first=null;last=null;}if(first!=null)startPin(c,(float)((tileX(first.optDouble("lon"),z)*TILE-centerX)*scale+w/2),(float)((tileY(first.optDouble("lat"),z)*TILE-centerY)*scale+h/2));if(last!=null&&points.length()>1){float fx=(float)((tileX(last.optDouble("lon"),z)*TILE-centerX)*scale+w/2),fy=(float)((tileY(last.optDouble("lat"),z)*TILE-centerY)*scale+h/2);if(markers&&!hasLocation)stopPin(c,fx,fy);else dot(c,fx,fy,routeColor);}if(legend&&markers&&!overview)drawLegend(c,w,kmShown,kmShown);if(hasLocation){float x=(float)((tileX(currentLon,z)*TILE-centerX)*scale+w/2),y=(float)((tileY(currentLat,z)*TILE-centerY)*scale+h/2);double metersPerPixel=156543.03392*Math.cos(Math.toRadians(currentLat))/Math.scalb(1.0,z);float radius=(float)(currentAccuracy/Math.max(.1,metersPerPixel)*scale);paint.setColor(Color.argb(45,33,150,243));c.drawCircle(x,y,Math.max(dp(12),radius),paint);paint.setColor(Color.WHITE);c.drawCircle(x,y,dp(9),paint);paint.setColor(Color.rgb(30,136,229));c.drawCircle(x,y,dp(6),paint);}
     }
     private void load(String key){if(pending.putIfAbsent(key,Boolean.TRUE)!=null)return;new Thread(()->{HttpURLConnection con=null;try{URL url=new URL("https://tile.openstreetmap.org/"+key+".png");con=(HttpURLConnection)url.openConnection();con.setConnectTimeout(5000);con.setReadTimeout(7000);con.setRequestProperty("User-Agent",UA);con.setUseCaches(true);try(InputStream in=con.getInputStream()){Bitmap b=BitmapFactory.decodeStream(in);if(b!=null)tiles.put(key,b);}}catch(Exception ignored){}finally{if(con!=null)con.disconnect();pending.remove(key);postInvalidate();}} ,"KadammMapTile").start();}
     private int zoomFor(double minLat,double maxLat,double minLon,double maxLon,float w,float h){double baseX=(tileX(maxLon,16)-tileX(minLon,16))*TILE,baseY=(tileY(minLat,16)-tileY(maxLat,16))*TILE;double ratio=Math.max((w*.70)/Math.max(1,baseX),(h*.70)/Math.max(1,baseY));int z=16+(int)Math.floor(Math.log(Math.max(.00001,ratio))/Math.log(2));return Math.max(3,Math.min(18,z));}

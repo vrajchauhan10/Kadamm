@@ -1,6 +1,6 @@
 # Kadamm project context
 
-Baseline reference, written from the code at v7.3 (versionCode 29, commit edb530f, 2026-11-01), updated for 8.0. `CLAUDE.md` has the build and release rules; this file maps the code.
+Baseline reference, written from the code at v7.3 (versionCode 29, commit edb530f, 2026-11-01), updated for 8.1. `CLAUDE.md` has the build and release rules; this file maps the code.
 
 ## Overview
 
@@ -43,6 +43,7 @@ Kadamm is a native Android walk/run tracker (application id `com.stride.run`, or
 | `Progress.java` | Date ranges for reports, period summaries, 16 badges, challenges (`kadamm_badges`) |
 | `Calories.java` | MET-based calorie estimate (weight from settings) |
 | `LocalAccount.java` | Accounts in SQLite (`kadamm.db`, table `accounts`: name, email, salted PBKDF2 hash, photo path); prefs `kadamm_account` hold who is signed in. Migrates the pre-8.0 prefs account |
+| `ReplayVideo.java` | Route replay as an MP4 (MediaCodec H.264 from a Surface + MediaMuxer, 720×1280, 30 fps); frames drawn with `RouteView.setReplay` |
 | `Streets.java` | Street names for Places via `Geocoder`, cached per 100 m square in prefs `kadamm_streets` |
 | `KadammTheme.java` | The only color palette: semantic tokens for light/dark |
 | `PullDown.java` | Swipe-down-to-close gesture used by sub-pages, the live screen and the start sheet |

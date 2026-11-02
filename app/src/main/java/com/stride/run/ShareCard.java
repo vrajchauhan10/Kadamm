@@ -88,10 +88,11 @@ final class ShareCard {
         return b;
     }
     /** "crafted by V" in the app's signature fonts, right-aligned at (right, baseline). */
-    static void signature(Context c,Canvas cv,float right,float baseline,int color){
+    static void signature(Context c,Canvas cv,float right,float baseline,int color){signature(c,cv,right,baseline,color,1f);}
+    static void signature(Context c,Canvas cv,float right,float baseline,int color,float scale){
         try{
             Paint a=new Paint(Paint.ANTI_ALIAS_FLAG);a.setColor(Color.argb(170,Color.red(color),Color.green(color),Color.blue(color)));
-            Paint v=new Paint(a);a.setTypeface(c.getResources().getFont(R.font.great_vibes));a.setTextSize(52);v.setTypeface(c.getResources().getFont(R.font.parisienne));v.setTextSize(56);
+            Paint v=new Paint(a);a.setTypeface(c.getResources().getFont(R.font.great_vibes));a.setTextSize(52*scale);v.setTypeface(c.getResources().getFont(R.font.parisienne));v.setTextSize(56*scale);
             float vw=v.measureText("V"),aw=a.measureText("crafted by ");cv.drawText("crafted by ",right-vw-aw,baseline,a);cv.drawText("V",right-vw,baseline,v);
         }catch(Exception ignored){}
     }

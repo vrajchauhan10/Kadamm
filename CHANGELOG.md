@@ -1,5 +1,13 @@
 # Changelog
 
+## 8.1 (versionCode 34)
+
+- Route replay: a session's map has Play, a scrub slider and 1×/2×/4× speed. The route draws itself along the streets in GPS time (slow stretches play slower), blue while walking and red while running, with a moving marker and a caption: walking or running, distance and time so far.
+- Share replay video: a 10-second 720 × 1280 MP4 of the replay with the numbers counting up and a "Finished" frame, in dark or light. Encoded on the phone in a few seconds; send it on WhatsApp, to any app, or save it to Movies/Kadamm.
+- Kilometre dots in their own colours (km 1 green, km 2 yellow, km 3 pink…), with a legend in the map's corner naming each one; during a replay each dot and legend row lights up as you pass it.
+- Start is a green round pin and stop a green square pin; the big ring with the total kilometres is gone.
+- Share sheets for images and videos add "Save" to the gallery.
+
 ## 8.0 (versionCode 33) — major release
 
 - Goal celebration: the first time Kadamm is on screen after you reach your step goal, a full-screen confetti shower with a trophy card ("10,000 steps!", steps beyond the goal, your streak) and Share / Keep going. Once a day, on any screen, including the live map and while the mini bar shows.
