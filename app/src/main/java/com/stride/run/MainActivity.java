@@ -2161,7 +2161,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         c.setFocusable(true);c.setOnClickListener(v->navigate("Achievements"));
     }
     private void renderAchievements(){
-        brand("YOUR PROGRESS","Badges","Earn medals in four tiers, from easy to extreme.");
+        brand("YOUR PROGRESS","Achievements","Earn medals in four tiers, from easy to extreme.");
         JSONArray h=history();java.util.Map<String,Long> totals=DaySteps.allDayTotals(this);int goal=dailyGoal();KadammTheme th=chartTheme();
         java.util.List<Progress.Badge> all=Progress.badges(this,h,totals,goal);boolean celebrate=!Progress.unseen(this,all).isEmpty();
         int earned=0;int[] perTier=new int[4],earnedTier=new int[4];for(Progress.Badge b:all){perTier[b.tier]++;if(b.earned()){earned++;earnedTier[b.tier]++;}}
