@@ -52,6 +52,21 @@ final class SessionMetrics {
     double gain=-1,loss=-1,altMin=Double.NaN,altMax=Double.NaN,gapPace=-1;boolean barometer;long[] gradeS;
     double consistency=-1,firstHalfPace=-1,secondHalfPace=-1,vdot=-1;
     int hrAvg=-1,hrMax=-1,maxHr=-1;long[] hrZoneS;String hrSource;
+    /** Where the steps-over-time came from: "Kadamm" (8.2+ recording), "Health Connect" (per minute) or "". */
+    String stepSource="";boolean seaLevel;
+    /** Fastest pace held for 1, 5, 10, 20, 30 and 60 minutes (GPS): duration seconds → seconds per km. */
+    final Map<Integer,Double> bestByTime=new LinkedHashMap<>();
+    static final int[] CURVE={60,300,600,1200,1800,3600};
+    /** Stride variability: spread of the 30-second stride over the walk, as a % of the average. */
+    double strideCv=-1;
+    /** Grade-adjusted pace along the route {km, seconds per km, 0}, with the barometer only. */
+    List<double[]> gap=new ArrayList<>();
+    /** Map overlays {lat1, lon1, lat2, lon2, colour}: by speed (slow green → fast red) and by grade. */
+    final List<double[]> paceOverlay=new ArrayList<>(),gradeOverlay=new ArrayList<>();
+    /** Where each best effort finished {lat, lon}, for pinning labels on the map. */
+    final Map<Integer,double[]> bestEnd=new HashMap<>();
+    /** Speeds (km/h) by 30-second window while moving, for pace zones: {seconds, km/h}. */
+    final List<double[]> speeds=new ArrayList<>();
 
     static final class Split { int index;double fraction=1,pace,cadence=-1,elev=Double.NaN;long sec;boolean fastest,slowest; }
 
@@ -59,11 +74,11 @@ final class SessionMetrics {
 
     // ---- Cache: sessions don't change once saved, apart from Health Connect extras ----
     private static final Map<Long,Object[]> cache=new HashMap<>();
-    private static String signature(JSONObject o){return o.optString("route","").length()+"/"+o.optString("timeline","").length()+"/"+o.optString("hr","").length()+"/"+o.optDouble("distanceKm")+"/"+o.optLong("steps")+"/"+o.optString("activityMode");}
+    private static String signature(JSONObject o){return o.optString("route","").length()+"/"+o.optString("timeline","").length()+"/"+o.optString("hr","").length()+"/"+o.optString("hcMin","").length()+"/"+o.optDouble("distanceKm")+"/"+o.optLong("steps")+"/"+o.optString("activityMode");}
     static SessionMetrics of(Context c,JSONObject o){
         long id=o.optLong("id");String sig=signature(o)+"/"+settingsKey(c);
         synchronized(cache){Object[] hit=cache.get(id);if(hit!=null&&sig.equals(hit[0]))return (SessionMetrics)hit[1];}
-        SessionMetrics m=compute(c,o);
+        if(appContext==null)appContext=c.getApplicationContext();SessionMetrics m=compute(c,o);
         synchronized(cache){cache.put(id,new Object[]{sig,m});}
         return m;
     }
@@ -73,12 +88,12 @@ final class SessionMetrics {
     /** Fills the cache off the main thread, so the first look at a session or a report doesn't stall. */
     static void warm(Context c,JSONArray hist){
         Context app=c.getApplicationContext();
-        new Thread(()->{
+        Thread t=new Thread(()->{
             for(int i=0;i<hist.length();i++){JSONObject o=hist.optJSONObject(i);if(o!=null)try{of(app,o);}catch(Exception ignored){}}
             warmed=true;
             // Places and records walk every route point too; doing them here keeps Profile's first open quick.
             try{Insights.coverage(hist);Insights.records(hist,DaySteps.allDayTotals(app));}catch(Exception ignored){}
-        },"KadammMetrics").start();
+        },"KadammMetrics");t.setPriority(Thread.MIN_PRIORITY);t.start();
     }
     private static SharedPreferences settings(Context c){return c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE);}
     private static String settingsKey(Context c){SharedPreferences s=settings(c);return s.getInt("strideLengthCm",72)+"/"+s.getInt("ageYears",0)+"/"+s.getInt("maxHr",0);}
@@ -103,6 +118,14 @@ final class SessionMetrics {
         List<long[]> stepSeries=new ArrayList<>();
         if(tl.length>=6&&tl[tl.length-1][1]>0)for(long[] r:tl){if(r[1]>=0)stepSeries.add(new long[]{r[0],r[1]});}
         else for(P p:pts)if(p.k>=0)stepSeries.add(new long[]{p.s,p.k});
+        if(!stepSeries.isEmpty())x.stepSource="Kadamm";
+        else{
+            // Older sessions: Samsung Health's per-minute steps, read through Health Connect, summed into a running total.
+            JSONArray hm=o.optJSONArray("hcMin");if(hm==null)try{String v=o.optString("hcMin","");if(!v.isEmpty())hm=new JSONArray(v);}catch(Exception ignored){}
+            if(hm!=null&&hm.length()>=3){long cum=0;stepSeries.add(new long[]{Math.max(0,hm.optJSONArray(0).optLong(0)),0});
+                for(int i=0;i<hm.length();i++){JSONArray r=hm.optJSONArray(i);if(r==null)continue;cum+=r.optLong(1);stepSeries.add(new long[]{r.optLong(0)+60,cum});}
+                if(cum>0)x.stepSource="Health Connect";else stepSeries.clear();}
+        }
         // Distance over time {seconds, metres, isRun}: GPS track outdoors, the timeline indoors.
         List<double[]> dist=new ArrayList<>();
         if(x.gps)for(P p:pts)dist.add(new double[]{p.s,p.m,p.run?1:0});
@@ -121,6 +144,8 @@ final class SessionMetrics {
         if(x.run&&x.gps&&!x.vehicle)x.vdot=vdot(x);
         if(x.gps)x.pace=Insights.pace(Insights.track(o.optString("route","[]")));
         else if(dist.size()>=6)x.pace=paceFromTimeline(dist);
+        if(x.gps&&!x.vehicle){curve(x,pts);overlays(x,pts);}
+        if(x.stride.size()>=6){double sum=0;for(double[] q:x.stride)sum+=q[1];double mean=sum/x.stride.size(),v=0;for(double[] q:x.stride)v+=(q[1]-mean)*(q[1]-mean);x.strideCv=Math.sqrt(v/x.stride.size())/mean*100;}
         return x;
     }
 
@@ -203,7 +228,7 @@ final class SessionMetrics {
         if(x.cadence.size()>=4){
             x.zoneSource="cadence";
             for(int i=0;i<x.cadence.size();i++){
-                double[] q=x.cadence.get(i);double dt=i==0?5:Math.min(30,q[0]-x.cadence.get(i-1)[0]);
+                double[] q=x.cadence.get(i);double dt=i==0?Math.min(60,q[0]):Math.min(90,q[0]-x.cadence.get(i-1)[0]);
                 if(q[1]<40){still+=dt;if(moving&&still>=20){x.stops++;moving=false;}continue;}
                 still=0;moving=true;x.zoneS[zone(q[1],CADENCE_FROM)]+=Math.round(dt);
             }
@@ -257,7 +282,7 @@ final class SessionMetrics {
                 P e=pts.get(i);if(e.m<target)continue;
                 while(j+1<i&&e.m-pts.get(j+1).m>=target)j++;
                 P a=pts.get(j),b=pts.get(j+1);double startM=e.m-target;double f=b.m==a.m?0:(startM-a.m)/(b.m-a.m);
-                double startT=a.s+(b.s-a.s)*Math.max(0,Math.min(1,f));bestT=Math.min(bestT,e.s-startT);
+                double startT=a.s+(b.s-a.s)*Math.max(0,Math.min(1,f));if(e.s-startT<bestT){bestT=e.s-startT;x.bestEnd.put(target,new double[]{e.lat,e.lon});}
             }
             // A pace faster than 2:30 /km means a GPS jump, not a real effort.
             if(bestT<Double.MAX_VALUE&&bestT/(target/1000d)>=150)x.best.put(target,bestT);
@@ -275,6 +300,15 @@ final class SessionMetrics {
         else if(!x.gps){int n=0;for(long[] r:tl)if(r[3]!=Long.MIN_VALUE)n++;if(n>=10){x.barometer=true;for(long[] r:tl)if(r[3]!=Long.MIN_VALUE)alt.add(new double[]{r[0],r[2],r[3]/100d});}}
         if(alt.isEmpty())for(P p:pts)if(!Double.isNaN(p.alt))alt.add(new double[]{p.s,p.m,p.alt});
         if(alt.size()<10)return;
+        // Heights above sea level: GPS reports height above the WGS84 ellipsoid, so the geoid offset for this
+        // place is added; barometer altitude (standard atmosphere) is anchored to the GPS sea-level average.
+        P first=null;for(P p:pts)if(!Double.isNaN(p.alt)){first=p;break;}
+        double off=first==null?Double.NaN:geoid(first.lat,first.lon);
+        if(!Double.isNaN(off)){
+            if(x.barometer){double g=0,b=0;int n=0;for(P p:pts)if(!Double.isNaN(p.alt)&&!Double.isNaN(p.baro)){g+=p.alt+off;b+=p.baro;n++;}if(n>=10){double shift=(g-b)/n;for(double[] q:alt)q[2]+=shift;}}
+            else for(double[] q:alt)q[2]+=off;
+            x.seaLevel=true;
+        }
         // Smooth: a moving average over neighbours (wider for GPS).
         int w=x.barometer?2:8;double[] sm=new double[alt.size()];
         for(int i=0;i<sm.length;i++){double s=0;int n=0;for(int k=Math.max(0,i-w);k<=Math.min(sm.length-1,i+w);k++){s+=alt.get(k)[2];n++;}sm[i]=s/n;}
@@ -293,9 +327,22 @@ final class SessionMetrics {
             x.gradeS[g>.02?0:g<-.02?2:1]+=Math.round(dt);
             double gc=Math.max(-.45,Math.min(.45,g));double cost=155.4*Math.pow(gc,5)-30.4*Math.pow(gc,4)-43.3*Math.pow(gc,3)+46.3*gc*gc+19.5*gc+3.6;
             adjusted+=dm*cost/3.6;time+=dt;
+            if(dm>0)x.gap.add(new double[]{alt.get(i)[1]/1000d,Math.max(150,Math.min(1800,dt/(dm*cost/3.6/1000d))),0});
         }
+        x.gap=smooth(x.gap,8);
         if(adjusted>100)x.gapPace=time/(adjusted/1000d);
     }
+    private static final Map<String,Double> geoidCache=new HashMap<>();
+    /** Sea-level height minus ellipsoid height here (metres), from Android's geoid model (Android 14+); NaN if unavailable. */
+    private static double geoid(double lat,double lon){
+        if(android.os.Build.VERSION.SDK_INT<34)return Double.NaN;String key=Math.round(lat*10)+","+Math.round(lon*10);
+        synchronized(geoidCache){Double v=geoidCache.get(key);if(v!=null)return v;}
+        double out=Double.NaN;
+        try{android.location.Location l=new android.location.Location("gps");l.setLatitude(lat);l.setLongitude(lon);l.setAltitude(0);
+            new android.location.altitude.AltitudeConverter().addMslAltitudeToLocation(appContext,l);if(l.hasMslAltitude())out=l.getMslAltitudeMeters();}catch(Exception ignored){}
+        synchronized(geoidCache){geoidCache.put(key,out);}return out;
+    }
+    private static Context appContext;
     private static double altAt(List<double[]> alt,double[] sm,double m){for(int i=0;i<alt.size();i++)if(alt.get(i)[1]>=m)return sm[i];return alt.isEmpty()?Double.NaN:sm[sm.length-1];}
 
     private static void heartRate(Context c,SessionMetrics x,JSONObject o){
@@ -308,6 +355,50 @@ final class SessionMetrics {
             x.hrZoneS=new long[5];
             for(int i=1;i<x.hr.size();i++){double dt=Math.min(30,x.hr.get(i)[0]-x.hr.get(i-1)[0]),f=x.hr.get(i)[1]/x.maxHr;if(f<.5)continue;x.hrZoneS[zone(f,HR_FROM)]+=Math.round(dt);}
         }
+    }
+
+    private static List<double[]> smooth(List<double[]> d,int w){List<double[]> out=new ArrayList<>();for(int i=0;i<d.size();i++){double sum=0;int n=0;for(int k=Math.max(0,i-w);k<=Math.min(d.size()-1,i+w);k++){sum+=d.get(k)[1];n++;}out.add(new double[]{d.get(i)[0],sum/n,0});}return out;}
+
+    /** Fastest pace held over each duration in {@link #CURVE}: the most distance covered in that much time. */
+    private static void curve(SessionMetrics x,List<P> pts){
+        for(int dur:CURVE){
+            if(pts.get(pts.size()-1).s-pts.get(0).s<dur)break;double bestM=0;int j=0;
+            for(int i=1;i<pts.size();i++){while(j<i&&pts.get(i).s-pts.get(j+1).s>=dur)j++;if(pts.get(i).s-pts.get(j).s>=dur)bestM=Math.max(bestM,pts.get(i).m-pts.get(j).m);}
+            if(bestM>dur/1800d*1000*.1&&dur/(bestM/1000d)>=150)x.bestByTime.put(dur,dur/(bestM/1000d));
+        }
+    }
+    /**
+     * Route overlays. Pace: each stretch coloured by its 30-second speed, from this session's slowest (green)
+     * to fastest (red) stretches. Grade (barometer only): uphill red, flat amber, downhill blue.
+     */
+    private static void overlays(SessionMetrics x,List<P> pts){
+        long[] t=new long[pts.size()];for(int i=0;i<t.length;i++)t[i]=pts.get(i).s;
+        double[] kmh=new double[pts.size()];
+        for(int i=1;i<pts.size();i++){int j=back(t,i,30);if(j<0)j=0;double dt=t[i]-t[j];kmh[i]=dt>0?(pts.get(i).m-pts.get(j).m)/dt*3.6:0;if(kmh[i]>=1&&dt<=120)x.speeds.add(new double[]{t[i],kmh[i],Math.min(30,t[i]-t[i-1])});}
+        double[] sorted=new double[x.speeds.size()];for(int i=0;i<sorted.length;i++)sorted[i]=x.speeds.get(i)[1];Arrays.sort(sorted);
+        if(sorted.length>=10){double lo=sorted[sorted.length/10],hi=sorted[sorted.length*9/10];if(hi-lo<.5){lo-=.25;hi+=.25;}
+            for(int i=1;i<pts.size();i++){P a=pts.get(i-1),b=pts.get(i);if(b.brk)continue;double f=(kmh[i]-lo)/(hi-lo);x.paceOverlay.add(new double[]{a.lat,a.lon,b.lat,b.lon,ramp(Math.max(0,Math.min(1,f)))});}}
+        int baro=0;for(P p:pts)if(!Double.isNaN(p.baro))baro++;
+        if(baro>=10){int j=0;
+            for(int i=1;i<pts.size();i++){P b=pts.get(i);if(b.brk||Double.isNaN(b.baro))continue;while(j<i-1&&b.m-pts.get(j+1).m>=30)j++;P a=pts.get(j);if(Double.isNaN(a.baro)||b.m-a.m<10)continue;
+                double g=(b.baro-a.baro)/(b.m-a.m);P p=pts.get(i-1);x.gradeOverlay.add(new double[]{p.lat,p.lon,b.lat,b.lon,g>.02?MetricViews.ZONE_COLORS[4]:g<-.02?MetricViews.ZONE_COLORS[1]:MetricViews.ZONE_COLORS[3]});}}
+    }
+    /** Green → amber → red. */
+    static int ramp(double f){int a=f<.5?MetricViews.ZONE_COLORS[2]:MetricViews.ZONE_COLORS[3],b=f<.5?MetricViews.ZONE_COLORS[3]:MetricViews.ZONE_COLORS[4];return MetricViews.blendC(a,b,(float)(f<.5?f*2:(f-.5)*2));}
+
+    // ---- Pace zones: six zones around your threshold pace, the best pace you've held for 30 minutes ----
+    static final String[] PACE_ZONES={"Recovery","Endurance","Tempo","Threshold","VO₂ max","Anaerobic"};
+    /** Lower bounds as a share of threshold speed (Strava-style): 78, 88, 94, 101, 105 %. */
+    static final double[] PACE_FROM={.78,.88,.94,1.01,1.05};
+    /** Threshold pace (seconds per km) from all sessions' best 30-minute stretch, or -1 before any 30-minute GPS session. */
+    static double thresholdPace(Context c,JSONArray hist){
+        double best=-1;for(int i=0;i<hist.length();i++){JSONObject s=hist.optJSONObject(i);if(s==null)continue;Double p=of(c,s).bestByTime.get(1800);if(p!=null&&(best<0||p<best))best=p;}return best;
+    }
+    /** Seconds in each pace zone for this session, given the threshold pace. */
+    long[] paceZones(double threshold){
+        if(threshold<=0||speeds.isEmpty())return null;double tk=3600/threshold;long[] z=new long[6];
+        for(double[] q:speeds){int k=0;for(double f:PACE_FROM)if(q[1]>=tk*f)k++;z[k]+=Math.round(q[2]);}
+        return z;
     }
 
     /** Daniels' VDOT from the best running effort of 1.5 km or more: an estimate of VO₂max from race pace. */
@@ -387,9 +478,15 @@ final class SessionMetrics {
             double k=s.optDouble("distanceKm",0);long t=s.optLong("startTimeMs",s.optLong("id"));if(t>start||Math.abs(k-km)>km*.2)continue;SessionMetrics m=of(c,s);if(m.paceMoving>0)out.add(new double[]{t,m.paceMoving,s.optLong("id")});}
         out.sort((a,b)->Double.compare(a[0],b[0]));return out;
     }
-    /** Intensity minutes (WHO: moderate plus twice vigorous) from sessions in [from, to) day keys. */
+    /**
+     * Intensity minutes (WHO: moderate plus twice vigorous) for days in [from, to). Each day takes the larger of
+     * its sessions' minutes and its all-day brisk minutes from Health Connect, never the two added together.
+     */
     static double intensityMinutes(Context c,JSONArray hist,String from,String to){
-        double sum=0;for(int i=0;i<hist.length();i++){JSONObject s=hist.optJSONObject(i);if(s==null)continue;String d=s.optString("day","");if(d.compareTo(from)>=0&&d.compareTo(to)<0&&!Insights.vehicle(s))sum+=of(c,s).intensityMin;}return sum;
+        Map<String,Double> byDay=new HashMap<>();
+        for(int i=0;i<hist.length();i++){JSONObject s=hist.optJSONObject(i);if(s==null)continue;String d=s.optString("day","");if(d.compareTo(from)>=0&&d.compareTo(to)<0&&!Insights.vehicle(s)){Double v=byDay.get(d);byDay.put(d,(v==null?0:v)+of(c,s).intensityMin);}}
+        JSONObject md=DaySteps.minuteDays(c);for(java.util.Iterator<String> it=md.keys();it.hasNext();){String d=it.next();if(d.compareTo(from)<0||d.compareTo(to)>=0)continue;double b=md.optJSONObject(d).optDouble("brisk",0);Double v=byDay.get(d);if(v==null||b>v)byDay.put(d,b);}
+        double sum=0;for(double v:byDay.values())sum+=v;return sum;
     }
 
     // ---- Words ----

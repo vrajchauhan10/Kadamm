@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="8.2";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="8.3";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -167,7 +167,7 @@ public class MainActivity extends Activity {
     /** True when a scrolling view inside {@code v} is not at its top, so a downward drag should scroll it instead. */
     private boolean scrolledDown(View v){if(v.canScrollVertically(-1))return true;if(v instanceof android.view.ViewGroup){android.view.ViewGroup g=(android.view.ViewGroup)v;for(int i=0;i<g.getChildCount();i++)if(g.getChildAt(i).getVisibility()==View.VISIBLE&&scrolledDown(g.getChildAt(i)))return true;}return false;}
     private LinearLayout navItem(String title,String icon){LinearLayout item=col();item.setGravity(Gravity.CENTER);item.setFocusable(true);item.setContentDescription(title);item.setOnClickListener(v->navigate(title));android.widget.ImageView symbol=icon(iconRes(title),muted,2);item.addView(symbol,lp(-1,28));TextView label=tx(title,11,muted,true);label.setGravity(Gravity.CENTER);item.addView(label,lp(-1,20));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1);p.setMargins(dp(3),0,dp(3),0);nav.addView(item,p);return item;}
-    private void navigate(String destination){page=destination;scroller.scrollTo(0,0);closeDrawer();renderPage();}
+    private void navigate(String destination){page=destination;closeDrawer();renderPage();}
     private void openDrawer(){buildDrawerContents();drawer.setBackgroundColor(panel);drawerLayer.setVisibility(View.VISIBLE);drawerLayer.setAlpha(0f);drawerLayer.animate().alpha(1f).setDuration(reducedMotion()?0:160).start();drawer.setTranslationX(-drawer.getLayoutParams().width);drawer.animate().translationX(0).setInterpolator(new android.view.animation.DecelerateInterpolator()).setDuration(reducedMotion()?0:240).start();}
     private void closeDrawer(){if(drawerLayer==null||drawerLayer.getVisibility()!=View.VISIBLE)return;drawer.animate().translationX(-drawer.getLayoutParams().width).setDuration(reducedMotion()?0:160).start();drawerLayer.animate().alpha(0f).setDuration(reducedMotion()?0:120).withEndAction(()->drawerLayer.setVisibility(View.GONE)).start();}
     private boolean reducedMotion(){try{return android.provider.Settings.Global.getFloat(getContentResolver(),"animator_duration_scale",1f)<=0f;}catch(Exception e){return false;}}
@@ -244,14 +244,29 @@ public class MainActivity extends Activity {
         // its first layout, so building it never eats into the animation's frames.
         content.animate().translationX(-dir*w*.5f).alpha(0f).setDuration(110).withLayer().withEndAction(()->{scroller.scrollTo(0,0);renderPageNow();content.setTranslationX(dir*w*.35f);content.setAlpha(0f);content.post(()->content.animate().translationX(0).alpha(1f).setDuration(220).setInterpolator(EASE).withLayer().start());}).start();
     }
-    private void renderPage(){int from=tabIndex(renderedPage),to=tabIndex(page);if(from>=0&&to>=0&&from!=to&&content.getChildCount()>0){slideTo(to>from?1:-1);return;}content.setTranslationX(0);float motion=1f;try{motion=android.provider.Settings.Global.getFloat(getContentResolver(),"animator_duration_scale",1f);}catch(Exception ignored){}if(content.getChildCount()==0||motion<=0f){renderPageNow();return;}content.animate().cancel();content.animate().alpha(0f).setDuration(75).withLayer().withEndAction(()->{renderPageNow();content.setAlpha(0f);content.setTranslationY(dp(10));content.post(()->content.animate().alpha(1f).translationY(0).setDuration(200).setInterpolator(EASE).withLayer().start());}).start();}
-    private void renderPageNow(){long perfStart=android.os.SystemClock.uptimeMillis();renderPageInner();android.util.Log.d("KadammPerf",page+" built in "+(android.os.SystemClock.uptimeMillis()-perfStart)+" ms");}
-    private void renderPageInner(){if(replayAnim!=null){replayAnim.cancel();replayAnim=null;}if(!page.equals(renderedPage)&&scroller!=null)scroller.scrollTo(0,0);renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else if(page.equals("Routes"))renderRoutes();else if(page.equals("Notifications"))renderNotifications();else if(page.equals("Reports"))renderReports();else if(page.equals("Achievements"))renderAchievements();else if(page.equals("Permissions"))renderPermissions();else if(page.equals("Auto"))renderAutoTracking();else if(page.equals("Storage"))renderStorage();else if(page.equals("Places"))renderPlaces();else renderDetail(lastSession);if(content.getChildCount()>0)signatureAtEnd();}
+    private final java.util.HashMap<String,Integer> scrollMemory=new java.util.HashMap<>();private int restoreScroll=-1;
+    private void rememberScroll(){if(renderedPage!=null&&scroller!=null)scrollMemory.put(renderedPage,scroller.getScrollY());}
+    private void renderPage(){rememberScroll();int from=tabIndex(renderedPage),to=tabIndex(page);if(from>=0&&to>=0&&from!=to&&content.getChildCount()>0){slideTo(to>from?1:-1);return;}content.setTranslationX(0);float motion=1f;try{motion=android.provider.Settings.Global.getFloat(getContentResolver(),"animator_duration_scale",1f);}catch(Exception ignored){}if(content.getChildCount()==0||motion<=0f){renderPageNow();return;}content.animate().cancel();content.animate().alpha(0f).setDuration(75).withLayer().withEndAction(()->{renderPageNow();content.setAlpha(0f);content.setTranslationY(dp(10));content.post(()->content.animate().alpha(1f).translationY(0).setDuration(200).setInterpolator(EASE).withLayer().start());}).start();}
+    private void renderPageNow(){long perfStart=android.os.SystemClock.uptimeMillis();renderPageInner();if(restoreScroll>=0){int y=restoreScroll;restoreScroll=-1;scroller.post(()->scroller.scrollTo(0,y));}android.util.Log.d("KadammPerf",page+" built in "+(android.os.SystemClock.uptimeMillis()-perfStart)+" ms");}
+    /**
+     * Where Back goes: sub-pages remember the page they were opened from (Profile → Achievements → a session),
+     * so Back and swipe-down return there instead of jumping to Today. Switching tabs starts a fresh trail.
+     */
+    private final java.util.ArrayDeque<String> backStack=new java.util.ArrayDeque<>();private boolean goingBack;
+    private void trackBack(){
+        if(page.equals(renderedPage)||renderedPage==null)return;
+        if(tabIndex(page)>=0)backStack.clear();
+        else if(!goingBack){backStack.remove(page);backStack.push(renderedPage);}
+        goingBack=false;
+    }
+    private void goBack(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.pop();Integer y=scrollMemory.get(to);restoreScroll=y==null?-1:y;goingBack=true;page=to;closeDrawer();renderPage();}
+    private String backLabel(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.peek();return "Detail".equals(to)?"Session":"Auto".equals(to)?"Auto tracking":to;}
+    private void renderPageInner(){trackBack();if(replayAnim!=null){replayAnim.cancel();replayAnim=null;}if(!page.equals(renderedPage)&&scroller!=null)scroller.scrollTo(0,0);renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else if(page.equals("Routes"))renderRoutes();else if(page.equals("Notifications"))renderNotifications();else if(page.equals("Reports"))renderReports();else if(page.equals("Achievements"))renderAchievements();else if(page.equals("Permissions"))renderPermissions();else if(page.equals("Auto"))renderAutoTracking();else if(page.equals("Storage"))renderStorage();else if(page.equals("Places"))renderPlaces();else renderDetail(lastSession);if(content.getChildCount()>0)signatureAtEnd();}
     private void styleNavItem(LinearLayout item,boolean selected){int color=selected?lime:muted;item.setBackground(rippleOn(selected?raised:Color.TRANSPARENT,14));((android.widget.ImageView)item.getChildAt(0)).setImageTintList(android.content.res.ColorStateList.valueOf(color));((TextView)item.getChildAt(1)).setTextColor(selected?ink:muted);}
-    private void brand(String eyebrow,String headline,String sub){LinearLayout brand=row();content.addView(brand,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);brand.addView(brandButton(),bbp);TextView e=tx(eyebrow.toUpperCase(Locale.US),10,muted,true);LinearLayout.LayoutParams ep=lp(-1,25);ep.topMargin=dp(8);content.addView(e,ep);TextView h=tx(headline,29,ink,true);content.addView(h);if(sub!=null){TextView s=tx(sub,13,muted,false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(5);sp.bottomMargin=dp(16);content.addView(s,sp);}}
+    private void brand(String eyebrow,String headline,String sub){LinearLayout brand=row();content.addView(brand,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);brand.addView(brandButton(),bbp);if(tabIndex(page)<0){brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));TextView bk=tx("‹  "+backLabel(),13,ink,true);bk.setGravity(Gravity.CENTER);bk.setPadding(dp(14),0,dp(16),0);bk.setBackground(rippleOn(raised,18));bk.setContentDescription("Back to "+backLabel());bk.setOnClickListener(v->goBack());brand.addView(bk,lp(-2,36));}TextView e=tx(eyebrow.toUpperCase(Locale.US),10,muted,true);LinearLayout.LayoutParams ep=lp(-1,25);ep.topMargin=dp(8);content.addView(e,ep);TextView h=tx(headline,29,ink,true);content.addView(h);if(sub!=null){TextView s=tx(sub,13,muted,false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(5);sp.bottomMargin=dp(16);content.addView(s,sp);}}
     private LinearLayout card(){LinearLayout c=col();c.setPadding(dp(16),dp(16),dp(16),dp(16));c.setBackground(panelShape(16));LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(12);content.addView(c,p);return c;}
     private GradientDrawable panelShape(int radius){GradientDrawable d=shape(panel,radius);d.setStroke(dp(1),line);return d;}
-    private void renderToday(){JSONArray hist=history();dayTotals=DaySteps.allDayTotals(this);loadIdleLocation();renderHeader();renderStepSetup();renderBadgeBanner(hist);renderHero(hist);renderCoach();renderBento(hist);renderDistanceGoal(hist);
+    private void renderToday(){JSONArray hist=history();dayTotals=DaySteps.allDayTotals(this);loadIdleLocation();renderHeader();renderStepSetup();renderBadgeBanner(hist);renderHero(hist);renderCoach();renderPlan(hist);renderMovementQuality();renderBento(hist);renderDistanceGoal(hist);
         LinearLayout mapCard=card();trackCard=mapCard;LinearLayout head=row();TextView title=tx("Live route",16,ink,true);head.addView(title,new LinearLayout.LayoutParams(0,dp(26),1));status=tx("● READY",10,lime,true);head.addView(status);mapCard.addView(head);FrameLayout mapFrame=new FrameLayout(this);LinearLayout.LayoutParams mfp=lp(-1,190);mfp.topMargin=dp(8);mapCard.addView(mapFrame,mfp);route=new RouteView(this);route.setTheme(bg,raised,lime,darkTheme);route.setContentDescription("Map. Tap to open full screen");route.setOnClickListener(v->openMapView());mapFrame.addView(route,new FrameLayout.LayoutParams(-1,-1));android.widget.ImageView follow=icon(R.drawable.ic_my_location,ink,10);follow.setBackground(rippleOn(raised,12));FrameLayout.LayoutParams flp=new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.RIGHT|Gravity.TOP);flp.setMargins(0,dp(10),dp(10),0);mapFrame.addView(follow,flp);follow.setContentDescription("Follow my location");follow.setOnClickListener(v->{route.setFollowLocation(true);if(prefs.getBoolean("gpsFix",false))route.setCurrentLocation(prefs.getFloat("latitude",0),prefs.getFloat("longitude",0),prefs.getFloat("accuracy",0));else toast("Waiting for a reliable GPS fix");});LinearLayout mapMeta=row();mapCard.addView(mapMeta,lp(-1,26));accuracyLabel=tx("GPS accuracy · waiting for signal",10,muted,false);mapMeta.addView(accuracyLabel,new LinearLayout.LayoutParams(0,dp(26),1));TextView standard=tx("Tap map to explore",10,lime,true);mapMeta.addView(standard);TextView mapHint=tx("© OpenStreetMap contributors · satellite tiles are not available from this map source",9,muted,false);mapCard.addView(mapHint);
         // Track an activity: four clear choices, one Start button; live numbers only while a session runs.
         boolean running=prefs.getBoolean("active",false);LinearLayout box=card();
@@ -583,7 +598,7 @@ public class MainActivity extends Activity {
         d.setOnShowListener(x->d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{String err=LocalAccount.rename(this,in.getText().toString());if(err!=null){in.setError(err);return;}d.dismiss();toast("Name updated");renderPageNow();}));d.show();
     }
     private void profileStat(LinearLayout p,String l,String val){LinearLayout c=col();p.addView(c,new LinearLayout.LayoutParams(0,-1,1));c.addView(tx(l,9,muted,true));c.addView(tx(val,16,ink,true));}
-    private void renderDetail(JSONObject o){if(o==null){page="History";renderPage();return;}TextView back=tx("←  HISTORY",11,lime,true);content.addView(back,lp(-1,28));back.setOnClickListener(v->{page="History";renderPage();});String dt=o.optString("date","");brand(dt,sessionTitle(o),"Session summary · "+o.optString("time",""));RouteView rv=new RouteView(this);rv.setInteractive(true);rv.setTheme(bg,raised,lime,darkTheme);rv.setRoute(o.optString("route","[]"));rv.setClipToOutline(true);rv.setBackground(shape(panel,16));FrameLayout mapBox=new FrameLayout(this);LinearLayout.LayoutParams rp=lp(-1,320);content.addView(mapBox,rp);mapBox.addView(rv,new FrameLayout.LayoutParams(-1,-1));android.widget.ImageView fit=icon(R.drawable.ic_my_location,ink,10);fit.setBackground(rippleOn(panel,12));fit.setContentDescription("Show the whole route");fit.setOnClickListener(v->rv.resetView());TextView mstyle=tx("Map: "+mapStyleName(),11,ink,true);mstyle.setPadding(dp(10),dp(6),dp(10),dp(6));mstyle.setBackground(rippleOn(panel,14));FrameLayout.LayoutParams msp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.START);msp.setMargins(dp(10),dp(10),0,0);mapBox.post(()->mapBox.addView(mstyle,msp));mstyle.setOnClickListener(v->{cycleMapStyle();rv.setTheme(bg,raised,lime,darkTheme);mstyle.setText("Map: "+mapStyleName());});FrameLayout.LayoutParams fitp=new FrameLayout.LayoutParams(dp(40),dp(40),Gravity.TOP|Gravity.START);fitp.setMargins(dp(10),dp(52),0,0);mapBox.addView(fit,fitp);rv.setLegend(true);if(o.optString("route","[]").contains("\"s\"")&&o.optDouble("distanceKm",0)>=.1)replayControls(mapBox,rv,o);if(o.optDouble("runDistanceKm",0)>0||o.optString("route","").contains("\"t\":\"r\"")){LinearLayout key=row();LinearLayout.LayoutParams kp=lp(-1,28);kp.topMargin=dp(6);content.addView(key,kp);key.addView(tx("●",14,lime,true));key.addView(tx(String.format(Locale.US,"  Walk %.2f km      ",o.optDouble("walkDistanceKm",0)),12,ink,true));key.addView(tx("●",14,Color.rgb(234,67,53),true));key.addView(tx(String.format(Locale.US,"  Run %.2f km",o.optDouble("runDistanceKm",0)),12,ink,true));}TextView attribution=tx("© OpenStreetMap contributors · drag, pinch or double-tap to explore",10,muted,false);LinearLayout.LayoutParams ap=lp(-1,28);ap.topMargin=dp(5);content.addView(attribution,ap);renderSessionOverview(o);renderSessionInsights(o);sessionActions(o);}
+    private void renderDetail(JSONObject o){if(o==null){page="History";renderPage();return;}String dt=o.optString("date","");brand(dt,sessionTitle(o),"Session summary · "+o.optString("time",""));RouteView rv=new RouteView(this);rv.setInteractive(true);rv.setTheme(bg,raised,lime,darkTheme);rv.setRoute(o.optString("route","[]"));rv.setClipToOutline(true);rv.setBackground(shape(panel,16));FrameLayout mapBox=new FrameLayout(this);LinearLayout.LayoutParams rp=lp(-1,320);content.addView(mapBox,rp);mapBox.addView(rv,new FrameLayout.LayoutParams(-1,-1));android.widget.ImageView fit=icon(R.drawable.ic_my_location,ink,10);fit.setBackground(rippleOn(panel,12));fit.setContentDescription("Show the whole route");fit.setOnClickListener(v->rv.resetView());TextView mstyle=tx("Map: "+mapStyleName(),11,ink,true);mstyle.setPadding(dp(10),dp(6),dp(10),dp(6));mstyle.setBackground(rippleOn(panel,14));FrameLayout.LayoutParams msp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.START);msp.setMargins(dp(10),dp(10),0,0);mapBox.post(()->mapBox.addView(mstyle,msp));mstyle.setOnClickListener(v->{cycleMapStyle();rv.setTheme(bg,raised,lime,darkTheme);mstyle.setText("Map: "+mapStyleName());});FrameLayout.LayoutParams fitp=new FrameLayout.LayoutParams(dp(40),dp(40),Gravity.TOP|Gravity.START);fitp.setMargins(dp(10),dp(52),0,0);mapBox.addView(fit,fitp);rv.setLegend(true);mapModes(mapBox,rv,o);if(o.optString("route","[]").contains("\"s\"")&&o.optDouble("distanceKm",0)>=.1)replayControls(mapBox,rv,o);if(o.optDouble("runDistanceKm",0)>0||o.optString("route","").contains("\"t\":\"r\"")){LinearLayout key=row();LinearLayout.LayoutParams kp=lp(-1,28);kp.topMargin=dp(6);content.addView(key,kp);key.addView(tx("●",14,lime,true));key.addView(tx(String.format(Locale.US,"  Walk %.2f km      ",o.optDouble("walkDistanceKm",0)),12,ink,true));key.addView(tx("●",14,Color.rgb(234,67,53),true));key.addView(tx(String.format(Locale.US,"  Run %.2f km",o.optDouble("runDistanceKm",0)),12,ink,true));}TextView attribution=tx("© OpenStreetMap contributors · drag, pinch or double-tap to explore",10,muted,false);LinearLayout.LayoutParams ap=lp(-1,28);ap.topMargin=dp(5);content.addView(attribution,ap);renderSessionOverview(o);renderSessionInsights(o);sessionActions(o);}
     private void correctDistance(JSONObject session){android.widget.EditText input=new android.widget.EditText(this);input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);input.setText(String.format(Locale.US,"%.2f",session.optDouble("distanceKm")));dialog().setTitle("Correct distance").setMessage("Enter the distance shown on the treadmill, in kilometres.").setView(input).setNegativeButton("Cancel",null).setPositiveButton("Save",(dialog,which)->{try{double km=Double.parseDouble(input.getText().toString().trim());if(km<0||km>500){toast("Enter a distance from 0 to 500 km");return;}double ratio=session.optDouble("distanceKm",0)>0?km/session.optDouble("distanceKm",0):1;session.put("walkDistanceKm",session.optDouble("walkDistanceKm",km)*ratio);session.put("runDistanceKm",session.optDouble("runDistanceKm",0)*ratio);session.put("distanceKm",km);session.put("calories",Calories.estimate(this,session.optDouble("walkDistanceKm",km),session.optLong("walkDurationMs",session.optLong("durationMs")),session.optDouble("runDistanceKm",0),session.optLong("runDurationMs",0),session.optLong("steps",0)));session.put("distanceEstimated",false);session.put("distanceCorrected",true);saveSession(historyPrefs,session);lastSession=session;renderPage();}catch(Exception e){toast("Enter a valid distance");}}).show();}
     private void detailRow(LinearLayout c,String a,String av,String b,String bv){LinearLayout r=row();LinearLayout.LayoutParams p=lp(-1,54);c.addView(r,p);LinearLayout x=col(),y=col();r.addView(x,new LinearLayout.LayoutParams(0,-1,1));r.addView(y,new LinearLayout.LayoutParams(0,-1,1));x.addView(tx(a,9,muted,true));x.addView(tx(av,17,ink,true));y.addView(tx(b,9,muted,true));y.addView(tx(bv,17,ink,true));}
     private void sessionRow(JSONObject o,Runnable click){if(o==null)return;LinearLayout r=row();r.setPadding(dp(14),dp(12),dp(12),dp(12));r.setBackground(panelShape(14));LinearLayout.LayoutParams p=lp(-1,82);p.topMargin=dp(8);content.addView(r,p);LinearLayout desc=col();r.addView(desc,new LinearLayout.LayoutParams(0,-1,1));desc.addView(tx((o.optBoolean("auto",false)?"Auto · ":"")+sessionLabel(o)+"  ·  "+formatDuration(o.optLong("durationMs")),14,ink,true));double km=o.optDouble("distanceKm",0);long ms=o.optLong("durationMs",0);long sec=km>0?Math.round(ms/1000d/km):0;desc.addView(tx(String.format(Locale.US,"%.2f km  ·  %s  ·  %,d steps",km,o.optString("time",""),o.optInt("steps")),10,muted,false));desc.addView(tx(String.format(Locale.US,"%d:%02d /km  ·  ~%d kcal",sec/60,sec%60,o.optInt("calories",(int)Math.round(km*65))),10,muted,false));String savedRoute=o.optString("route", "[]");if(!"[]".equals(savedRoute)){RouteView preview=new RouteView(this);preview.setTheme(bg,raised,lime,darkTheme);preview.setMarkers(false);preview.setRoute(savedRoute);LinearLayout.LayoutParams pv=lp(58,58);pv.setMargins(dp(5),0,dp(5),0);r.addView(preview,pv);}r.addView(tx("›",25,muted,false));r.setOnClickListener(v->click.run());}
@@ -807,7 +822,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         try{HealthSync.refresh(this,()->{StepsWidget.refresh(this);if(resumed&&!dragging&&("Health".equals(page)||"Today".equals(page))){int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));}syncing=false;});}catch(Throwable ignored){}
     }
     @Override protected void onResume(){
-        super.onResume();resumed=true;startStepCounting();refreshHealth(true);SessionMetrics.warm(this,history());
+        super.onResume();resumed=true;startStepCounting();refreshHealth(true);handler.postDelayed(()->SessionMetrics.warm(this,history()),1500);
         if(content!=null&&(("Today".equals(page)&&stepSetupShown&&DaySteps.permitted(this))||"Health".equals(page)||"Notifications".equals(page)||"Permissions".equals(page)||"Auto".equals(page)||"Storage".equals(page)))renderPageNow();
     }
     @Override protected void onPause(){
@@ -1272,6 +1287,34 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     }
     private String paceText(double sec){return sec>0?String.format(Locale.US,"%d'%02d\"",Math.round(sec)/60,Math.round(sec)%60):"—";}
 
+    /**
+     * Map colouring, chosen with a small segmented control on the map: the plain route, the route coloured by
+     * speed with this session's records pinned (default), or by grade when the barometer recorded climbing.
+     */
+    private void mapModes(FrameLayout mapBox,RouteView rv,JSONObject o){
+        SessionMetrics m=SessionMetrics.of(this,o);if(m.paceOverlay.isEmpty())return;JSONArray hist=history();
+        java.util.List<Object[]> pins=new java.util.ArrayList<>();
+        for(int i=SessionMetrics.EFFORTS.length-1;i>=0&&pins.size()<2;i--){int d=SessionMetrics.EFFORTS[i];double[] at=m.bestEnd.get(d);if(at==null)continue;int r=SessionMetrics.rank(this,hist,o,d);
+            if(r>=1&&r<=3&&(pins.isEmpty()||Insights.metres((double)pins.get(0)[0],(double)pins.get(0)[1],at[0],at[1])>120))pins.add(new Object[]{at[0],at[1],(r==1?"Fastest ":r==2?"2nd fastest ":"3rd fastest ")+SessionMetrics.EFFORT_NAMES[i],r==1?Color.rgb(196,128,8):r==2?Color.rgb(96,108,124):Color.rgb(160,82,30)});}
+        String[] names=m.gradeOverlay.isEmpty()?new String[]{"Route","Pace"}:new String[]{"Route","Pace","Grade"};
+        LinearLayout seg=row();seg.setPadding(dp(3),dp(3),dp(3),dp(3));seg.setBackground(shape(darkTheme?Color.argb(225,22,22,26):Color.argb(235,255,255,255),16));
+        FrameLayout.LayoutParams sp=new FrameLayout.LayoutParams(-2,dp(34),Gravity.BOTTOM|Gravity.START);sp.setMargins(dp(10),0,0,dp(10));mapBox.addView(seg,sp);
+        TextView key=tx("",10,ink,true);key.setPadding(dp(8),dp(4),dp(8),dp(4));key.setBackground(shape(darkTheme?Color.argb(225,22,22,26):Color.argb(235,255,255,255),10));
+        FrameLayout.LayoutParams kp=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.END);kp.setMargins(0,0,dp(10),dp(14));mapBox.addView(key,kp);
+        TextView[] opts=new TextView[names.length];
+        java.util.function.IntConsumer pick=k->{
+            for(int i=0;i<opts.length;i++){boolean on=i==k;opts[i].setTextColor(on?accentOn:ink);opts[i].setBackground(on?shape(lime,13):null);}
+            rv.setOverlay(k==1?m.paceOverlay:k==2?m.gradeOverlay:null);rv.setLabels(k==1?pins:null);
+            android.text.SpannableStringBuilder b=new android.text.SpannableStringBuilder();
+            if(k==1){append(b,"● ",MetricViews.ZONE_COLORS[2]);b.append("Slow   ");append(b,"● ",MetricViews.ZONE_COLORS[3]);b.append("Steady   ");append(b,"● ",MetricViews.ZONE_COLORS[4]);b.append("Fast");}
+            else if(k==2){append(b,"● ",MetricViews.ZONE_COLORS[4]);b.append("Up   ");append(b,"● ",MetricViews.ZONE_COLORS[3]);b.append("Flat   ");append(b,"● ",MetricViews.ZONE_COLORS[1]);b.append("Down");}
+            key.setText(b);key.setVisibility(k==0?View.GONE:View.VISIBLE);
+        };
+        for(int i=0;i<names.length;i++){int k=i;TextView t=tx(names[i],12,ink,true);t.setGravity(Gravity.CENTER);t.setPadding(dp(12),0,dp(12),0);seg.addView(t,new LinearLayout.LayoutParams(-2,-1));opts[i]=t;t.setOnClickListener(v->pick.accept(k));}
+        pick.accept(1);
+    }
+    private void append(android.text.SpannableStringBuilder b,String text,int color){int st=b.length();b.append(text);b.setSpan(new android.text.style.ForegroundColorSpan(color),st,b.length(),0);}
+
     private void renderSessionOverview(JSONObject o){
         SessionMetrics m=SessionMetrics.of(this,o);long ms=o.optLong("durationMs",0);double km=o.optDouble("distanceKm",0);
         LinearLayout c=card();
@@ -1341,6 +1384,30 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             }
             TextView im=tx(String.format(Locale.US,"%.0f intensity minutes toward the WHO's 150 a week · from %s",m.intensityMin,byHr?"heart rate":m.zoneSource),11,muted,false);LinearLayout.LayoutParams imp=lp(-1,-2);imp.topMargin=dp(12);zc.addView(im,imp);
         }
+        // Pace zones around your threshold pace
+        long[] pz=m.paceZones(SessionMetrics.thresholdPace(this,hist));
+        if(pz!=null){
+            long pt=0;for(long v:pz)pt+=v;
+            if(pt>=60){
+                double thr=SessionMetrics.thresholdPace(this,hist);
+                LinearLayout pzc=metricCard("PACE ZONES","","Six zones around your threshold pace: the fastest pace you have held for 30 minutes in any session ("+paceText(thr)+" /km). It's the walking version of Strava's pace zones, which are based on your predicted 5K. Each 30-second stretch of moving is placed by its speed as a share of threshold speed: recovery under 78 %, endurance 78–88 %, tempo 88–94 %, threshold 94–101 %, VO₂ max 101–105 %, anaerobic above.");
+                TextView sub=tx("Based on your threshold pace of "+paceText(thr)+" /km",11,muted,false);pzc.addView(sub);
+                int[] blues={Color.rgb(181,212,244),Color.rgb(133,183,235),Color.rgb(55,138,221),Color.rgb(24,95,165),Color.rgb(12,68,124),Color.rgb(4,44,83)};
+                double tk=3600/thr;long mx=0;for(long v:pz)mx=Math.max(mx,v);
+                for(int i=5;i>=0;i--){
+                    LinearLayout r=row();r.setPadding(0,dp(6),0,dp(2));pzc.addView(r,lp(-1,-2));
+                    r.addView(tx("Z"+(i+1),12,ink,true),lp(30,-2));
+                    FrameLayout bar=new FrameLayout(this);r.addView(bar,new LinearLayout.LayoutParams(0,dp(20),1));
+                    View fill=new View(this);fill.setBackground(shape(blues[i],6));final float f=mx>0?(float)pz[i]/mx:0;
+                    bar.addView(fill,new FrameLayout.LayoutParams(0,-1));bar.post(()->{FrameLayout.LayoutParams fl=(FrameLayout.LayoutParams)fill.getLayoutParams();fl.width=f>0?Math.max(dp(5),(int)(bar.getWidth()*f)):0;fill.setLayoutParams(fl);});
+                    TextView pc=tx(Math.round(pz[i]*100d/pt)+"%",12,ink,true);pc.setGravity(Gravity.END);r.addView(pc,lp(44,-2));
+                    double lo=i==0?0:SessionMetrics.PACE_FROM[i-1],hi=i==5?0:SessionMetrics.PACE_FROM[i];
+                    String range=i==0?"> "+paceText(3600/(tk*hi)):i==5?"< "+paceText(3600/(tk*lo)):paceText(3600/(tk*lo))+"–"+paceText(3600/(tk*hi));
+                    TextView rg=tx(range,10,muted,false);rg.setGravity(Gravity.END);r.addView(rg,lp(96,-2));
+                }
+                TextView names=tx("Z1 recovery · Z2 endurance · Z3 tempo · Z4 threshold · Z5 VO₂ max · Z6 anaerobic",10,muted,false);LinearLayout.LayoutParams np=lp(-1,-2);np.topMargin=dp(8);pzc.addView(names,np);
+            }
+        }
         // Pace
         if(m.pace.size()>=2){
             double best=Double.MAX_VALUE;for(double[] q:m.pace)best=Math.min(best,q[1]);
@@ -1348,6 +1415,13 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             String[][] cells={{"Avg",paceText(m.paceMoving),"/km"},{"Fastest",paceText(best),"/km"},{m.gapPace>0?"Grade-adjusted":"Elapsed avg",paceText(m.gapPace>0?m.gapPace:m.paceElapsed),"/km"}};statGrid(pc,cells,10);
             if(m.consistency>=0){TextView cs=tx((m.consistency<6?"Very steady pace":m.consistency<12?"Steady pace":"Changing pace")+String.format(Locale.US," · %.0f %% variation",m.consistency),12,m.consistency<12?positive:warning,true);LinearLayout.LayoutParams csp=lp(-1,-2);csp.topMargin=dp(10);pc.addView(cs,csp);}
             LinearLayout.LayoutParams pcp=lp(-1,190);pcp.topMargin=dp(8);pc.addView(new SessionChartView(this,th,m.pace,true),pcp);
+        }
+        if(m.gap.size()>=10){
+            LinearLayout gc=metricCard("GRADE ADJUSTED PACE","(min/km)","The pace you'd have held on flat ground with the same effort, from the barometer's gradient and Minetti's energy cost of walking or running on slopes. Climbs make your real pace slower than your GAP; descents make it faster.");
+            statGrid(gc,new String[][]{{"Avg GAP",paceText(m.gapPace),"/km"},{"Avg pace",paceText(m.paceMoving),"/km"},{"Hills cost you",m.gapPace>0&&m.paceMoving>0?String.format(Locale.US,"%+d",Math.round(m.paceMoving-m.gapPace)):"—","s/km"}},10);
+            LinearLayout.LayoutParams p=lp(-1,170);p.topMargin=dp(10);gc.addView(new MetricViews.Pair(this,th,thinPace(m.pace,300),thinPace(m.gap,300),lime),p);
+            LinearLayout lg=row();LinearLayout.LayoutParams lgp=lp(-1,-2);lgp.topMargin=dp(6);gc.addView(lg,lgp);
+            android.text.SpannableStringBuilder b=new android.text.SpannableStringBuilder();append(b,"■ ",lime);b.append("Your pace    ");append(b,"■ ",MetricViews.alpha(lime,110));b.append("Pace on flat ground (GAP)");lg.addView(tx("",11,muted,false));((TextView)lg.getChildAt(0)).setText(b);
         }
         // Splits
         if(m.splits.size()>=1){
@@ -1377,13 +1451,15 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             String spk=m.km>0&&m.stepsOk?String.format(Locale.US,"%,d",Math.round(m.steps/m.km)):"—";
             statGrid(cc,m.cadenceMax>0?new String[][]{{"Avg",String.valueOf(Math.round(m.cadenceAvg)),"spm"},{"Max",String.valueOf(Math.round(m.cadenceMax)),"spm"},{"Steps per km",spk,""}}:new String[][]{{"Avg",String.valueOf(Math.round(m.cadenceAvg)),"spm"},{"Steps per km",spk,""},{"Steps",String.format(Locale.US,"%,d",m.steps),""}},10);
             if(m.cadence.size()>=6){LinearLayout.LayoutParams p=lp(-1,170);p.topMargin=dp(10);cc.addView(new MetricViews.Series(this,th,m.cadence,true,lime,new double[]{80,100,115,130},m.cadenceAvg,v->String.valueOf(Math.round(v)),MetricViews::mmss),p);}
-            else{TextView n=tx("A cadence chart over time appears for sessions recorded with Kadamm 8.2 or later.",11,muted,false);LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(8);cc.addView(n,p);}
+            if(m.cadence.size()>=6&&"Health Connect".equals(m.stepSource)){TextView n=tx("Minute by minute from Samsung Health, through Health Connect",10,muted,false);cc.addView(n);}
+            else if(m.cadence.size()<6){TextView n=tx("A cadence chart over time appears once Health Connect has minute-level steps for this session, and for every session recorded with Kadamm 8.2 or later.",11,muted,false);LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(8);cc.addView(n,p);}
         }
         // Stride
         if(m.strideMeasured){
             LinearLayout st=metricCard("STRIDE","(cm)","Stride is the distance of one step: GPS distance divided by steps, over 30-second windows. It is measured only outdoors; indoors Kadamm uses the stride length you set. A longer stride at the same cadence means a faster pace.");
             int setting=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("strideLengthCm",72);
             statGrid(st,m.strideMaxCm>0?new String[][]{{"Avg",String.valueOf(Math.round(m.strideAvgCm)),"cm"},{"Max",String.valueOf(Math.round(m.strideMaxCm)),"cm"},{"Your setting",String.valueOf(setting),"cm"}}:new String[][]{{"Avg measured",String.valueOf(Math.round(m.strideAvgCm)),"cm"},{"Your setting",String.valueOf(setting),"cm"},{"Difference",String.format(Locale.US,"%+d",Math.round(m.strideAvgCm)-setting),"cm"}},10);
+            if(m.strideCv>=0){TextView sv=tx(String.format(Locale.US,"Gait steadiness: %s · stride varies %.0f %%",m.strideCv<8?"very steady":m.strideCv<15?"steady":"uneven",m.strideCv),12,m.strideCv<15?positive:warning,true);LinearLayout.LayoutParams svp=lp(-1,-2);svp.topMargin=dp(10);st.addView(sv,svp);}
             if(m.stride.size()>=6){LinearLayout.LayoutParams p=lp(-1,160);p.topMargin=dp(10);st.addView(new MetricViews.Series(this,th,m.stride,true,teal(),null,m.strideAvgCm,v->String.valueOf(Math.round(v)),MetricViews::mmss),p);}
         }
         // Heart rate (from a watch, through Health Connect)
@@ -1404,9 +1480,11 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         if(m.elevation.size()>=10){
             LinearLayout ec=metricCard("ELEVATION","(m)",m.barometer?"From your phone's barometer, which senses changes of about a metre. Gradient: uphill above +2 %, downhill below −2 %, over 30 m stretches.":"From GPS altitude, which can drift by several metres, so it is smoothed and only bigger changes count. Sessions recorded with Kadamm 8.2 or later use the barometer instead, and also show the gradient.");
             double sum=0;for(double[] q:m.elevation)sum+=q[1];
-            statGrid(ec,new String[][]{{"Gain",String.format(Locale.US,"%.0f",m.gain),"m"},{"Loss",m.loss>=0?String.format(Locale.US,"%.0f",m.loss):"—","m"},{"Range",String.format(Locale.US,"%.0f",m.altMax-m.altMin),"m"}},10);
-            LinearLayout.LayoutParams ep=lp(-1,150);ep.topMargin=dp(10);ec.addView(new SessionChartView(this,th,m.elevation.size()>400?thin(m.elevation,400):withRunFlag(m.elevation),false),ep);
-            if(!m.barometer){TextView n=tx("GPS altitude · less precise than the barometer",10,muted,false);ec.addView(n);}
+            statGrid(ec,new String[][]{{"Gain",String.format(Locale.US,"+%.0f",m.gain),"m"},{"Loss",m.loss>=0?String.format(Locale.US,"−%.0f",m.loss):"—","m"},{"Avg",String.format(Locale.US,"%.0f",sum/m.elevation.size()),"m"},{"Min",String.format(Locale.US,"%.0f",m.altMin),"m"},{"Max",String.format(Locale.US,"%.0f",m.altMax),"m"},{"Range",String.format(Locale.US,"%.0f",m.altMax-m.altMin),"m"}},10);
+            LinearLayout.LayoutParams ep=lp(-1,160);ep.topMargin=dp(10);
+            ec.addView(new MetricViews.Series(this,th,m.elevation.size()>400?thin(m.elevation,400):withRunFlag(m.elevation),false,MetricViews.ZONE_COLORS[3],null,sum/m.elevation.size(),v->String.format(Locale.US,"%.0f",v),v->String.format(Locale.US,"%.1f km",v)),ep);
+            if(!m.barometer){TextView n=tx((m.seaLevel?"GPS height above sea level":"GPS altitude")+" · less precise than the barometer",10,muted,false);ec.addView(n);}
+            else if(m.seaLevel){TextView n=tx("Above sea level · barometer anchored to GPS",10,muted,false);ec.addView(n);}
             if(m.gradeS!=null&&m.gradeS[0]+m.gradeS[1]+m.gradeS[2]>=60){
                 long tot=m.gradeS[0]+m.gradeS[1]+m.gradeS[2];LinearLayout gr=row();LinearLayout.LayoutParams gp=lp(-1,-2);gp.topMargin=dp(14);ec.addView(gr,gp);
                 int[] gcols={critical,MetricViews.ZONE_COLORS[3],MetricViews.ZONE_COLORS[1]};
@@ -1458,9 +1536,52 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             statGrid(vc,new String[][]{{"Est. VO₂max",String.format(Locale.US,"%.0f",m.vdot),"ml/kg/min"},{"5 km",MetricViews.mmss(bestT*Math.pow(5000/bestD,1.06)),""},{"10 km",MetricViews.mmss(bestT*Math.pow(10000/bestD,1.06)),""}},10);
         }
     }
+    private static java.util.List<double[]> thinPace(java.util.List<double[]> d,int n){if(d.size()<=n)return d;java.util.List<double[]> out=new java.util.ArrayList<>();double step=d.size()/(double)n;for(double i=0;i<d.size();i+=step)out.add(d.get((int)i));return out;}
     private static java.util.List<double[]> withRunFlag(java.util.List<double[]> d){java.util.List<double[]> out=new java.util.ArrayList<>();for(double[] q:d)out.add(new double[]{q[0],q[1],0});return out;}
     private static java.util.List<double[]> thin(java.util.List<double[]> d,int n){java.util.List<double[]> out=new java.util.ArrayList<>();double step=d.size()/(double)n;for(double i=0;i<d.size();i+=step){double[] q=d.get((int)i);out.add(new double[]{q[0],q[1],0});}return out;}
     private void chartStat(LinearLayout parent,String label,String value){LinearLayout c=col();parent.addView(c,new LinearLayout.LayoutParams(0,-2,1));c.addView(tx(label,9,muted,true));c.addView(tx(value,15,ink,true));}
+    /**
+     * Today's plan, like a coach's daily target: 60 % your step goal and 40 % brisk minutes (30 a day, the WHO
+     * weekly 150 over five days). Each part counts up to 150 %, so a big day shows over 100. The week's
+     * completion averages Monday to Sunday, with days to come as zero.
+     */
+    private double planFor(String day,Map<String,Long> totals,JSONObject md,JSONArray hist){
+        Long st=totals.get(day);double steps=st==null?0:st;JSONObject d=md.optJSONObject(day);
+        double brisk=d!=null&&d.has("brisk")?d.optDouble("brisk"):-1;
+        // Without Health Connect minutes, fall back to session zones once they are analysed (never on a cold start).
+        if(brisk<0){brisk=0;if(SessionMetrics.ready())for(int i=0;i<hist.length();i++){JSONObject o=hist.optJSONObject(i);if(o!=null&&day.equals(o.optString("day"))&&!Insights.vehicle(o)){SessionMetrics m=SessionMetrics.of(this,o);brisk+=(m.zoneS[2]+m.zoneS[3]+m.zoneS[4])/60d;}}}
+        return 100*(.6*Math.min(1.5,steps/Math.max(1,dailyGoal()))+.4*Math.min(1.5,brisk/30d));
+    }
+    private void renderPlan(JSONArray hist){
+        Map<String,Long> totals=dayTotals!=null?dayTotals:DaySteps.allDayTotals(this);JSONObject md=DaySteps.minuteDays(this);String today=todayKey();
+        double plan=planFor(today,totals,md,hist);
+        Calendar mon=Calendar.getInstance();int back=(mon.get(Calendar.DAY_OF_WEEK)+5)%7;mon.add(Calendar.DAY_OF_YEAR,-back);
+        double[] week=new double[7];double sum=0;for(int i=0;i<7;i++){Calendar d=(Calendar)mon.clone();d.add(Calendar.DAY_OF_YEAR,i);String k=DaySteps.key(d.getTimeInMillis());week[i]=k.compareTo(today)>0?-1:Math.min(100,planFor(k,totals,md,hist));if(week[i]>0)sum+=week[i];}
+        LinearLayout c=card();
+        LinearLayout hd=row();c.addView(hd,lp(-1,-2));TextView t=tx("TODAY'S PLAN",10,muted,true);t.setLetterSpacing(.08f);hd.addView(t,new LinearLayout.LayoutParams(0,-2,1));
+        TextView info=tx("ⓘ",15,muted,false);info.setOnClickListener(v->dialog().setTitle("Today's plan").setMessage("Your plan is 60 % your daily step goal and 40 % brisk minutes, 30 a day (minutes at 100 or more steps a minute, which is moderate intensity). Each part counts up to 150 %, so a big day goes past 100 %.\n\nThis week's completion is the average of Monday to Sunday, so it grows through the week.").setPositiveButton("OK",null).show());hd.addView(info);
+        LinearLayout big=row();big.setGravity(Gravity.BOTTOM);LinearLayout.LayoutParams bgp=lp(-1,-2);bgp.topMargin=dp(4);c.addView(big,bgp);
+        big.addView(valueUnit(String.valueOf(Math.round(plan)),"%",36,plan>=100?positive:ink));
+        big.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
+        JSONObject d=md.optJSONObject(today);
+        big.addView(tx(plan>=100?"Plan complete":d!=null&&d.has("brisk")?d.optInt("brisk")+" of 30 brisk min":"Brisk minutes from sessions",12,plan>=100?positive:muted,true));
+        LinearLayout.LayoutParams pp=lp(-1,30);pp.topMargin=dp(6);c.addView(new MetricViews.PlanBar(this,chartTheme(),(float)(plan/100),flame()),pp);
+        LinearLayout wk=row();LinearLayout.LayoutParams wkp=lp(-1,-2);wkp.topMargin=dp(14);c.addView(wk,wkp);
+        wk.addView(tx("This week",14,ink,true),new LinearLayout.LayoutParams(0,-2,1));wk.addView(valueUnit(String.valueOf(Math.round(sum/7)),"%",18,ink));
+        LinearLayout.LayoutParams wp=lp(-1,96);wp.topMargin=dp(6);c.addView(new MetricViews.WeekBars(this,chartTheme(),week,new String[]{"M","T","W","T","F","S","S"},back,MetricViews.ZONE_COLORS[2]),wp);
+    }
+    /**
+     * Movement quality today, from minute-level steps: peak-30 cadence (your 30 best minutes, a marker linked with
+     * lower mortality in large studies), brisk minutes, the longest stretch without moving, and steps by hour.
+     */
+    private void renderMovementQuality(){
+        JSONObject d=DaySteps.minuteDays(this).optJSONObject(todayKey());if(d==null||!d.has("p30"))return;
+        LinearLayout c=metricCard("MOVEMENT QUALITY","today","Peak-30 cadence is the average of your 30 highest step-per-minute minutes today, not necessarily in a row. Research on thousands of adults (Tudor-Locke; Del Pozo Cruz, JAMA Internal Medicine 2022) links a higher peak-30 cadence with lower risk of death, heart disease and dementia, beyond total steps. Around 100 is moderate intensity; 110+ is excellent.\n\nBrisk minutes are minutes at 100+ steps. Longest sitting is the longest run of minutes under 10 steps between 7 am and 11 pm; breaking it up every 30–60 minutes is healthier.\n\nFrom Samsung Health's minute steps through Health Connect.");
+        int p30=d.optInt("p30"),brisk=d.optInt("brisk"),sit=d.optInt("sit");
+        statGrid(c,new String[][]{{"Peak-30 cadence",String.valueOf(p30),"spm"},{"Brisk minutes",String.valueOf(brisk),"min"},{"Longest sitting",sit>=60?String.format(Locale.US,"%dh %02d",sit/60,sit%60):sit+" min",""}},10);
+        TextView v=tx(p30>=110?"Excellent walking intensity":p30>=100?"Moderate-intensity walking reached":p30>=80?"Mostly easy walking so far":"Little brisk walking so far",12,p30>=100?positive:warning,true);LinearLayout.LayoutParams vp=lp(-1,-2);vp.topMargin=dp(10);c.addView(v,vp);
+        JSONArray h=d.optJSONArray("h");if(h!=null&&h.length()==24){double[] hours=new double[24];for(int i=0;i<24;i++)hours[i]=h.optDouble(i);LinearLayout.LayoutParams hp=lp(-1,70);hp.topMargin=dp(10);c.addView(new MetricViews.Hours(this,chartTheme(),hours,lime),hp);}
+    }
     /** Profile: fitness and form, this week's intensity minutes, and how you walk over the last 30 days. */
     private void renderFitnessSnapshot(JSONArray h){
         SessionMetrics.Fitness fit=SessionMetrics.fitness(this,h);if(fit.days.isEmpty())return;
@@ -1862,6 +1983,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         for(int i=0;i<h.length();i++){JSONObject o=h.optJSONObject(i);if(o==null||Insights.vehicle(o))continue;String d=o.optString("day","");if(d.compareTo(from)<0||d.compareTo(to)>=0)continue;
             SessionMetrics m=SessionMetrics.of(this,o);long[] z=m.hrZoneS!=null?m.hrZoneS:m.zoneS;for(int k=0;k<5;k++)t[k]+=z[k];t[5]+=m.intensityMin;t[6]+=m.effort;t[7]++;
             if(m.walkingSpeed()>0&&!m.estimatedDistance){t[8]+=m.walkingSpeed()*m.movingS;t[9]+=m.movingS;}if(m.cadenceAvg>0){t[10]+=m.cadenceAvg*m.movingS;t[11]+=m.movingS;}}
+        t[5]=SessionMetrics.intensityMinutes(this,h,from,to);
         return t;
     }
     /** Reports: intensity minutes against the WHO's 150 a week, fitness and form, walking quality and the zone mix. */
@@ -1875,7 +1997,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         r.addView(new MetricViews.Ring(this,th,(float)(now[5]/target),MetricViews.ZONE_COLORS[2],String.valueOf(Math.round(now[5])),"of "+Math.round(target)),lp(112,112));
         LinearLayout rc=col();LinearLayout.LayoutParams rcp=new LinearLayout.LayoutParams(0,-2,1);rcp.leftMargin=dp(16);r.addView(rc,rcp);
         boolean met=now[5]>=target;rc.addView(tx(met?"WHO target met":Math.round(target-now[5])+" min to go",17,met?positive:ink,true));
-        rc.addView(tx(String.format(Locale.US,"%.0f moderate · %.0f vigorous min",(now[2]+now[3])/60,now[4]/60),12,muted,false));
+        rc.addView(tx("Sessions and all-day brisk walking",12,muted,false));
         if(before[7]>0){long d=Math.round(now[5]-before[5]);rc.addView(tx((d>=0?"▲ ":"▼ ")+Math.abs(d)+(elapsed<per.days?" min vs the same days before":" min vs the period before"),12,d>=0?positive:critical,true));}
         // Zone mix
         double zt=now[0]+now[1]+now[2]+now[3]+now[4];
@@ -1895,6 +2017,59 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             for(int i=startI;i<keys.size();i++)pts.add(new double[]{i-startI,fit.days.get(keys.get(i))[0],0});
             final java.util.List<String> fk=keys.subList(startI,keys.size());
             if(pts.size()>=3){LinearLayout.LayoutParams p=lp(-1,150);p.topMargin=dp(10);fc.addView(new MetricViews.Series(this,th,pts,false,vc,null,-1,v->String.format(Locale.US,"%.0f",v),v->{String k=fk.get((int)Math.max(0,Math.min(fk.size()-1,Math.round(v))));return k.substring(8)+"/"+k.substring(5,7);}),p);}
+        }
+        // Training load: this week's daily effort against the last four weeks'
+        if(!fit.days.isEmpty()){
+            java.util.List<double[]> vals=new java.util.ArrayList<>(fit.days.values());double a7=0,a28=0;int n=vals.size();
+            for(int i=Math.max(0,n-28);i<n;i++){a28+=vals.get(i)[3];if(i>=n-7)a7+=vals.get(i)[3];}a7/=7;a28/=28;
+            if(a28>0){double ratio=a7/a28;
+                LinearLayout lc=metricCard("TRAINING LOAD","","Acute:chronic workload ratio: your average daily effort over the last 7 days divided by the last 28. Sports science uses it to pace increases: 0.8–1.3 is the sweet spot, above 1.5 means you've ramped up quickly and injury risk rises, below 0.8 means you're doing less than you're used to.");
+                String verdict=ratio>1.5?"Ramping up fast":ratio>1.3?"Building, keep an eye on it":ratio>=.8?"Sweet spot":"Lighter than usual";int vc=ratio>1.5?critical:ratio>1.3?flame():ratio>=.8?positive:lime;
+                LinearLayout lr=row();LinearLayout.LayoutParams rp2=lp(-1,-2);rp2.topMargin=dp(8);lc.addView(lr,rp2);
+                lr.addView(valueUnit(String.format(Locale.US,"%.2f",ratio),"ratio",30,ink),new LinearLayout.LayoutParams(0,-2,1));lr.addView(tx(verdict,13,vc,true));
+                LinearLayout.LayoutParams sp2=lp(-1,40);sp2.topMargin=dp(6);lc.addView(new MetricViews.Scale(this,th,(float)(ratio/2),"0  rest","2.0  overload"),sp2);
+                statGrid(lc,new String[][]{{"7-day effort",String.format(Locale.US,"%.0f",a7*7),""},{"28-day weekly avg",String.format(Locale.US,"%.0f",a28*7),""},{"Sweet spot","0.8–1.3",""}},10);
+            }
+        }
+        // Peak-30 cadence and brisk minutes through the period (minute steps from Health Connect)
+        JSONObject md=DaySteps.minuteDays(this);
+        java.util.List<double[]> p30=new java.util.ArrayList<>();double briskSum=0,sitSum=0;int nd=0;double[][] heat=new double[7][24];int[] heatN=new int[7];
+        Calendar dc=(Calendar)per.start.clone();
+        for(int i=0;i<per.days;i++,dc.add(Calendar.DAY_OF_YEAR,1)){JSONObject x=md.optJSONObject(DaySteps.key(dc.getTimeInMillis()));if(x==null||!x.has("p30"))continue;
+            p30.add(new double[]{i,x.optDouble("p30"),0});briskSum+=x.optDouble("brisk");sitSum+=x.optDouble("sit");nd++;
+            int wd=(dc.get(Calendar.DAY_OF_WEEK)+5)%7;JSONArray hh=x.optJSONArray("h");if(hh!=null){for(int k=0;k<24;k++)heat[wd][k]+=hh.optDouble(k);heatN[wd]++;}}
+        if(nd>=1){
+            LinearLayout pc=metricCard("PEAK-30 CADENCE","(spm)","Each day's average of its 30 highest minutes of steps per minute. Studies of thousands of adults link a higher peak-30 cadence with lower risk of death, heart disease and dementia, independent of total steps. About 100 is moderate intensity; 110 or more is excellent. From Samsung Health's minute steps through Health Connect.");
+            double avg=0,best=0;for(double[] q:p30){avg+=q[1];best=Math.max(best,q[1]);}avg/=p30.size();
+            statGrid(pc,new String[][]{{"Average",String.format(Locale.US,"%.0f",avg),"spm"},{"Best day",String.format(Locale.US,"%.0f",best),"spm"},{"Brisk min a day",String.format(Locale.US,"%.0f",briskSum/nd),""}},10);
+            if(p30.size()>=3){final Progress.Period fp=per;LinearLayout.LayoutParams p=lp(-1,140);p.topMargin=dp(10);pc.addView(new MetricViews.Series(this,th,p30,true,lime,new double[]{80,100,115,130},avg,v->String.format(Locale.US,"%.0f",v),v->{Calendar c2=(Calendar)fp.start.clone();c2.add(Calendar.DAY_OF_YEAR,(int)Math.round(v));return new java.text.SimpleDateFormat("d MMM",Locale.getDefault()).format(c2.getTime());}),p);}
+            TextView sit=tx("",12,sitSum/nd>120?warning:muted,false);
+            sit.setText(String.format(Locale.US,"Longest sitting stretch: %dh %02d a day on average",Math.round(sitSum/nd)/60,Math.round(sitSum/nd)%60));LinearLayout.LayoutParams sp3=lp(-1,-2);sp3.topMargin=dp(8);pc.addView(sit,sp3);
+            // When you move: weekday × hour
+            for(int wr=0;wr<7;wr++)if(heatN[wr]>0)for(int k=0;k<24;k++)heat[wr][k]/=heatN[wr];
+            LinearLayout hm=metricCard("WHEN YOU MOVE","","Average steps in each hour, by weekday, over this period. Darker means more steps. From minute-level steps in Health Connect.");
+            int bh=0,bd=0;for(int wr=0;wr<7;wr++)for(int k=0;k<24;k++)if(heat[wr][k]>heat[bd][bh]){bd=wr;bh=k;}
+            hm.addView(tx(String.format(Locale.US,"Most active: %s around %s",new String[]{"Mondays","Tuesdays","Wednesdays","Thursdays","Fridays","Saturdays","Sundays"}[bd],bh==0?"midnight":bh<12?bh+" am":bh==12?"noon":(bh-12)+" pm"),12,muted,false));
+            LinearLayout.LayoutParams hp2=lp(-1,150);hp2.topMargin=dp(10);hm.addView(new MetricViews.Heatmap(this,th,heat,lime),hp2);
+        }
+        // Pace curve: best pace held for each duration, all-time against the last 90 days
+        java.util.Map<Integer,double[]> allBest=new java.util.TreeMap<>(),recentBest=new java.util.TreeMap<>();String since=DaySteps.key(System.currentTimeMillis()-90L*86400000L);
+        for(int i=0;i<h.length();i++){JSONObject o=h.optJSONObject(i);if(o==null)continue;SessionMetrics m=SessionMetrics.of(this,o);
+            for(java.util.Map.Entry<Integer,Double> e:m.bestByTime.entrySet()){double[] a=allBest.get(e.getKey());if(a==null||e.getValue()<a[0])allBest.put(e.getKey(),new double[]{e.getValue()});
+                if(o.optString("day","").compareTo(since)>=0){double[] b=recentBest.get(e.getKey());if(b==null||e.getValue()<b[0])recentBest.put(e.getKey(),new double[]{e.getValue()});}}}
+        if(allBest.size()>=3){
+            LinearLayout cv=metricCard("PACE CURVE","","Your fastest pace held for 1, 5, 10, 20, 30 and 60 minutes, from the GPS of every outdoor session: the walking version of a power curve. The bars compare your all-time best with the last 90 days.");
+            for(int dur:SessionMetrics.CURVE){double[] a=allBest.get(dur);if(a==null)continue;double[] rec=recentBest.get(dur);
+                LinearLayout crow=row();crow.setPadding(0,dp(8),0,dp(2));cv.addView(crow,lp(-1,-2));
+                crow.addView(tx(dur<3600?dur/60+" min":"1 hour",13,ink,true),lp(64,-2));
+                LinearLayout bars=col();crow.addView(bars,new LinearLayout.LayoutParams(0,-2,1));
+                double slow=1800,fast=400;float fa=(float)Math.max(.08,Math.min(1,(slow-a[0])/(slow-fast))),fr=rec==null?0:(float)Math.max(.08,Math.min(1,(slow-rec[0])/(slow-fast)));
+                View ab=new View(this);ab.setBackground(shape(MetricViews.alpha(lime,120),4));LinearLayout.LayoutParams abp=new LinearLayout.LayoutParams(0,dp(7));bars.addView(ab,abp);
+                View rb=new View(this);rb.setBackground(shape(lime,4));LinearLayout.LayoutParams rbp=new LinearLayout.LayoutParams(0,dp(7));rbp.topMargin=dp(3);bars.addView(rb,rbp);
+                bars.post(()->{abp.width=(int)(bars.getWidth()*fa);ab.setLayoutParams(abp);rbp.width=(int)(bars.getWidth()*fr);rb.setLayoutParams(rbp);});
+                LinearLayout vals=col();vals.setGravity(Gravity.END);crow.addView(vals,lp(84,-2));vals.addView(tx(paceText(a[0]),12,ink,true));vals.addView(tx(rec==null?"—":paceText(rec[0]),11,lime,true));
+            }
+            android.text.SpannableStringBuilder b=new android.text.SpannableStringBuilder();append(b,"■ ",MetricViews.alpha(lime,120));b.append("All time    ");append(b,"■ ",lime);b.append("Last 90 days");TextView lg=tx("",11,muted,false);lg.setText(b);LinearLayout.LayoutParams lgp=lp(-1,-2);lgp.topMargin=dp(8);cv.addView(lg,lgp);
         }
         // Walking quality
         if(now[9]>0||now[11]>0){
@@ -1986,58 +2161,58 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         c.setFocusable(true);c.setOnClickListener(v->navigate("Achievements"));
     }
     private void renderAchievements(){
-        brand("YOUR PROGRESS","Achievements","Badges in four tiers, from easy to extreme, and challenges you set.");
-        JSONArray h=history();java.util.Map<String,Long> totals=DaySteps.allDayTotals(this);int goal=dailyGoal();
+        brand("YOUR PROGRESS","Badges","Earn medals in four tiers, from easy to extreme.");
+        JSONArray h=history();java.util.Map<String,Long> totals=DaySteps.allDayTotals(this);int goal=dailyGoal();KadammTheme th=chartTheme();
         java.util.List<Progress.Badge> all=Progress.badges(this,h,totals,goal);boolean celebrate=!Progress.unseen(this,all).isEmpty();
         int earned=0;int[] perTier=new int[4],earnedTier=new int[4];for(Progress.Badge b:all){perTier[b.tier]++;if(b.earned()){earned++;earnedTier[b.tier]++;}}
-        // Hero: total earned, and a chip per tier.
-        LinearLayout hero=card();GradientDrawable hg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(panel,flame(),darkTheme?.26f:.14f),blend(panel,violet,darkTheme?.20f:.10f)});hg.setCornerRadius(dp(20));hg.setStroke(dp(1),blend(line,flame(),.3f));hero.setBackground(hg);
-        LinearLayout hr=row();hero.addView(hr,lp(-1,-2));
-        LinearLayout hl=col();hr.addView(hl,new LinearLayout.LayoutParams(0,-2,1));
-        hl.addView(tx("REWARD YOUR PROGRESS",10,flame(),true));hl.addView(valueUnit(String.valueOf(earned),"of "+all.size()+" badges",38,ink));
-        hl.addView(tx(earned==all.size()?"Every badge earned. Legendary.":"Next up: "+nearest(all).name,12,muted,false));
+        // Hero: the highest-tier medal earned, the count, and a tier-coloured progress strip.
         Progress.Badge top=null;for(Progress.Badge b:all)if(b.earned()&&(top==null||b.tier>=top.tier))top=b;
-        hr.addView(new MetricViews.Medal(this,chartTheme(),top==null?0:top.tier,top==null?R.drawable.ic_trophy:top.icon,top!=null,0),lp(84,84));
-        LinearLayout chips=row();LinearLayout.LayoutParams chp=lp(-1,-2);chp.topMargin=dp(14);hero.addView(chips,chp);
-        for(int t=0;t<4;t++){LinearLayout ch=col();ch.setGravity(Gravity.CENTER_HORIZONTAL);ch.setPadding(0,dp(8),0,dp(8));ch.setBackground(shape(blend(panel,MetricViews.TIER[t][0],darkTheme?.16f:.20f),12));LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,-2,1);if(t>0)cp.leftMargin=dp(6);chips.addView(ch,cp);
-            ch.addView(tx(earnedTier[t]+"/"+perTier[t],15,ink,true));TextView n=tx(MetricViews.TIER_NAMES[t].toUpperCase(Locale.US),9,darkTheme?MetricViews.TIER[t][0]:MetricViews.TIER[t][1],true);n.setLetterSpacing(.08f);ch.addView(n);}
-        // In progress: the closest badges not yet earned, in a sideways strip.
+        LinearLayout hero=card();int ht=top==null?0:top.tier;
+        GradientDrawable hg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(panel,MetricViews.TIER[ht][1],darkTheme?.55f:.25f),blend(panel,violet,darkTheme?.25f:.12f)});hg.setCornerRadius(dp(22));hg.setStroke(dp(1),blend(line,MetricViews.TIER[ht][0],.4f));hero.setBackground(hg);
+        TextView eye=tx("REWARD YOUR PROGRESS",10,darkTheme?MetricViews.TIER[ht][0]:MetricViews.TIER[ht][1],true);eye.setLetterSpacing(.1f);hero.addView(eye);
+        LinearLayout hr=row();LinearLayout.LayoutParams hrp=lp(-1,-2);hrp.topMargin=dp(8);hero.addView(hr,hrp);
+        hr.addView(new MetricViews.Medal(this,th,ht,top==null?R.drawable.ic_trophy:top.icon,top!=null,0),lp(96,96));
+        LinearLayout hc=col();LinearLayout.LayoutParams hcp=new LinearLayout.LayoutParams(0,-2,1);hcp.leftMargin=dp(16);hr.addView(hc,hcp);
+        hc.addView(valueUnit(String.valueOf(earned),"/ "+all.size(),40,ink));
+        hc.addView(tx(top==null?"Your first medal is one walk away":"Latest top tier: "+top.name,12,muted,false));
+        Progress.Badge next=nearest(all);hc.addView(tx("Next: "+next.name+" · "+Math.round(next.fraction()*100)+"%",12,ink,true));
+        LinearLayout strip=row();strip.setClipToOutline(true);strip.setBackground(shape(raised,5));LinearLayout.LayoutParams stp=lp(-1,10);stp.topMargin=dp(16);hero.addView(strip,stp);
+        for(int t=0;t<4;t++){View seg=new View(this);seg.setBackgroundColor(MetricViews.TIER[t][0]);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(0,-1,earnedTier[t]);if(earnedTier[t]>0)strip.addView(seg,sp);}
+        View rest=new View(this);strip.addView(rest,new LinearLayout.LayoutParams(0,-1,all.size()-earned));
+        LinearLayout legend=row();LinearLayout.LayoutParams lgp=lp(-1,-2);lgp.topMargin=dp(8);hero.addView(legend,lgp);
+        for(int t=0;t<4;t++){LinearLayout cl=col();legend.addView(cl,new LinearLayout.LayoutParams(0,-2,1));cl.addView(tx(earnedTier[t]+"/"+perTier[t],14,ink,true));TextView n=tx(MetricViews.TIER_NAMES[t],10,darkTheme?MetricViews.TIER[t][0]:MetricViews.TIER[t][1],true);cl.addView(n);}
+        // Current streak with a flame.
+        int[] st=DaySteps.streaks(totals,goal);Long tv=totals.get(todayKey());long todaySteps=tv==null?0:tv;
+        LinearLayout sc=card();LinearLayout sr=row();sc.addView(sr,lp(-1,-2));
+        LinearLayout sl=col();sr.addView(sl,new LinearLayout.LayoutParams(0,-2,1));
+        TextView sh=tx("CURRENT STREAK",10,flame(),true);sh.setLetterSpacing(.1f);sl.addView(sh);
+        sl.addView(valueUnit(String.valueOf(st[0]),st[0]==1?"day":"days",34,ink));
+        sl.addView(tx(st[0]>=st[1]&&st[0]>0?"Your longest ever":"Best "+st[1]+" days · "+Math.max(0,st[1]-st[0])+" to beat it",12,muted,false));
+        sr.addView(new MetricViews.Flame(this,th,st[0]),lp(74,84));
+        ProgressBar gp=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);gp.setMax(1000);gp.setProgress((int)Math.min(1000,todaySteps*1000/Math.max(1,goal)));gp.setProgressTintList(android.content.res.ColorStateList.valueOf(flame()));gp.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(raised));
+        LinearLayout.LayoutParams gpp=lp(-1,8);gpp.topMargin=dp(12);sc.addView(gp,gpp);
+        sc.addView(tx(todaySteps>=goal?"Today's goal done, streak extended":String.format(Locale.US,"%,d more steps today to keep it going",goal-todaySteps),11,todaySteps>=goal?positive:muted,todaySteps>=goal));
+        // In progress
         java.util.List<Progress.Badge> close=new java.util.ArrayList<>();for(Progress.Badge b:all)if(!b.earned()&&b.fraction()>0)close.add(b);
         close.sort((x,y)->Float.compare(y.fraction(),x.fraction()));
-        if(!close.isEmpty()){
-            TextView ip=tx("IN PROGRESS",10,muted,true);ip.setLetterSpacing(.08f);LinearLayout.LayoutParams ipp=lp(-1,-2);ipp.topMargin=dp(18);content.addView(ip,ipp);
-            android.widget.HorizontalScrollView hs=new android.widget.HorizontalScrollView(this);hs.setHorizontalScrollBarEnabled(false);hs.setClipToPadding(false);LinearLayout.LayoutParams hsp=lp(-1,-2);hsp.topMargin=dp(8);content.addView(hs,hsp);
-            LinearLayout strip=row();strip.setGravity(Gravity.TOP);hs.addView(strip);
-            for(int i=0;i<Math.min(8,close.size());i++){
-                Progress.Badge b=close.get(i);LinearLayout cell=col();cell.setGravity(Gravity.CENTER_HORIZONTAL);cell.setPadding(dp(10),dp(12),dp(10),dp(12));cell.setBackground(panelShape(16));
-                LinearLayout.LayoutParams clp=lp(132,-2);if(i>0)clp.leftMargin=dp(8);strip.addView(cell,clp);
-                cell.addView(new MetricViews.Medal(this,chartTheme(),b.tier,b.icon,false,b.fraction()),lp(62,62));
-                TextView n=tx(b.name,12,ink,true);n.setGravity(Gravity.CENTER);n.setMaxLines(1);n.setEllipsize(android.text.TextUtils.TruncateAt.END);LinearLayout.LayoutParams np=lp(-1,-2);np.topMargin=dp(8);cell.addView(n,np);
-                TextView d=tx(b.progressText(),10,muted,false);d.setGravity(Gravity.CENTER);cell.addView(d,lp(-1,-2));
-                ProgressBar pb=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);pb.setMax(1000);pb.setProgress((int)(b.fraction()*1000));pb.setProgressTintList(android.content.res.ColorStateList.valueOf(MetricViews.TIER[b.tier][0]));pb.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(raised));LinearLayout.LayoutParams pp=lp(-1,5);pp.topMargin=dp(6);cell.addView(pb,pp);
-                cell.setOnClickListener(v->badgeDetail(b));
-            }
+        if(!close.isEmpty()){shelfTitle("IN PROGRESS",null);LinearLayout s1=shelf();for(int i=0;i<Math.min(8,close.size());i++)medalCell(s1,close.get(i),true);}
+        // Personal bests as gold medals: tap one to open its session.
+        java.util.List<Insights.Record> recs=Insights.records(h,totals);
+        if(!recs.isEmpty()){shelfTitle("PERSONAL BESTS",null);LinearLayout s2=shelf();
+            for(Insights.Record r:recs){LinearLayout cell=col();cell.setGravity(Gravity.CENTER_HORIZONTAL);cell.setPadding(dp(10),dp(14),dp(10),dp(12));cell.setBackground(panelShape(18));LinearLayout.LayoutParams clp=lp(136,-2);clp.rightMargin=dp(8);s2.addView(cell,clp);
+                int icon=r.label.contains("km")||r.label.contains("Fastest")?R.drawable.ic_bolt:r.label.contains("distance")?R.drawable.ic_ruler:r.label.contains("session")?R.drawable.ic_timer:r.label.contains("streak")?R.drawable.ic_flame:R.drawable.ic_walk;
+                cell.addView(new MetricViews.Medal(this,th,2,icon,true,0),lp(64,64));
+                TextView v=tx(r.value,15,ink,true);v.setGravity(Gravity.CENTER);v.setMaxLines(1);LinearLayout.LayoutParams vp=lp(-1,-2);vp.topMargin=dp(8);cell.addView(v,vp);
+                TextView l=tx(r.label,10,darkTheme?MetricViews.TIER[2][0]:MetricViews.TIER[2][1],true);l.setGravity(Gravity.CENTER);l.setMaxLines(2);cell.addView(l,lp(-1,-2));
+                TextView d=tx(r.date,10,muted,false);d.setGravity(Gravity.CENTER);d.setMaxLines(1);cell.addView(d,lp(-1,-2));
+                if(r.sessionId>0){JSONObject go=null;for(int i=0;i<h.length();i++){JSONObject o=h.optJSONObject(i);if(o!=null&&o.optLong("id")==r.sessionId)go=o;}final JSONObject g2=go;if(g2!=null)cell.setOnClickListener(v2->{lastSession=g2;page="Detail";renderPage();});}}
         }
-        // Tiers, each a grid of medals.
+        // Each tier as a shelf, earned medals first.
         for(int t=0;t<4;t++){
-            LinearLayout head=row();LinearLayout.LayoutParams hp=lp(-1,-2);hp.topMargin=dp(22);content.addView(head,hp);
-            View dot=new View(this);GradientDrawable dg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,MetricViews.TIER[t]);dg.setShape(GradientDrawable.OVAL);dot.setBackground(dg);head.addView(dot,lp(14,14));
-            TextView ht=tx("  "+MetricViews.TIER_NAMES[t].toUpperCase(Locale.US),12,ink,true);ht.setLetterSpacing(.08f);head.addView(ht,new LinearLayout.LayoutParams(0,-2,1));
-            head.addView(tx(earnedTier[t]+" of "+perTier[t],11,muted,false));
-            LinearLayout grid=null;int col=0;
-            for(Progress.Badge b:all){
-                if(b.tier!=t)continue;
-                if(col%3==0){grid=row();grid.setGravity(Gravity.TOP);LinearLayout.LayoutParams gp=lp(-1,-2);gp.topMargin=dp(10);content.addView(grid,gp);}
-                boolean on=b.earned();LinearLayout cell=col();cell.setGravity(Gravity.CENTER_HORIZONTAL);cell.setPadding(dp(6),dp(12),dp(6),dp(12));
-                GradientDrawable cg=shape(on?blend(panel,MetricViews.TIER[t][0],darkTheme?.12f:.10f):panel,16);cg.setStroke(dp(1),on?blend(line,MetricViews.TIER[t][0],.45f):line);cell.setBackground(cg);
-                LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(0,dp(150),1);if(col%3>0)clp.leftMargin=dp(8);grid.addView(cell,clp);
-                cell.addView(new MetricViews.Medal(this,chartTheme(),t,b.icon,on,b.fraction()),lp(58,58));
-                TextView n=tx(b.name,12,on?ink:muted,true);n.setGravity(Gravity.CENTER);n.setMaxLines(2);LinearLayout.LayoutParams nlp=lp(-1,-2);nlp.topMargin=dp(8);cell.addView(n,nlp);
-                TextView d=tx(on?"Earned":b.progressText(),10,on?(darkTheme?MetricViews.TIER[t][0]:MetricViews.TIER[t][1]):muted,on);d.setGravity(Gravity.CENTER);cell.addView(d,lp(-1,-2));
-                cell.setContentDescription(b.name+", "+MetricViews.TIER_NAMES[t]+", "+(on?"earned":"not yet earned, "+b.progressText())+". "+b.desc);
-                cell.setOnClickListener(v->badgeDetail(b));col++;
-            }
-            if(grid!=null)for(int k=col%3;k>0&&k<3;k++){LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(0,dp(150),1);fp.leftMargin=dp(8);grid.addView(new View(this),fp);}
+            shelfTitle(MetricViews.TIER_NAMES[t].toUpperCase(Locale.US)+"  ·  "+earnedTier[t]+" of "+perTier[t],MetricViews.TIER[t]);
+            LinearLayout s3=shelf();java.util.List<Progress.Badge> tierList=new java.util.ArrayList<>();for(Progress.Badge b:all)if(b.tier==t)tierList.add(b);
+            tierList.sort((x,y)->x.earned()==y.earned()?Float.compare(y.fraction(),x.fraction()):x.earned()?-1:1);
+            for(Progress.Badge b:tierList)medalCell(s3,b,false);
         }
         TextView chT=tx("CHALLENGES",10,muted,true);chT.setLetterSpacing(.08f);LinearLayout.LayoutParams ctp=lp(-1,-2);ctp.topMargin=dp(24);content.addView(chT,ctp);
         for(Progress.Challenge ch:Progress.challenges(this,h,totals,goal)){
@@ -2055,6 +2230,27 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         if(celebrate&&!reducedMotion()){ConfettiView confetti=new ConfettiView(this);root.addView(confetti,new FrameLayout.LayoutParams(-1,-1));confetti.play();}
         Progress.markSeen(this,all);
     }
+    private void shelfTitle(String title,int[] tier){
+        LinearLayout r=row();LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(22);content.addView(r,rp);
+        if(tier!=null){View dot=new View(this);GradientDrawable dg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,tier);dg.setShape(GradientDrawable.OVAL);dot.setBackground(dg);LinearLayout.LayoutParams dp2=lp(12,12);dp2.rightMargin=dp(8);r.addView(dot,dp2);}
+        TextView t=tx(title,11,ink,true);t.setLetterSpacing(.08f);r.addView(t);
+    }
+    private LinearLayout shelf(){
+        android.widget.HorizontalScrollView hs=new android.widget.HorizontalScrollView(this);hs.setHorizontalScrollBarEnabled(false);hs.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        LinearLayout.LayoutParams hp=lp(-1,-2);hp.topMargin=dp(10);content.addView(hs,hp);LinearLayout s=row();s.setGravity(Gravity.TOP);hs.addView(s);return s;
+    }
+    /** One badge on a shelf: the medal, name, and earned or progress; tap for details. */
+    private void medalCell(LinearLayout shelf,Progress.Badge b,boolean ring){
+        boolean on=b.earned();LinearLayout cell=col();cell.setGravity(Gravity.CENTER_HORIZONTAL);cell.setPadding(dp(8),dp(14),dp(8),dp(12));
+        GradientDrawable cg=shape(on?blend(panel,MetricViews.TIER[b.tier][0],darkTheme?.14f:.12f):panel,18);cg.setStroke(dp(1),on?blend(line,MetricViews.TIER[b.tier][0],.5f):line);cell.setBackground(cg);
+        LinearLayout.LayoutParams clp=lp(112,-2);clp.rightMargin=dp(8);shelf.addView(cell,clp);
+        cell.addView(new MetricViews.Medal(this,chartTheme(),b.tier,b.icon,on,b.fraction()),lp(66,66));
+        TextView n=tx(b.name,12,on?ink:muted,true);n.setGravity(Gravity.CENTER);n.setMaxLines(1);n.setEllipsize(android.text.TextUtils.TruncateAt.END);LinearLayout.LayoutParams np=lp(-1,-2);np.topMargin=dp(8);cell.addView(n,np);
+        TextView d=tx(on?"Earned":Math.round(b.fraction()*100)+"%",10,on?(darkTheme?MetricViews.TIER[b.tier][0]:MetricViews.TIER[b.tier][1]):muted,on);d.setGravity(Gravity.CENTER);cell.addView(d,lp(-1,-2));
+        if(!on){ProgressBar pb=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);pb.setMax(1000);pb.setProgress((int)(b.fraction()*1000));pb.setProgressTintList(android.content.res.ColorStateList.valueOf(MetricViews.TIER[b.tier][0]));pb.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(raised));LinearLayout.LayoutParams pp=lp(-1,4);pp.topMargin=dp(6);cell.addView(pb,pp);}
+        cell.setContentDescription(b.name+", "+MetricViews.TIER_NAMES[b.tier]+", "+(on?"earned":"not yet earned, "+b.progressText())+". "+b.desc);
+        cell.setOnClickListener(v->badgeDetail(b));
+    }
     private Progress.Badge nearest(java.util.List<Progress.Badge> all){Progress.Badge best=null;for(Progress.Badge b:all)if(!b.earned()&&(best==null||b.fraction()>best.fraction()||b.fraction()==best.fraction()&&b.tier<best.tier))best=b;return best==null?all.get(0):best;}
     private void badgeDetail(Progress.Badge b){
         LinearLayout box=col();box.setGravity(Gravity.CENTER_HORIZONTAL);box.setPadding(dp(24),dp(20),dp(24),dp(4));
@@ -2070,8 +2266,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         if(mapLayer!=null&&mapLayer.getVisibility()==View.VISIBLE){closeMapView();return;}
         if(liveLayer!=null&&liveLayer.getVisibility()==View.VISIBLE){closeLive();return;}
         if(drawerLayer!=null&&drawerLayer.getVisibility()==View.VISIBLE){closeDrawer();return;}
-        if("Detail".equals(page)){navigate("History");return;}
-        if(!"Today".equals(page)){navigate("Today");return;}
+        if(!"Today".equals(page)){if(tabIndex(page)>=0)navigate("Today");else goBack();return;}
         super.onBackPressed();
     }
     @Override protected void onDestroy(){handler.removeCallbacks(refresh);super.onDestroy();}

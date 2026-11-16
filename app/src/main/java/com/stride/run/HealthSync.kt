@@ -209,6 +209,8 @@ object HealthSync {
                 val range = TimeRangeFilter.between(Instant.ofEpochMilli(from), Instant.ofEpochMilli(to))
                 // Heart rate from a watch (via Samsung Health or any app writing to Health Connect), read once per session.
                 if (hrAllowed && !s.optBoolean("hrChecked", false) && now - to > 30L * 60000L) { heartRate(hc, s, range, from); changed = true }
+                // Steps minute by minute from the preferred source: cadence over time for sessions recorded before 8.2.
+                if (!s.has("hcMin") && now - to > 30L * 60000L && to - from >= 3L * 60000L) { minuteSteps(hc, s, range, from, filter); changed = true }
                 if (s.optLong("hcSyncedAt", 0L) > to + 6L * 3600000L) continue
                 var steps = 0L; var kcal = -1.0
                 for (origin in perOrigin.keys) {
@@ -223,6 +225,7 @@ object HealthSync {
             if (changed) history.edit().putString("sessions", sessionsAll.toString()).apply()
         } catch (_: Exception) {
         }
+        try { dailyMinutes(hc, prefs, today, zone, filter) } catch (_: Exception) { }
         edit.putBoolean("hcBackground", granted.contains(BACKGROUND))
         edit.putLong("healthDayTotal", dayTotal)
             .putString("healthOrigin", preferred ?: "")
@@ -278,5 +281,42 @@ object HealthSync {
             s.put("hrChecked", true)
         } catch (_: Exception) {
         }
+    }
+
+    /** {seconds since start, steps in that minute} for a session, from Health Connect's per-minute step totals. */
+    private suspend fun minuteSteps(hc: HealthConnectClient, s: JSONObject, range: TimeRangeFilter, from: Long, filter: Set<DataOrigin>) {
+        try {
+            val rows = hc.aggregateGroupByDuration(AggregateGroupByDurationRequest(setOf(StepsRecord.COUNT_TOTAL), range, Duration.ofMinutes(1), filter))
+            val out = JSONArray()
+            for (r in rows) { val n = r.result[StepsRecord.COUNT_TOTAL] ?: 0L; out.put(JSONArray().put((r.startTime.toEpochMilli() - from) / 1000L).put(n)) }
+            s.put("hcMin", out)
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * Per-day movement quality from minute-level steps, for the last 30 days (past days once, today every sync):
+     * peak-30 cadence (the mean of the day's 30 highest minutes, Tudor-Locke), brisk minutes (100+ steps a
+     * minute), the longest sitting stretch between 7 am and 11 pm (minutes under 10 steps), and steps per hour.
+     */
+    private suspend fun dailyMinutes(hc: HealthConnectClient, prefs: android.content.SharedPreferences, today: LocalDate, zone: ZoneId, filter: Set<DataOrigin>) {
+        val days = try { JSONObject(prefs.getString("minuteDays", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
+        for (back in 0..29) {
+            val day = today.minusDays(back.toLong()); val key = day.toString()
+            if (back > 0 && days.has(key)) continue
+            val start = day.atStartOfDay(zone).toInstant(); val end = if (back == 0) Instant.now() else day.plusDays(1).atStartOfDay(zone).toInstant()
+            val rows = try { hc.aggregateGroupByDuration(AggregateGroupByDurationRequest(setOf(StepsRecord.COUNT_TOTAL), TimeRangeFilter.between(start, end), Duration.ofMinutes(1), filter)) } catch (_: Exception) { continue }
+            val perMinute = LongArray(1440); val hours = LongArray(24)
+            for (r in rows) { val m = ((r.startTime.toEpochMilli() - start.toEpochMilli()) / 60000L).toInt(); if (m in 0..1439) { val n = r.result[StepsRecord.COUNT_TOTAL] ?: 0L; perMinute[m] = n; hours[m / 60] += n } }
+            if (perMinute.sum() == 0L && back > 0) { days.put(key, JSONObject().put("empty", true)); continue }
+            val top = perMinute.sortedDescending().take(30)
+            val brisk = perMinute.count { it >= 100L }
+            val lastMinute = if (back == 0) ((Instant.now().toEpochMilli() - start.toEpochMilli()) / 60000L).toInt().coerceAtMost(1380) else 1380
+            var sit = 0; var run = 0
+            for (m in 420 until lastMinute) { if (perMinute[m] < 10L) { run++; if (run > sit) sit = run } else run = 0 }
+            val h = JSONArray(); for (v in hours) h.put(v)
+            days.put(key, JSONObject().put("p30", Math.round(top.average())).put("brisk", brisk).put("sit", sit).put("h", h))
+        }
+        prefs.edit().putString("minuteDays", days.toString()).apply()
     }
 }

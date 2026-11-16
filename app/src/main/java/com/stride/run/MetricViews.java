@@ -131,6 +131,85 @@ final class MetricViews {
         }
     }
 
+    /** Two paces over distance on one scale, faster higher: a solid area (yours) in front of a light one (grade-adjusted). */
+    static final class Pair extends Base {
+        private final List<double[]> a,b;private final int color;
+        Pair(Context c,KadammTheme t,List<double[]> mine,List<double[]> adjusted,int color){super(c,t);a=mine;b=adjusted;this.color=color;}
+        @Override protected void onDraw(Canvas c){
+            if(a.size()<2||b.size()<2)return;float w=getWidth(),h=getHeight(),left=dp(40),top=dp(6),bottom=dp(20),cw=w-left-dp(6),ch=h-top-bottom;
+            double lo=Double.MAX_VALUE,hi=0,x1=Math.max(a.get(a.size()-1)[0],b.get(b.size()-1)[0]);
+            for(List<double[]> l:java.util.Arrays.asList(a,b))for(double[] q:l){lo=Math.min(lo,q[1]);hi=Math.max(hi,q[1]);}
+            double pad=(hi-lo)*.1+5;lo-=pad;hi+=pad;final double flo=lo,fhi=hi;
+            p.setTextSize(dp(9.5f));p.setStrokeWidth(dp(1));
+            for(int g=0;g<3;g++){double v=lo+(hi-lo)*(.15+.35*g);float y=(float)(top+ch*(v-lo)/(hi-lo));p.setColor(alpha(t.border,200));c.drawLine(left,y,left+cw,y,p);p.setColor(t.textMuted);p.setTextAlign(Paint.Align.RIGHT);c.drawText(Insights.clock(v),left-dp(5),y+dp(3.5f),p);}
+            for(int k=0;k<2;k++){List<double[]> l=k==0?b:a;Path area=new Path();area.moveTo(left,top+ch);
+                for(double[] q:l)area.lineTo((float)(left+cw*q[0]/x1),(float)(top+ch*(q[1]-flo)/(fhi-flo)));
+                area.lineTo((float)(left+cw*l.get(l.size()-1)[0]/x1),top+ch);area.close();p.setColor(k==0?alpha(color,90):alpha(color,230));p.setStyle(Paint.Style.FILL);c.drawPath(area,p);}
+            p.setColor(t.textMuted);p.setTextAlign(Paint.Align.LEFT);c.drawText("0 km",left,h-dp(5),p);p.setTextAlign(Paint.Align.RIGHT);c.drawText(String.format(Locale.US,"%.1f km",x1),left+cw,h-dp(5),p);p.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+
+    /** A 0–100 % bar with ticks, overflowing past 100 % in a deeper shade (the daily plan). */
+    static final class PlanBar extends Base {
+        private final float f;private final int color;
+        PlanBar(Context c,KadammTheme t,float fraction,int color){super(c,t);f=Math.max(0,fraction);this.color=color;}
+        @Override protected void onDraw(Canvas c){
+            float w=getWidth(),bh=dp(8),y=dp(4),full=w*(f>1?1/f:1);
+            p.setColor(t.surfaceRaised);c.drawRoundRect(new RectF(0,y,w,y+bh),bh/2,bh/2,p);
+            p.setColor(color);c.drawRoundRect(new RectF(0,y,Math.max(bh,w*Math.min(1,f)*(f>1?1/f:1)),y+bh),bh/2,bh/2,p);
+            if(f>1){p.setColor(blendC(color,Color.rgb(150,60,0),.35f));c.drawRoundRect(new RectF(full,y,w,y+bh),bh/2,bh/2,p);p.setColor(t.background);c.drawRect(full-dp(1),y,full+dp(1),y+bh,p);}
+            p.setTextSize(dp(10));p.setColor(t.textMuted);c.drawText("0%",0,y+bh+dp(14),p);p.setTextAlign(Paint.Align.RIGHT);c.drawText("100%",full,y+bh+dp(14),p);p.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+    /** Seven day bars on a 0–100 scale; today outlined, days to come (-1) as empty tracks. */
+    static final class WeekBars extends Base {
+        private final double[] v;private final String[] labels;private final int today,color;
+        WeekBars(Context c,KadammTheme t,double[] values,String[] labels,int today,int color){super(c,t);v=values;this.labels=labels;this.today=today;this.color=color;}
+        @Override protected void onDraw(Canvas c){
+            float w=getWidth(),h=getHeight(),bottom=h-dp(16),top=dp(4),slot=w/v.length,bw=Math.min(dp(22),slot*.5f);
+            p.setTextSize(dp(10));p.setTextAlign(Paint.Align.CENTER);
+            for(int i=0;i<v.length;i++){float cx=slot*i+slot/2;p.setColor(t.surfaceRaised);c.drawRoundRect(new RectF(cx-bw/2,top,cx+bw/2,bottom),dp(4),dp(4),p);
+                if(v[i]>0){float y=(float)(bottom-(bottom-top)*Math.min(1,v[i]/100));p.setColor(i==today?color:alpha(color,170));c.drawRoundRect(new RectF(cx-bw/2,y,cx+bw/2,bottom),dp(4),dp(4),p);}
+                p.setColor(i==today?t.text:t.textMuted);c.drawText(labels[i],cx,h-dp(3),p);}
+            p.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+    /** Steps by hour of the day as 24 small bars, with 6 am, noon and 6 pm marked. */
+    static final class Hours extends Base {
+        private final double[] v;private final int color;
+        Hours(Context c,KadammTheme t,double[] hours,int color){super(c,t);v=hours;this.color=color;}
+        @Override protected void onDraw(Canvas c){
+            float w=getWidth(),h=getHeight(),bottom=h-dp(14),slot=w/24f;double mx=1;for(double x:v)mx=Math.max(mx,x);
+            for(int i=0;i<24;i++){float bh=(float)((bottom-dp(2))*v[i]/mx);p.setColor(v[i]>0?alpha(color,v[i]>=mx*.5?255:150):t.surfaceRaised);c.drawRoundRect(new RectF(slot*i+dp(1),bottom-Math.max(dp(2),bh),slot*(i+1)-dp(1),bottom),dp(2),dp(2),p);}
+            p.setTextSize(dp(9.5f));p.setColor(t.textMuted);p.setTextAlign(Paint.Align.CENTER);String[] l={"12a","6a","12p","6p"};for(int i=0;i<4;i++)c.drawText(l[i],slot*(i*6)+slot/2,h-dp(2),p);p.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+    /** Weekday × hour grid of average steps: the hours you actually move. */
+    static final class Heatmap extends Base {
+        private final double[][] v;private final int color;
+        Heatmap(Context c,KadammTheme t,double[][] grid,int color){super(c,t);v=grid;this.color=color;}
+        @Override protected void onDraw(Canvas c){
+            float left=dp(16),w=getWidth()-left,h=getHeight()-dp(14),cw=w/24f,ch=h/7f;double mx=1;for(double[] r:v)for(double x:r)mx=Math.max(mx,x);
+            String[] d={"M","T","W","T","F","S","S"};p.setTextSize(dp(9.5f));
+            for(int r=0;r<7;r++){p.setColor(t.textMuted);c.drawText(d[r],0,ch*r+ch/2+dp(3.5f),p);
+                for(int k=0;k<24;k++){double f=v[r][k]/mx;p.setColor(f<=0?t.surfaceRaised:alpha(color,(int)(40+215*Math.sqrt(f))));c.drawRoundRect(new RectF(left+cw*k+dp(.8f),ch*r+dp(.8f),left+cw*(k+1)-dp(.8f),ch*(r+1)-dp(.8f)),dp(2),dp(2),p);}}
+            p.setColor(t.textMuted);p.setTextAlign(Paint.Align.CENTER);String[] l={"12a","6a","12p","6p"};for(int i=0;i<4;i++)c.drawText(l[i],left+cw*(i*6)+cw/2,getHeight()-dp(2),p);p.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+
+    /** A two-tone flame with the streak count in it; grey when the streak is zero. */
+    static final class Flame extends Base {
+        private final int days;
+        Flame(Context c,KadammTheme t,int days){super(c,t);this.days=days;}
+        @Override protected void onDraw(Canvas c){
+            float w=getWidth(),h=getHeight();Path o=new Path();o.moveTo(w*.5f,0);o.cubicTo(w*.7f,h*.25f,w*.98f,h*.38f,w*.92f,h*.66f);o.cubicTo(w*.86f,h*.98f,w*.14f,h*.98f,w*.08f,h*.66f);o.cubicTo(w*.04f,h*.45f,w*.28f,h*.38f,w*.3f,h*.16f);o.cubicTo(w*.4f,h*.28f,w*.46f,h*.3f,w*.5f,0);o.close();
+            boolean lit=days>0;p.setColor(Color.BLACK);p.setShader(new LinearGradient(0,0,0,h,lit?Color.rgb(255,196,0):t.surfaceRaised,lit?Color.rgb(244,81,30):t.border,Shader.TileMode.CLAMP));c.drawPath(o,p);p.setShader(null);
+            Path in=new Path();in.moveTo(w*.5f,h*.36f);in.cubicTo(w*.62f,h*.52f,w*.76f,h*.6f,w*.72f,h*.76f);in.cubicTo(w*.68f,h*.93f,w*.32f,h*.93f,w*.28f,h*.76f);in.cubicTo(w*.26f,h*.62f,w*.42f,h*.56f,w*.5f,h*.36f);in.close();
+            p.setColor(lit?Color.rgb(255,236,170):t.surface);c.drawPath(in,p);
+            p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));p.setTextSize(h*.22f);p.setColor(lit?Color.rgb(160,50,0):t.textMuted);c.drawText(String.valueOf(days),w*.5f,h*.84f,p);p.setTypeface(null);p.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+
     /** Tier colours for badges: bronze (easy), silver (medium), gold (hard), amethyst (extreme). */
     static final int[][] TIER={{Color.rgb(214,140,86),Color.rgb(140,78,40)},{Color.rgb(214,222,232),Color.rgb(120,132,148)},{Color.rgb(255,214,92),Color.rgb(196,128,8)},{Color.rgb(196,140,255),Color.rgb(98,42,190)}};
     static final String[] TIER_NAMES={"Easy","Medium","Hard","Extreme"};
@@ -140,11 +219,15 @@ final class MetricViews {
         private final int tier,icon;private final boolean earned;private final float progress;
         Medal(Context c,KadammTheme t,int tier,int icon,boolean earned,float progress){super(c,t);this.tier=tier;this.icon=icon;this.earned=earned;this.progress=Math.max(0,Math.min(1,progress));}
         @Override protected void onDraw(Canvas c){
-            float s=Math.min(getWidth(),getHeight()),cx=getWidth()/2f,cy=getHeight()/2f,r=s*.46f;
+            float s=Math.min(getWidth(),getHeight()),cx=getWidth()/2f,cy=getHeight()/2f-(earned?s*.04f:0),r=s*(earned?.40f:.44f);
             Path hex=new Path();for(int i=0;i<6;i++){double a=Math.toRadians(60*i-90);float x=(float)(cx+r*Math.cos(a)),y=(float)(cy+r*Math.sin(a));if(i==0)hex.moveTo(x,y);else hex.lineTo(x,y);}hex.close();
             int[] tc=TIER[tier];
             if(earned){
+                // Ribbon tails behind the medal.
+                p.setColor(blendC(tc[1],Color.BLACK,.15f));Path rib=new Path();rib.moveTo(cx-r*.42f,cy+r*.55f);rib.lineTo(cx-r*.62f,cy+r*1.02f);rib.lineTo(cx-r*.38f,cy+r*.9f);rib.lineTo(cx-r*.22f,cy+r*1.05f);rib.lineTo(cx-r*.05f,cy+r*.6f);rib.close();c.drawPath(rib,p);
+                Path rib2=new Path();rib2.moveTo(cx+r*.42f,cy+r*.55f);rib2.lineTo(cx+r*.62f,cy+r*1.02f);rib2.lineTo(cx+r*.38f,cy+r*.9f);rib2.lineTo(cx+r*.22f,cy+r*1.05f);rib2.lineTo(cx+r*.05f,cy+r*.6f);rib2.close();c.drawPath(rib2,p);
                 p.setColor(Color.BLACK);p.setShader(new LinearGradient(cx-r,cy-r,cx+r,cy+r,tc[0],tc[1],Shader.TileMode.CLAMP));c.drawPath(hex,p);p.setShader(null);
+                p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(1.5f));p.setColor(alpha(Color.WHITE,90));c.drawPath(hex,p);p.setStyle(Paint.Style.FILL);
                 // Inner face and a highlight, for a struck-metal look.
                 Path inner=new Path();float ri=r*.78f;for(int i=0;i<6;i++){double a=Math.toRadians(60*i-90);float x=(float)(cx+ri*Math.cos(a)),y=(float)(cy+ri*Math.sin(a));if(i==0)inner.moveTo(x,y);else inner.lineTo(x,y);}inner.close();
                 p.setShader(new LinearGradient(cx,cy-ri,cx,cy+ri,tc[1],blendC(tc[1],Color.BLACK,.25f),Shader.TileMode.CLAMP));c.drawPath(inner,p);p.setShader(null);

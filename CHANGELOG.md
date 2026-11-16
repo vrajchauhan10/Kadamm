@@ -1,5 +1,17 @@
 # Changelog
 
+## 8.3 (versionCode 36)
+
+- Back and swipe-down return to the screen you came from (Profile → Achievements → Back lands on Profile), at the same scroll position; sub-pages show a "‹ Profile" pill.
+- Session map: Route / Pace / Grade modes. Pace colours each stretch from your slow (green) to fast (red) 30-second speed and pins this walk's top-3 all-time efforts; Grade colours uphill, flat and downhill (barometer sessions).
+- Pace zones: six zones (recovery to anaerobic) around your threshold pace, the best pace you've held for 30 minutes.
+- Grade-adjusted pace chart (your pace against flat-ground pace) for barometer sessions; elevation as an area chart with gain, loss, average, min, max and range, in metres above sea level (Android geoid model).
+- Cadence and stride dot charts for older sessions too, from Samsung Health's minute steps through Health Connect; gait steadiness (stride variability).
+- Today: a coach-style daily plan (60 % step goal, 40 % brisk minutes) with weekly completion bars, and Movement quality: peak-30 cadence, brisk minutes, longest sitting stretch and steps by hour.
+- Reports: training load (acute:chronic ratio), peak-30 cadence trend, a weekday × hour "when you move" heatmap, and a pace curve (best pace for 1–60 minutes, all time against the last 90 days). WHO intensity minutes now take each day's larger of session minutes and all-day brisk minutes.
+- Badges redesigned: hero with your top medal and tier progress strip, a streak card with a flame, in-progress, personal-best and per-tier shelves, and medals with ribbons.
+- Fixes: intensity-zone time was halved for minute-level step data; the analysis warm-up now waits until the app is on screen.
+
 ## 8.2 (versionCode 35)
 
 - Session analysis, modelled on premium trackers and computed only from what the phone recorded: an overview with a slow-to-fast scale and nine numbers; a "Kadamm Intelligence" summary; relative effort against your 3-week average, with fitness change; five intensity zones (from cadence, GPS speed or the session average) and WHO intensity minutes; pace with grade-adjusted pace and consistency; details per km with cadence and climb; cadence and stride charts; heart rate and heart-rate zones when a watch writes to Health Connect; elevation with a gradient donut; best efforts (400 m to half marathon) with all-time ranks; matched sessions; walking speed as a health marker; VO₂max (VDOT) and race predictions for runs. Every card has an ⓘ that explains the formula.

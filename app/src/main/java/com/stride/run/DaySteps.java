@@ -135,6 +135,8 @@ final class DaySteps {
     }
     static long startedAt(Context c){return c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getLong("startedAt",0);}
 
+    /** Per-day movement quality from Health Connect minute steps: {day: {p30, brisk, sit, h[24]}} (see HealthSync.dailyMinutes). */
+    static JSONObject minuteDays(Context c){try{return new JSONObject(c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getString("minuteDays","{}"));}catch(Exception e){return new JSONObject();}}
     private static String parsedRaw;private static JSONArray parsed=new JSONArray();
     /**
      * Saved sessions, parsed once and reused until the stored text changes. The history is about a megabyte of

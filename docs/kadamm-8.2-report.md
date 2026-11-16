@@ -162,3 +162,31 @@ VO₂max is shown only for GPS runs. The usual walking tests need heart rate.
 - **Effort weights:** 0.2, 0.5, 1, 1.5 and 2.5 per minute, chosen so a typical 30-minute brisk walk scores about 45.
 - **Fitness numbers:** use your own effort scale, so compare them with your earlier values, not with Strava's.
 - **Maximum heart rate:** zones stay off until you set your age.
+
+---
+
+# Kadamm 8.3 additions
+
+| Area | What's new | How it's calculated |
+|---|---|---|
+| Navigation | Back and swipe-down return to the screen you came from, at the same scroll position; a "‹ Profile" pill on sub-pages | A back stack of pages with their scroll positions |
+| Session map | Route / Pace / Grade modes, with top-3 record pins | Pace: 30-second speed, coloured from this walk's 10th to 90th percentile. Grade: barometer slope over 30 m, ±2 % thresholds |
+| Pace zones | Z1 recovery to Z6 anaerobic | Threshold = your best 30-minute pace from any GPS session; zones at 78 / 88 / 94 / 101 / 105 % of threshold speed |
+| Grade-adjusted pace | Your pace against your pace on flat ground | Minetti energy cost of walking on slopes; barometer sessions only |
+| Elevation | Area chart, gain, loss, average, min, max, range | Height above sea level: GPS ellipsoid height plus Android's geoid offset; barometer readings anchored to it |
+| Cadence and stride for older walks | Dot charts minute by minute | Samsung Health per-minute steps through Health Connect (`hcMin`) |
+| Gait steadiness | How much your stride length varies | Coefficient of variation of the 30-second stride |
+| Today's plan | Daily % and weekly completion bars | 60 % step goal + 40 % brisk minutes (30 a day), each capped at 150 % |
+| Movement quality | Peak-30 cadence, brisk minutes, longest sitting, steps by hour | Health Connect minute steps. Peak-30 = mean of the day's 30 best minutes (Tudor-Locke). Sitting = minutes under 10 steps, 7 am–11 pm |
+| Training load | Acute:chronic ratio with a verdict | 7-day ÷ 28-day average daily effort; 0.8–1.3 is the sweet spot |
+| When you move | Weekday × hour heatmap | Average steps per hour over the period |
+| Pace curve | Best pace for 1–60 minutes, all time against the last 90 days | The most distance covered within each duration on the GPS track |
+| Badges | Hero medal, streak flame, shelves for in progress, personal bests and each tier | Same 45 badges and rules as 8.2 |
+
+On your data:
+- **Today:** plan 76 %, this week 11 %, peak-30 cadence 101, 24 brisk minutes, longest sitting 2 h 03.
+- **Pace zones:** threshold 12'39"/km. Nov 15 split as Z4 22 %, Z3 28 %, Z2 27 %, Z1 19 %.
+- **Training load:** ratio 0.74, lighter than usual.
+- **Pace curve:** 30 minutes at 12'39", 1 hour at 14'12".
+
+Not built in this round: matched-route segments (racing your past self on repeated stretches). Saved routes still compare whole attempts.
