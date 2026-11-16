@@ -2,7 +2,7 @@
 
 ## 8.5 (versionCode 38)
 
-- Today keeps Recent activity to one clean "Your sessions" card (latest day, its sessions and distance, and the total) with a new layers icon; it opens a Sessions page where every day is listed as an expandable stack, 7 days at a time.
+- Today keeps Recent activity to one "Your sessions" card with two neutral cards stacked under it (latest day, its sessions and distance, and the total) with a new layers icon; it opens a Sessions page where every day is listed as an expandable stack, 7 days at a time.
 - A session with no distance shows "— /km" instead of "0:00 /km".
 - Day stacks on the Sessions page use neutral cards and outlines instead of blue tints.
 

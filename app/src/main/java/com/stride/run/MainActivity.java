@@ -641,7 +641,7 @@ public class MainActivity extends Activity {
         JSONObject last=all.optJSONObject(all.length()-1);String day=last==null?"":last.optString("day","");
         int n=0,auto=0;double km=0;java.util.HashSet<String> dayset=new java.util.HashSet<>();
         for(int i=0;i<all.length();i++){JSONObject o=all.optJSONObject(i);if(o==null)continue;dayset.add(o.optString("day",""));if(day.equals(o.optString("day",""))){n++;if(o.optBoolean("auto",false))auto++;km+=o.optDouble("distanceKm",0);}}
-        int layers=0;// one clean card: the stacks live on the Sessions page
+        int layers=Math.min(2,dayset.size()-1);
         FrameLayout stack=new FrameLayout(this);stack.setClipChildren(false);LinearLayout.LayoutParams sp=lp(-1,-2);content.addView(stack,sp);
         for(int k=layers;k>=1;k--){View u=new View(this);u.setBackground(stackLayer(k,18));
             FrameLayout.LayoutParams up=new FrameLayout.LayoutParams(-1,-1);up.setMargins(dp(14*k),dp(20),dp(14*k),dp(7*(layers-k)));stack.addView(u,up);}
