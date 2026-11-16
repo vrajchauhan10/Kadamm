@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.4 (versionCode 37)
+
+- Recent activity on Today is grouped by day as stacked cards: Today, Yesterday, then weekday or date. Each shows a date tile, how many sessions were automatic or manual, the day's distance, time and steps, the longest route with a session-count badge, and one peeking card behind it per extra session. Tap a day to fan it open into its sessions (each tagged AUTO or MANUAL) and tap one for its details; open days stay open after Back. "Show 3 more days" adds older days, "Show fewer" goes back.
+
 ## 8.3 (versionCode 36)
 
 - Back and swipe-down return to the screen you came from (Profile → Achievements → Back lands on Profile), at the same scroll position; sub-pages show a "‹ Profile" pill.
