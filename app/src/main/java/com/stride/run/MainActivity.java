@@ -624,6 +624,8 @@ public class MainActivity extends Activity {
             if(recentDays>7){TextView f=tx("Show fewer",13,muted,true);f.setGravity(Gravity.CENTER);f.setPadding(dp(18),0,dp(18),0);f.setBackground(rippleOn(raised,22));LinearLayout.LayoutParams fp=lp(-2,40);if(!all2)fp.leftMargin=dp(8);more.addView(f,fp);f.setOnClickListener(v->{recentDays=7;int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));});}
         }
     }
+    /** A card peeking out under a stack: neutral, a little closer to the page colour with each layer, with a hairline edge. */
+    private GradientDrawable stackLayer(int k,int radius){GradientDrawable g=shape(blend(panel,bg,darkTheme?.30f*k:.38f*k),radius);g.setStroke(dp(1),blend(line,bg,.15f*k));return g;}
     /** The Sessions page: every walk and run, grouped by day as stacks you can open. */
     private void renderSessions(){
         JSONArray all=history();brand("YOUR ACTIVITY","Sessions",all.length()+(all.length()==1?" walk or run":" walks and runs")+", grouped by day. Tap a day to open it.");
@@ -639,13 +641,13 @@ public class MainActivity extends Activity {
         JSONObject last=all.optJSONObject(all.length()-1);String day=last==null?"":last.optString("day","");
         int n=0,auto=0;double km=0;java.util.HashSet<String> dayset=new java.util.HashSet<>();
         for(int i=0;i<all.length();i++){JSONObject o=all.optJSONObject(i);if(o==null)continue;dayset.add(o.optString("day",""));if(day.equals(o.optString("day",""))){n++;if(o.optBoolean("auto",false))auto++;km+=o.optDouble("distanceKm",0);}}
-        int layers=Math.min(2,dayset.size()-1);
+        int layers=0;// one clean card: the stacks live on the Sessions page
         FrameLayout stack=new FrameLayout(this);stack.setClipChildren(false);LinearLayout.LayoutParams sp=lp(-1,-2);content.addView(stack,sp);
-        for(int k=layers;k>=1;k--){View u=new View(this);GradientDrawable ug=shape(blend(blend(panel,lime,darkTheme?.10f+.06f*k:.06f+.05f*k),bg,.15f*k),18);ug.setStroke(dp(1),blend(line,lime,.25f));u.setBackground(ug);
-            FrameLayout.LayoutParams up=new FrameLayout.LayoutParams(-1,-1);up.setMargins(dp(14*k),dp(6*k),dp(14*k),-dp(6*k));stack.addView(u,up);}
+        for(int k=layers;k>=1;k--){View u=new View(this);u.setBackground(stackLayer(k,18));
+            FrameLayout.LayoutParams up=new FrameLayout.LayoutParams(-1,-1);up.setMargins(dp(14*k),dp(20),dp(14*k),dp(7*(layers-k)));stack.addView(u,up);}
         LinearLayout front=row();front.setPadding(dp(14),dp(14),dp(12),dp(14));
-        GradientDrawable fg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(panel,lime,darkTheme?.12f:.06f),panel});fg.setCornerRadius(dp(18));fg.setStroke(dp(1),blend(line,lime,.25f));front.setBackground(ripple(fg));
-        FrameLayout.LayoutParams fp=new FrameLayout.LayoutParams(-1,-2);fp.bottomMargin=dp(6*layers);stack.addView(front,fp);
+        GradientDrawable fg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(panel,lime,darkTheme?.12f:.06f),panel});fg.setCornerRadius(dp(18));fg.setStroke(dp(1),line);front.setBackground(ripple(fg));
+        FrameLayout.LayoutParams fp=new FrameLayout.LayoutParams(-1,-2);fp.bottomMargin=dp(7*layers);stack.addView(front,fp);
         android.widget.ImageView ic=icon(R.drawable.ic_layers,accentOn,10);ic.setBackground(shape(lime,14));front.addView(ic,lp(46,46));
         LinearLayout mid=col();LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(0,-2,1);mp.leftMargin=dp(12);front.addView(mid,mp);
         mid.addView(tx("Your sessions",16,ink,true));
@@ -668,11 +670,11 @@ public class MainActivity extends Activity {
         FrameLayout stack=new FrameLayout(this);stack.setClipChildren(false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(10);content.addView(stack,sp);
         // Cards peeking out underneath, one per extra session (up to two).
         View[] under=new View[layers];
-        for(int k=layers;k>=1;k--){View u=new View(this);GradientDrawable ug=shape(blend(blend(panel,lime,darkTheme?.10f+.06f*k:.06f+.05f*k),bg,.15f*k),16);ug.setStroke(dp(1),blend(line,lime,.25f));u.setBackground(ug);u.setElevation(0);
-            FrameLayout.LayoutParams up=new FrameLayout.LayoutParams(-1,-1);up.setMargins(dp(12*k),dp(10*k),dp(12*k),-dp(10*k));stack.addView(u,up);under[k-1]=u;if(open){u.setAlpha(0f);u.setTranslationY(-dp(10*k));}}
+        for(int k=layers;k>=1;k--){View u=new View(this);u.setBackground(stackLayer(k,16));u.setElevation(0);
+            FrameLayout.LayoutParams up=new FrameLayout.LayoutParams(-1,-1);up.setMargins(dp(12*k),dp(20),dp(12*k),dp(7*(layers-k)));stack.addView(u,up);under[k-1]=u;if(open){u.setAlpha(0f);u.setTranslationY(-dp(7*k));}}
         LinearLayout front=col();front.setPadding(dp(14),dp(14),dp(14),dp(14));
-        GradientDrawable fg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(panel,lime,darkTheme?.10f:.05f),panel});fg.setCornerRadius(dp(16));fg.setStroke(dp(1),blend(line,lime,.2f));front.setBackground(fg);
-        FrameLayout.LayoutParams fp=new FrameLayout.LayoutParams(-1,-2);fp.bottomMargin=open?0:dp(10*layers);stack.addView(front,fp);
+        GradientDrawable fg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(panel,lime,darkTheme?.10f:.05f),panel});fg.setCornerRadius(dp(16));fg.setStroke(dp(1),line);front.setBackground(fg);
+        FrameLayout.LayoutParams fp=new FrameLayout.LayoutParams(-1,-2);fp.bottomMargin=open?0:dp(7*layers);stack.addView(front,fp);
         LinearLayout top=row();front.addView(top,lp(-1,-2));
         // Date tile
         LinearLayout date=col();date.setGravity(Gravity.CENTER);date.setBackground(shape(blend(panel,lime,darkTheme?.22f:.12f),14));top.addView(date,lp(48,54));
@@ -706,8 +708,8 @@ public class MainActivity extends Activity {
             android.transition.TransitionManager.beginDelayedTransition(content,new android.transition.ChangeBounds().setDuration(240).setInterpolator(EASE));
             boolean now=!openDays.contains(day);if(now)openDays.add(day);else openDays.remove(day);
             chev.animate().rotation(now?-90:90).setDuration(220).setInterpolator(EASE).start();
-            for(int k=0;k<under.length;k++)under[k].animate().alpha(now?0f:1f).translationY(now?-dp(10*(k+1)):0).setDuration(200).setInterpolator(EASE).start();
-            FrameLayout.LayoutParams lpf=(FrameLayout.LayoutParams)front.getLayoutParams();lpf.bottomMargin=now?0:dp(10*layers);front.setLayoutParams(lpf);
+            for(int k=0;k<under.length;k++)under[k].animate().alpha(now?0f:1f).translationY(now?-dp(7*(k+1)):0).setDuration(200).setInterpolator(EASE).start();
+            FrameLayout.LayoutParams lpf=(FrameLayout.LayoutParams)front.getLayoutParams();lpf.bottomMargin=now?0:dp(7*layers);front.setLayoutParams(lpf);
             if(now){body.setVisibility(View.VISIBLE);body.setAlpha(0f);body.setTranslationY(-dp(8));body.animate().alpha(1f).translationY(0).setDuration(240).setInterpolator(EASE).start();}
             else body.setVisibility(View.GONE);
         });
