@@ -19,6 +19,7 @@ Every round of changes gets a new version: bump `version.properties`, set `APP_V
 - `RecorderService.java` — foreground service that records a session (GPS, step sensor, notification).
 - `DaySteps.java` — all-day step totals from the hardware step counter, and the one place that decides a day's total across phone sensor, Health Connect and sessions. `StepSyncJob` samples it every 15 minutes.
 - `HealthSync.kt` / `HealthConnectActivity.kt` — Health Connect step import and consent.
+- `SessionMetrics.java` — per-session analysis (zones, effort, splits, cadence, stride, elevation, best efforts, heart rate) and cross-session fitness; `MetricViews.java` draws its charts and badge medals.
 - `RouteView`, `ProgressRingView`, `WeeklyActivityView`, `ActivityChartView` — custom drawn views.
 
 ## Rules

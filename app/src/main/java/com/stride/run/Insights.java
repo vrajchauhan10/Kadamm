@@ -94,7 +94,12 @@ final class Insights {
     /** A ride, not a walk or run: 15+ km/h on average with far fewer steps than the distance needs. Same rule as the session note. */
     static boolean vehicle(JSONObject o){double h=o.optLong("durationMs",0)/3600000d,km=o.optDouble("distanceKm",0);return h>0&&km/h>=15&&o.optLong("steps",0)<km*300;}
     /** Fastest 1 km and 5 km, longest distance, longest session and most steps in a day. Vehicle rides are left out. */
-    static List<Record> records(JSONArray hist,Map<String,Long> days){
+    private static JSONArray recordsFor;private static Map<String,Long> recordsDays;private static List<Record> recordsLast;
+    static synchronized List<Record> records(JSONArray hist,Map<String,Long> days){
+        if(hist==recordsFor&&days.equals(recordsDays))return recordsLast;
+        List<Record> r=computeRecords(hist,days);recordsFor=hist;recordsDays=new java.util.HashMap<>(days);recordsLast=r;return r;
+    }
+    private static List<Record> computeRecords(JSONArray hist,Map<String,Long> days){
         List<Record> out=new ArrayList<>();
         JSONObject f1=null,f5=null,far=null,lng=null;double b1=-1,b5=-1;
         for(int i=0;i<hist.length();i++){
@@ -175,7 +180,13 @@ final class Insights {
      * square it touches is counted once, so walking the same street again adds nothing. A square's date is the
      * first session that reached it, which gives "new this week" and "new this month".
      */
-    static Coverage coverage(JSONArray hist){
+    private static JSONArray coverageFor;private static Coverage coverageLast;
+    /** Cached per parsed history (it is reused until sessions change), since walking every route point takes a while. */
+    static synchronized Coverage coverage(JSONArray hist){
+        if(hist==coverageFor&&coverageLast!=null)return coverageLast;
+        Coverage cv=computeCoverage(hist);coverageFor=hist;coverageLast=cv;return cv;
+    }
+    private static Coverage computeCoverage(JSONArray hist){
         Coverage cv=new Coverage();java.util.HashMap<Long,Long> first=new java.util.HashMap<>();java.util.HashMap<Long,double[]> where=new java.util.HashMap<>();JSONArray all=new JSONArray();
         long now=System.currentTimeMillis();
         for(int i=0;i<hist.length();i++){

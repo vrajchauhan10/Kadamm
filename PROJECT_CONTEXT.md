@@ -33,14 +33,16 @@ Kadamm is a native Android walk/run tracker (application id `com.stride.run`, or
 | `MainActivity.java` (~1240 lines, ~90k tokens, mostly dense one-liners) | Every screen, navigation, drawer, swipe pager, auth overlay, intro animation, live overlay, full-screen map, share, backup/restore, permissions, reports, achievements |
 | `RecorderService.java` | Session state machine (start, pause/toggle, stop, discard, set type, restore), GPS smoothing, altitude, cadence-based walk/run detection, step sensor, auto-finish, live notification (Android 16 Live Update / Now Bar promotion) |
 | `DaySteps.java` | Hardware step counter → per-day deltas (`kadamm_steps.days`); **the single place that decides a day's total** (`todayTotal`, `allDayTotals`), today's distance (`distanceToday`), active calories (`activeKcalToday`, never HC total calories) and move minutes (`moveMinutesToday`); streaks; goal notifications |
-| `HealthSync.kt` | Health Connect read: per-source aggregation (takes the highest single source, not the HC sum), past days, active minutes, per-session windows (re-read up to 6 h after a session ends) |
+| `HealthSync.kt` | Health Connect read: per-source aggregation (takes the highest single source, not the HC sum), past days, active minutes, per-session windows (re-read up to 6 h after a session ends), and (8.2) heart-rate samples per session (`hr`, `hrSource`, `hrChecked`) when the optional heart-rate permission is granted |
 | `HealthConnectActivity.kt`, `HealthConnectRationaleActivity.kt` | HC consent UI and rationale |
 | `AutoTrack.java` | Activity Recognition transitions → starts `RecorderService` with `auto=true`; `autoStopMin` setting |
 | `Reminders.java` | Inactivity and evening nudges, daily summary, weekly report notifications |
 | `Messages.java` | Phrase rotation so a notification wording isn't repeated in a day (`kadamm_messages`) |
 | `Coach.java` | On-device "insight" sentences for the Today summary (no AI service) |
-| `Insights.java` | Route analysis (pace, elevation, splits, records) and saved routes (`kadamm_routes`) |
-| `Progress.java` | Date ranges for reports, period summaries, 16 badges, challenges (`kadamm_badges`) |
+| `Insights.java` | Route analysis (pace, elevation, splits, records) and saved routes (`kadamm_routes`); `coverage` and `records` are cached per parsed history |
+| `SessionMetrics.java` | (8.2) Per-session analysis, cached by id: cadence and stride series, intensity zones (cadence, else GPS speed, else session average; heart rate when present), effort, WHO intensity minutes, km splits, consistency, best efforts and all-time ranks, barometric/GPS elevation, gradient and grade-adjusted pace, heart rate, VDOT for runs; across sessions: relative effort, fitness/fatigue/form (Banister), matched sessions. `warm()` fills the cache off the main thread on resume |
+| `MetricViews.java` | (8.2) Drawn views for the analysis: `Series` (zone-coloured dots or area line over time), `Bands` (relative effort), `Donut`, `Scale`, `Ring`, `Medal` (tiered badge) |
+| `Progress.java` | Date ranges for reports, period summaries, 45 badges in four tiers (easy, medium, hard, extreme), challenges (`kadamm_badges`) |
 | `Calories.java` | MET-based calorie estimate (weight from settings) |
 | `LocalAccount.java` | Accounts in SQLite (`kadamm.db`, table `accounts`: name, email, salted PBKDF2 hash, photo path); prefs `kadamm_account` hold who is signed in. Migrates the pre-8.0 prefs account |
 | `ReplayVideo.java` | Route replay as an MP4 (MediaCodec H.264 from a Surface + MediaMuxer, 720×1280, 30 fps); frames drawn with `RouteView.setReplay` |
@@ -67,13 +69,14 @@ All data is in SharedPreferences, mostly JSON strings:
 | Prefs file | Keys / contents |
 |---|---|
 | `stride_state` | Live session state written by `RecorderService` and polled every second by `MainActivity.updateLive`: `active`, `paused`, `elapsed`, `distance`, `steps`, `currentType`, `activityMode` (outdoor/indoor), `gpsFix`, `latitude`/`longitude`/`accuracy`, `walk/runDistanceKm`, `walk/runDurationMs`, `elevGainM`, `speedKmh`, `moving`… |
-| `kadamm_history` | `sessions`: a JSON array of session objects, appended in chronological order. Fields: `id`, `day` (yyyy-MM-dd), `date`, `time`, `type` (Walk/Run/Mixed), `distanceKm`, `durationMs`, `steps`, `stepsAvailable`, `stepsEstimated`, `distanceEstimated`, `distanceCorrected`, `calories`, `walk/run*`, `route` (JSON string of points `{lat,lon,a,s,t…}`), `auto` |
+| `kadamm_history` | `sessions`: a JSON array of session objects, appended in chronological order. Fields: `id`, `day` (yyyy-MM-dd), `date`, `time`, `type` (Walk/Run/Mixed), `distanceKm`, `durationMs`, `steps`, `stepsAvailable`, `stepsEstimated`, `distanceEstimated`, `distanceCorrected`, `calories`, `walk/run*`, `route` (JSON string of points `{lat,lon,a,s,t,k,b,break}`: `k` session steps and `b` barometric altitude from 8.2), `timeline` (8.2: `[[seconds, steps or -1, metres, barometric altitude or null], …]` every 5 s, indoor too), `hr` (8.2, from Health Connect: `[[seconds, bpm], …]`), `auto` |
 | `kadamm_steps` (`DaySteps.PREFS`) | `days` {day: steps} from the phone counter, `lastCounter`, `startedAt`… |
 | `kadamm_health` | `healthConnected`, `healthDate`, `healthDayTotal`, `healthDays` {day: steps}, `healthPhoneAtSync`, `healthSyncedAt`, `hcBackground`, `healthActiveMin` |
-| `kadamm_settings` | `stepGoal` (10000), `themeMode`, `strideLengthCm`, `weightKg`, notification switches and times, `autoTrack`, `autoStopMin`, challenge targets, permission-asked flags |
+| `kadamm_settings` | `stepGoal` (10000), `themeMode`, `strideLengthCm`, `weightKg`, `ageYears` (8.2, for maximum heart rate), notification switches and times, `autoTrack`, `autoStopMin`, challenge targets, permission-asked flags |
 | `kadamm_account` | `accountId`, `email` (last used), `loggedIn`, `guest`; account rows are in `kadamm.db` |
 | `kadamm_routes`, `kadamm_badges`, `kadamm_messages` | Saved routes, badges already seen, notifications sent today |
 
+- Parsed history is cached in `DaySteps.sessions` until the stored string changes; treat the array as read-only unless you save it back.
 - Step rule: the day total is `max(phone counter, Health Connect live, session steps)`, never a sum (`DaySteps.todayTotal`, `allDayTotals`, `merge`).
 - Backup (`MainActivity.onActivityResult`/`restore`): a JSON file through SAF with `kadamm_history.sessions`, `kadamm_routes.routes`, `kadamm_steps.days`, `kadamm_health.healthDays` and `settings`. Restore merges sessions and routes by `id`, keeps the higher steps per day, and overwrites settings.
 - `android:allowBackup="true"`: Android auto-backup can include all prefs.

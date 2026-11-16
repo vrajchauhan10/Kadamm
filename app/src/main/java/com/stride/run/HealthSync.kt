@@ -8,6 +8,8 @@ import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
+import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.metadata.DataOrigin
@@ -35,7 +37,8 @@ object HealthSync {
     val allPermissions = readSteps + setOf(
         HealthPermission.getReadPermission(DistanceRecord::class),
         HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
-        HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class)
+        HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
+        HealthPermission.getReadPermission(HeartRateRecord::class)
     )
     @JvmStatic fun isRunning() = running
     /** Lets Kadamm read while closed, so the widget and reminders stay current. Only offered where Health Connect supports it. */
@@ -198,11 +201,15 @@ object HealthSync {
             val sessionsAll = JSONArray(history.getString("sessions", "[]"))
             val now = System.currentTimeMillis(); var changed = false
             val activeAllowed = granted.contains(HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class))
+            val hrAllowed = granted.contains(HealthPermission.getReadPermission(HeartRateRecord::class))
             for (i in 0 until sessionsAll.length()) {
                 val s = sessionsAll.optJSONObject(i) ?: continue
                 val from = s.optLong("startTimeMs", 0L); val to = s.optLong("endTimeMs", 0L)
-                if (to <= from || now - to > 30L * 86400000L || s.optLong("hcSyncedAt", 0L) > to + 6L * 3600000L) continue
+                if (to <= from || now - to > 30L * 86400000L) continue
                 val range = TimeRangeFilter.between(Instant.ofEpochMilli(from), Instant.ofEpochMilli(to))
+                // Heart rate from a watch (via Samsung Health or any app writing to Health Connect), read once per session.
+                if (hrAllowed && !s.optBoolean("hrChecked", false) && now - to > 30L * 60000L) { heartRate(hc, s, range, from); changed = true }
+                if (s.optLong("hcSyncedAt", 0L) > to + 6L * 3600000L) continue
                 var steps = 0L; var kcal = -1.0
                 for (origin in perOrigin.keys) {
                     val o = setOf(DataOrigin(origin))
@@ -243,5 +250,33 @@ object HealthSync {
         }
         prefs.edit().putString("healthStatus", status).apply()
         return status
+    }
+
+    /**
+     * Stores a session's heart rate as {seconds since start, bpm}, averaged into 5-second buckets, plus the source
+     * app. Sessions with no heart-rate records (no watch worn) are only marked as checked: nothing is invented.
+     */
+    private suspend fun heartRate(hc: HealthConnectClient, s: JSONObject, range: TimeRangeFilter, from: Long) {
+        try {
+            val buckets = sortedMapOf<Long, MutableList<Long>>(); var token: String? = null; var origin = ""
+            do {
+                val page = hc.readRecords(ReadRecordsRequest(HeartRateRecord::class, range, pageToken = token))
+                for (r in page.records) {
+                    if (origin.isEmpty()) origin = r.metadata.dataOrigin.packageName
+                    for (x in r.samples) {
+                        val sec = (x.time.toEpochMilli() - from) / 1000L
+                        if (sec >= 0 && x.beatsPerMinute in 30L..230L) buckets.getOrPut(sec / 5L * 5L) { mutableListOf() }.add(x.beatsPerMinute)
+                    }
+                }
+                token = page.pageToken
+            } while (!token.isNullOrEmpty())
+            if (buckets.size >= 6) {
+                val out = JSONArray()
+                for ((sec, v) in buckets) out.put(JSONArray().put(sec).put(Math.round(v.average())))
+                s.put("hr", out); s.put("hrSource", label(origin))
+            }
+            s.put("hrChecked", true)
+        } catch (_: Exception) {
+        }
     }
 }

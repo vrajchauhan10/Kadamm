@@ -1,5 +1,16 @@
 # Changelog
 
+## 8.2 (versionCode 35)
+
+- Session analysis, modelled on premium trackers and computed only from what the phone recorded: an overview with a slow-to-fast scale and nine numbers; a "Kadamm Intelligence" summary; relative effort against your 3-week average, with fitness change; five intensity zones (from cadence, GPS speed or the session average) and WHO intensity minutes; pace with grade-adjusted pace and consistency; details per km with cadence and climb; cadence and stride charts; heart rate and heart-rate zones when a watch writes to Health Connect; elevation with a gradient donut; best efforts (400 m to half marathon) with all-time ranks; matched sessions; walking speed as a health marker; VO₂max (VDOT) and race predictions for runs. Every card has an ⓘ that explains the formula.
+- Recording now stores session steps on each GPS point, a 5-second step timeline (indoor too) and barometric altitude, so new sessions get cadence, stride and gradient over time.
+- Health Connect: optional heart-rate permission; each session's heart rate is imported automatically. Goals has a new Age setting for maximum heart rate.
+- Badges: 45 badges in four tiers (easy, medium, hard, extreme) drawn as medals, with an in-progress strip, tier counts and a detail sheet.
+- Reports: a Health & fitness section with intensity minutes against the WHO's 150 a week, the zone mix, fitness/fatigue/form with a 60-day chart, and walking speed and cadence against the period before.
+- Profile: a fitness snapshot (fitness, form, this week's intensity minutes, 30-day walking speed and cadence).
+- History: Month at a glance redrawn: the line stops at today, goal days get green dots, labelled goal line, peak and today markers, and daily average, goal days and best day under it.
+- Smoother: the session history is parsed once and cached (it was re-parsed every second), Places, records and the profile photo are cached, analysis is warmed in the background, page transitions run on hardware layers after layout, and the goal celebration and confetti draw less per frame. Measured on the test phone while switching tabs: janky frames 3.1 % → 1.0 %, 99th-percentile frame 200 ms → 16 ms.
+
 ## 8.1 (versionCode 34)
 
 - Route replay: a session's map has Play, a scrub slider and 1×/2×/4× speed. The route draws itself along the streets in GPS time (slow stretches play slower), blue while walking and red while running, with a moving marker and a caption: walking or running, distance and time so far.

@@ -135,8 +135,17 @@ final class DaySteps {
     }
     static long startedAt(Context c){return c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getLong("startedAt",0);}
 
-    private static JSONArray sessions(Context c){
-        try{return new JSONArray(c.getSharedPreferences("kadamm_history",Context.MODE_PRIVATE).getString("sessions","[]"));}catch(Exception e){return new JSONArray();}
+    private static String parsedRaw;private static JSONArray parsed=new JSONArray();
+    /**
+     * Saved sessions, parsed once and reused until the stored text changes. The history is about a megabyte of
+     * JSON; parsing it on every screen and every second of the live view was what made the app stutter.
+     * Callers must treat the result as read-only unless they save it back.
+     */
+    static synchronized JSONArray sessions(Context c){
+        String raw=c.getSharedPreferences("kadamm_history",Context.MODE_PRIVATE).getString("sessions","[]");
+        if(raw==parsedRaw||raw.equals(parsedRaw))return parsed;
+        try{parsed=new JSONArray(raw);}catch(Exception e){parsed=new JSONArray();}
+        parsedRaw=raw;return parsed;
     }
     /** Steps recorded inside Kadamm sessions on a day, including the session in progress. */
     static long sessionOn(Context c,String day){

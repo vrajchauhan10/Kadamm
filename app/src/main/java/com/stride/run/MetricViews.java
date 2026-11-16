@@ -1,0 +1,162 @@
+package com.stride.run;
+
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.DashPathEffect;
+import android.graphics.LinearGradient;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
+import android.graphics.Shader;
+import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.view.View;
+
+import java.util.List;
+import java.util.Locale;
+
+/** Small drawn views for the session analysis, reports and badges. All colours come from the theme or the zone palette. */
+final class MetricViews {
+    private MetricViews() {}
+    /** Zone palette, light to vigorous: violet, blue, green, amber, red. */
+    static final int[] ZONE_COLORS={Color.rgb(147,112,219),Color.rgb(66,133,244),Color.rgb(52,168,83),Color.rgb(251,168,4),Color.rgb(234,67,53)};
+    static int alpha(int c,int a){return Color.argb(a,Color.red(c),Color.green(c),Color.blue(c));}
+    static String mmss(double sec){long s=Math.round(sec);return s>=3600?String.format(Locale.US,"%d:%02d:%02d",s/3600,(s/60)%60,s%60):String.format(Locale.US,"%02d:%02d",s/60,s%60);}
+
+    private abstract static class Base extends View {
+        final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);final KadammTheme t;
+        Base(Context c,KadammTheme t){super(c);this.t=t;}
+        float dp(float v){return v*getResources().getDisplayMetrics().density;}
+    }
+
+    /**
+     * A value over time. DOTS colours each sample by the zone it falls in (cadence, stride); AREA draws a line
+     * with a gradient fill (heart rate, fitness). A dashed line marks the average.
+     */
+    static final class Series extends Base {
+        interface Fmt { String f(double v); }
+        private final List<double[]> d;private final boolean dots;private final int color;private final double[] bounds;private final Fmt y,x;private final double avg;
+        Series(Context c,KadammTheme t,List<double[]> data,boolean dots,int color,double[] zoneBounds,double avg,Fmt yFmt,Fmt xFmt){
+            super(c,t);d=data;this.dots=dots;this.color=color;bounds=zoneBounds;this.avg=avg;y=yFmt;x=xFmt;
+        }
+        private int colorOf(double v){if(bounds==null)return color;int z=0;for(double b:bounds)if(v>=b)z++;return ZONE_COLORS[Math.min(4,z+(bounds.length<4?1:0))];}
+        @Override protected void onDraw(Canvas c){
+            if(d.size()<2)return;float w=getWidth(),h=getHeight(),left=dp(36),right=dp(8),top=dp(8),bottom=dp(22),cw=w-left-right,ch=h-top-bottom;
+            double lo=Double.MAX_VALUE,hi=-Double.MAX_VALUE,x0=d.get(0)[0],x1=d.get(d.size()-1)[0];
+            for(double[] q:d){lo=Math.min(lo,q[1]);hi=Math.max(hi,q[1]);}
+            if(avg>0){lo=Math.min(lo,avg);hi=Math.max(hi,avg);}
+            double span=Math.max(hi-lo,Math.max(1,Math.abs(hi)*.1));lo-=span*.15;hi+=span*.15;if(lo<0&&d.get(0)[1]>=0)lo=Math.max(0,lo);
+            final double flo=lo,fhi=hi;
+            p.setTextSize(dp(9.5f));p.setStrokeWidth(dp(1));
+            for(int g=0;g<3;g++){double v=lo+(hi-lo)*(.15+.35*g);float gy=(float)(top+ch*(1-(v-lo)/(hi-lo)));p.setColor(alpha(t.border,200));c.drawLine(left,gy,left+cw,gy,p);p.setColor(t.textMuted);p.setTextAlign(Paint.Align.RIGHT);c.drawText(y.f(v),left-dp(5),gy+dp(3.5f),p);}
+            if(dots){
+                p.setStyle(Paint.Style.FILL);float r=dp(d.size()>300?1.9f:2.4f);
+                for(double[] q:d){float px=(float)(left+cw*(q[0]-x0)/Math.max(1,x1-x0)),py=(float)(top+ch*(1-(q[1]-flo)/(fhi-flo)));p.setColor(q[2]>0?ZONE_COLORS[4]:colorOf(q[1]));c.drawCircle(px,py,r,p);}
+            }else{
+                Path line=new Path(),area=new Path();
+                for(int i=0;i<d.size();i++){double[] q=d.get(i);float px=(float)(left+cw*(q[0]-x0)/Math.max(1,x1-x0)),py=(float)(top+ch*(1-(q[1]-flo)/(fhi-flo)));if(i==0){line.moveTo(px,py);area.moveTo(px,top+ch);area.lineTo(px,py);}else{line.lineTo(px,py);area.lineTo(px,py);}}
+                area.lineTo(left+cw,top+ch);area.close();
+                p.setStyle(Paint.Style.FILL);p.setColor(Color.BLACK);p.setShader(new LinearGradient(0,top,0,top+ch,alpha(color,t.dark?120:90),alpha(color,0),Shader.TileMode.CLAMP));c.drawPath(area,p);p.setShader(null);
+                p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(2));p.setStrokeJoin(Paint.Join.ROUND);p.setColor(color);c.drawPath(line,p);p.setStyle(Paint.Style.FILL);
+            }
+            if(avg>0){float ay=(float)(top+ch*(1-(avg-lo)/(hi-lo)));p.setStyle(Paint.Style.STROKE);p.setColor(alpha(t.text,150));p.setStrokeWidth(dp(1));p.setPathEffect(new DashPathEffect(new float[]{dp(4),dp(3)},0));c.drawLine(left,ay,left+cw,ay,p);p.setPathEffect(null);p.setStyle(Paint.Style.FILL);}
+            p.setColor(t.textMuted);p.setTextSize(dp(9.5f));
+            for(int i=0;i<=3;i++){double v=x0+(x1-x0)*i/3;p.setTextAlign(i==0?Paint.Align.LEFT:i==3?Paint.Align.RIGHT:Paint.Align.CENTER);c.drawText(x.f(v),left+cw*i/3f,h-dp(5),p);}
+            p.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+
+    /**
+     * Relative effort as three bands, higher than usual on top, your recent average in the middle, lower at the
+     * bottom; a marker shows where this session lands.
+     */
+    static final class Bands extends Base {
+        private final double ratio;private final int accent;
+        Bands(Context c,KadammTheme t,double ratio,int accent){super(c,t);this.ratio=ratio;this.accent=accent;}
+        @Override protected void onDraw(Canvas c){
+            float w=getWidth(),h=getHeight(),bh=h/3f;String[] names={"Higher than usual","Your 3-week average","Lower than usual"};int[] cs={Color.rgb(211,47,47),Color.rgb(123,31,162),Color.rgb(149,88,214)};
+            p.setTextSize(dp(12));p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
+            for(int i=0;i<3;i++){p.setColor(cs[i]);c.drawRect(0,i*bh,w,(i+1)*bh,p);p.setColor(Color.WHITE);c.drawText(names[i],dp(14),i*bh+bh/2+dp(4),p);}
+            // 0.7× sits at the bottom of the middle band, 1.3× at its top; beyond that the marker moves into the outer bands.
+            double r=Math.max(.2,Math.min(2,ratio));float y;
+            if(r>=1.3)y=(float)(bh*(1-(Math.min(2,r)-1.3)/.7));else if(r<=.7)y=(float)(2*bh+bh*(.7-r)/.5);else y=(float)(bh+bh*(1.3-r)/.6);
+            y=Math.max(dp(5),Math.min(h-dp(5),y));float mx=w*.86f;
+            p.setColor(Color.WHITE);p.setStrokeWidth(dp(2));c.drawLine(mx,0,mx,h,p);c.drawCircle(mx,y,dp(6),p);p.setColor(accent);c.drawCircle(mx,y,dp(3.2f),p);
+            p.setTypeface(null);
+        }
+    }
+    static int blendC(int a,int b,float f){return Color.rgb((int)(Color.red(a)+(Color.red(b)-Color.red(a))*f),(int)(Color.green(a)+(Color.green(b)-Color.green(a))*f),(int)(Color.blue(a)+(Color.blue(b)-Color.blue(a))*f));}
+
+    /** A ring split into coloured parts, with a label in the middle. */
+    static final class Donut extends Base {
+        private final double[] v;private final int[] cs;private final String center,sub;
+        Donut(Context c,KadammTheme t,double[] values,int[] colors,String center,String sub){super(c,t);v=values;cs=colors;this.center=center;this.sub=sub;}
+        @Override protected void onDraw(Canvas c){
+            float s=Math.min(getWidth(),getHeight()),st=dp(14),cx=getWidth()/2f,cy=getHeight()/2f;RectF o=new RectF(cx-s/2+st/2,cy-s/2+st/2,cx+s/2-st/2,cy+s/2-st/2);
+            double total=0;for(double x:v)total+=x;p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(st);p.setStrokeCap(Paint.Cap.BUTT);
+            if(total<=0){p.setColor(t.surfaceRaised);c.drawOval(o,p);}
+            float a=-90;for(int i=0;i<v.length;i++){if(v[i]<=0)continue;float sw=(float)(v[i]/total*360);p.setColor(cs[i]);c.drawArc(o,a+.8f,Math.max(.5f,sw-1.6f),false,p);a+=sw;}
+            p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);p.setColor(t.text);p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));p.setTextSize(dp(18));c.drawText(center,cx,cy+(sub==null?dp(6):dp(2)),p);
+            if(sub!=null){p.setTypeface(null);p.setTextSize(dp(10));p.setColor(t.textMuted);c.drawText(sub,cx,cy+dp(16),p);}
+            p.setTextAlign(Paint.Align.LEFT);p.setTypeface(null);
+        }
+    }
+
+    /** A slow-to-fast colour scale with a marker, like a speedometer laid flat. */
+    static final class Scale extends Base {
+        private final float at;private final String lo,hi;private final int[] cs;
+        Scale(Context c,KadammTheme t,float fraction,String lo,String hi){this(c,t,fraction,lo,hi,false);}
+        /** {@code higherIsBetter}: red at the low end and green at the high end, for health markers. */
+        Scale(Context c,KadammTheme t,float fraction,String lo,String hi,boolean higherIsBetter){super(c,t);at=Math.max(0,Math.min(1,fraction));this.lo=lo;this.hi=hi;cs=higherIsBetter?new int[]{ZONE_COLORS[4],ZONE_COLORS[3],ZONE_COLORS[2]}:new int[]{ZONE_COLORS[2],ZONE_COLORS[3],ZONE_COLORS[4]};}
+        @Override protected void onDraw(Canvas c){
+            float w=getWidth(),bh=dp(6),y=dp(14);p.setColor(Color.BLACK);
+            p.setShader(new LinearGradient(0,0,w,0,cs,null,Shader.TileMode.CLAMP));c.drawRoundRect(new RectF(0,y,w,y+bh),bh/2,bh/2,p);p.setShader(null);
+            float mx=Math.max(dp(6),Math.min(w-dp(6),w*at));p.setColor(t.text);Path tri=new Path();tri.moveTo(mx-dp(6),y-dp(9));tri.lineTo(mx+dp(6),y-dp(9));tri.lineTo(mx,y-dp(1));tri.close();c.drawPath(tri,p);
+            p.setTextSize(dp(10));p.setColor(cs[0]);c.drawText(lo,0,y+bh+dp(14),p);p.setTextAlign(Paint.Align.RIGHT);p.setColor(cs[2]);c.drawText(hi,w,y+bh+dp(14),p);p.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+
+    /** Progress ring with a big number in the middle (intensity minutes against the WHO 150). */
+    static final class Ring extends Base {
+        private final float f;private final int color;private final String big,small;
+        Ring(Context c,KadammTheme t,float fraction,int color,String big,String small){super(c,t);f=Math.max(0,fraction);this.color=color;this.big=big;this.small=small;}
+        @Override protected void onDraw(Canvas c){
+            float s=Math.min(getWidth(),getHeight()),st=dp(10),cx=getWidth()/2f,cy=getHeight()/2f;RectF o=new RectF(cx-s/2+st,cy-s/2+st,cx+s/2-st,cy+s/2-st);
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(st);p.setStrokeCap(Paint.Cap.ROUND);p.setColor(alpha(color,45));c.drawOval(o,p);
+            p.setColor(color);c.drawArc(o,-90,360*Math.min(1,f),false,p);
+            if(f>1){p.setColor(blendC(color,Color.WHITE,.45f));c.drawArc(o,-90,360*Math.min(1,f-1),false,p);}
+            p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);p.setColor(t.text);p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));p.setTextSize(s*.22f);c.drawText(big,cx,cy+s*.06f,p);
+            p.setTypeface(null);p.setTextSize(Math.max(dp(9),s*.085f));p.setColor(t.textMuted);c.drawText(small,cx,cy+s*.2f,p);p.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+
+    /** Tier colours for badges: bronze (easy), silver (medium), gold (hard), amethyst (extreme). */
+    static final int[][] TIER={{Color.rgb(214,140,86),Color.rgb(140,78,40)},{Color.rgb(214,222,232),Color.rgb(120,132,148)},{Color.rgb(255,214,92),Color.rgb(196,128,8)},{Color.rgb(196,140,255),Color.rgb(98,42,190)}};
+    static final String[] TIER_NAMES={"Easy","Medium","Hard","Extreme"};
+
+    /** A badge as a medal: a tier-coloured hexagon with the icon, or a grey one with a progress arc while locked. */
+    static final class Medal extends Base {
+        private final int tier,icon;private final boolean earned;private final float progress;
+        Medal(Context c,KadammTheme t,int tier,int icon,boolean earned,float progress){super(c,t);this.tier=tier;this.icon=icon;this.earned=earned;this.progress=Math.max(0,Math.min(1,progress));}
+        @Override protected void onDraw(Canvas c){
+            float s=Math.min(getWidth(),getHeight()),cx=getWidth()/2f,cy=getHeight()/2f,r=s*.46f;
+            Path hex=new Path();for(int i=0;i<6;i++){double a=Math.toRadians(60*i-90);float x=(float)(cx+r*Math.cos(a)),y=(float)(cy+r*Math.sin(a));if(i==0)hex.moveTo(x,y);else hex.lineTo(x,y);}hex.close();
+            int[] tc=TIER[tier];
+            if(earned){
+                p.setColor(Color.BLACK);p.setShader(new LinearGradient(cx-r,cy-r,cx+r,cy+r,tc[0],tc[1],Shader.TileMode.CLAMP));c.drawPath(hex,p);p.setShader(null);
+                // Inner face and a highlight, for a struck-metal look.
+                Path inner=new Path();float ri=r*.78f;for(int i=0;i<6;i++){double a=Math.toRadians(60*i-90);float x=(float)(cx+ri*Math.cos(a)),y=(float)(cy+ri*Math.sin(a));if(i==0)inner.moveTo(x,y);else inner.lineTo(x,y);}inner.close();
+                p.setShader(new LinearGradient(cx,cy-ri,cx,cy+ri,tc[1],blendC(tc[1],Color.BLACK,.25f),Shader.TileMode.CLAMP));c.drawPath(inner,p);p.setShader(null);
+                p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(1.2f));p.setColor(alpha(Color.WHITE,120));c.drawPath(inner,p);p.setStyle(Paint.Style.FILL);
+                if(tier==3){p.setColor(alpha(Color.WHITE,200));for(int i=0;i<3;i++){double a=Math.toRadians(-60+i*60);c.drawCircle((float)(cx+r*1.02f*Math.cos(a)),(float)(cy-r*.9f+Math.abs(i-1)*r*.1f),dp(1.6f),p);}}
+            }else{
+                p.setColor(t.surfaceRaised);c.drawPath(hex,p);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(1));p.setColor(t.border);c.drawPath(hex,p);
+                if(progress>0){p.setStrokeWidth(dp(3));p.setStrokeCap(Paint.Cap.ROUND);p.setColor(tc[0]);c.drawArc(new RectF(cx-r*.9f,cy-r*.9f,cx+r*.9f,cy+r*.9f),-90,360*progress,false,p);}
+                p.setStyle(Paint.Style.FILL);
+            }
+            Drawable d=getContext().getDrawable(icon);
+            if(d!=null){d=d.mutate();d.setTint(earned?Color.WHITE:t.textMuted);int is=(int)(r*.82f);d.setBounds((int)(cx-is/2f),(int)(cy-is/2f),(int)(cx+is/2f),(int)(cy+is/2f));d.setAlpha(earned?255:150);d.draw(c);}
+        }
+    }
+}

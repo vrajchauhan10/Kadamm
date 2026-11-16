@@ -293,6 +293,11 @@ def test_recording():
         assert _value(_state(), "elapsed") > p2, "resume did not restart the timer"
         sh("input tap %d %d" % pause); time.sleep(1.5)
         km = _value(_state(), "distance"); points = _state().count("&quot;lat&quot;")
+        # 8.2: a step timeline every 5 seconds (indoor too) and barometric altitude on route points.
+        st = _state(); samples = re.search(r'name="timeline">(.*?)</string>', st, re.S)
+        samples = samples.group(1).count("],[") + 1 if samples and "[[" in samples.group(1) else 0
+        baro = st.count("&quot;b&quot;")
+        assert samples >= 2, f"step timeline has {samples} samples"
         sh("input tap %d %d" % finish)
         _confirm("Finish activity?", "Finish")
         assert wait("Session summary"), "summary screen did not open"
@@ -305,8 +310,8 @@ def test_recording():
         if mock:
             assert 0.24 <= km <= 0.33, f"expected about 0.30 km, recorded {km:.3f} km"
             assert points >= 20, f"route has only {points} points"
-            return f"mock walk 300 m, {km * 1000:.0f} m recorded, {points} route points"
-        return f"real GPS: {km * 1000:.0f} m, {points} route points; mock route skipped (Shell is not the mock location app)"
+            return f"mock walk 300 m, {km * 1000:.0f} m recorded, {points} route points, {samples} timeline samples, {baro} barometer points"
+        return f"real GPS: {km * 1000:.0f} m, {points} route points, {samples} timeline samples, {baro} barometer points; mock route skipped (Shell is not the mock location app)"
     finally:
         if mock:
             sh("cmd location providers remove-test-provider gps")
