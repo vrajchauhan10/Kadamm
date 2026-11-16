@@ -1,5 +1,10 @@
 # Changelog
 
+## 8.5 (versionCode 38)
+
+- Today keeps Recent activity to one stacked "Your sessions" card (latest day, its sessions and distance, and the total) with a new layers icon; it opens a Sessions page where every day is listed as an expandable stack, 7 days at a time.
+- A session with no distance shows "— /km" instead of "0:00 /km".
+
 ## 8.4 (versionCode 37)
 
 - Recent activity on Today is grouped by day as stacked cards: Today, Yesterday, then weekday or date. Each shows a date tile, how many sessions were automatic or manual, the day's distance, time and steps, the longest route with a session-count badge, and one peeking card behind it per extra session. Tap a day to fan it open into its sessions (each tagged AUTO or MANUAL) and tap one for its details; open days stay open after Back. "Show 3 more days" adds older days, "Show fewer" goes back.
