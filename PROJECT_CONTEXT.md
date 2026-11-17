@@ -41,6 +41,9 @@ Kadamm is a native Android walk/run tracker (application id `com.stride.run`, or
 | `Coach.java` | On-device "insight" sentences for the Today summary (no AI service) |
 | `Insights.java` | Route analysis (pace, elevation, splits, records) and saved routes (`kadamm_routes`); `coverage` and `records` are cached per parsed history |
 | `SessionMetrics.java` | (8.2) Per-session analysis, cached by id: cadence and stride series, intensity zones (cadence, else GPS speed, else session average; heart rate when present), effort, WHO intensity minutes, km splits, consistency, best efforts and all-time ranks, barometric/GPS elevation, gradient and grade-adjusted pace, heart rate, VDOT for runs; across sessions: relative effort, fitness/fatigue/form (Banister), matched sessions. `warm()` fills the cache off the main thread 1.5 s after resume. 8.3 adds pace zones (`thresholdPace`, `paceZones`), the pace curve (`bestByTime`), GAP series, pace/grade map overlays, stride variability, sea-level heights (`AltitudeConverter`) and steps over time from Health Connect minutes (`hcMin`) for older sessions |
+| `Trainer.java` | (9.1) Stages, weekly plan, today's workout, forecast, projections and tips from history |
+| `HealthImport.kt` | (9.1) Health Connect import of past walks/runs (ExerciseSessionRecord, routes, HR) and daily steps |
+| `GoalCapsule.java`, `GoalsWidget.java`, `SessionRules.java`, `DaySummary.java` | (8.6–9.0) Daily goals capsule and widget, save rules (100 steps, rides, indoor), day aggregation |
 | `MetricViews.java` | (8.2) Drawn views for the analysis: `Series` (zone-coloured dots or area line over time), `Bands` (relative effort), `Donut`, `Scale`, `Ring`, `Medal` (tiered badge) |
 | `Progress.java` | Date ranges for reports, period summaries, 45 badges in four tiers (easy, medium, hard, extreme), challenges (`kadamm_badges`) |
 | `Calories.java` | MET-based calorie estimate (weight from settings) |

@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="9.0";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="9.1";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -260,13 +260,13 @@ public class MainActivity extends Activity {
         goingBack=false;
     }
     private void goBack(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.pop();Integer y=scrollMemory.get(to);restoreScroll=y==null?-1:y;goingBack=true;page=to;closeDrawer();renderPage();}
-    private String backLabel(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.peek();return "DaySummary".equals(to)?"Day summary":"Detail".equals(to)?"Session":"Auto".equals(to)?"Auto tracking":"Today".equals(to)?"Home":to;}
-    private void renderPageInner(){trackBack();if(replayAnim!=null){replayAnim.cancel();replayAnim=null;}if(!page.equals(renderedPage)&&scroller!=null)scroller.scrollTo(0,0);renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else if(page.equals("Routes"))renderRoutes();else if(page.equals("Notifications"))renderNotifications();else if(page.equals("Reports"))renderReports();else if(page.equals("Achievements"))renderAchievements();else if(page.equals("Permissions"))renderPermissions();else if(page.equals("Auto"))renderAutoTracking();else if(page.equals("Storage"))renderStorage();else if(page.equals("Places"))renderPlaces();else if(page.equals("Sessions"))renderSessions();else if(page.equals("DaySummary"))renderDaySummary();else renderDetail(lastSession);if(content.getChildCount()>0)signatureAtEnd();}
+    private String backLabel(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.peek();return "DaySummary".equals(to)?"Day summary":"Import".equals(to)?"Import":"Detail".equals(to)?"Session":"Auto".equals(to)?"Auto tracking":"Today".equals(to)?"Home":to;}
+    private void renderPageInner(){trackBack();if(replayAnim!=null){replayAnim.cancel();replayAnim=null;}if(!page.equals(renderedPage)&&scroller!=null)scroller.scrollTo(0,0);renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else if(page.equals("Routes"))renderRoutes();else if(page.equals("Notifications"))renderNotifications();else if(page.equals("Reports"))renderReports();else if(page.equals("Achievements"))renderAchievements();else if(page.equals("Permissions"))renderPermissions();else if(page.equals("Auto"))renderAutoTracking();else if(page.equals("Storage"))renderStorage();else if(page.equals("Places"))renderPlaces();else if(page.equals("Sessions"))renderSessions();else if(page.equals("DaySummary"))renderDaySummary();else if(page.equals("Trainer"))renderTrainer();else if(page.equals("Import"))renderImport();else renderDetail(lastSession);if(content.getChildCount()>0)signatureAtEnd();}
     private void styleNavItem(LinearLayout item,boolean selected){int color=selected?lime:muted;item.setBackground(rippleOn(selected?raised:Color.TRANSPARENT,14));((android.widget.ImageView)item.getChildAt(0)).setImageTintList(android.content.res.ColorStateList.valueOf(color));((TextView)item.getChildAt(1)).setTextColor(selected?ink:muted);}
     private void brand(String eyebrow,String headline,String sub){LinearLayout brand=row();content.addView(brand,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);brand.addView(brandButton(),bbp);if(tabIndex(page)<0){brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));TextView bk=tx("‹  "+backLabel(),13,ink,true);bk.setGravity(Gravity.CENTER);bk.setPadding(dp(14),0,dp(16),0);bk.setBackground(rippleOn(raised,18));bk.setContentDescription("Back to "+backLabel());bk.setOnClickListener(v->goBack());brand.addView(bk,lp(-2,36));}TextView e=tx(eyebrow.toUpperCase(Locale.US),10,muted,true);LinearLayout.LayoutParams ep=lp(-1,25);ep.topMargin=dp(8);content.addView(e,ep);TextView h=tx(headline,29,ink,true);content.addView(h);if(sub!=null){TextView s=tx(sub,13,muted,false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(5);sp.bottomMargin=dp(16);content.addView(s,sp);}}
     private LinearLayout card(){LinearLayout c=col();c.setPadding(dp(16),dp(16),dp(16),dp(16));c.setBackground(panelShape(16));LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(12);content.addView(c,p);return c;}
     private GradientDrawable panelShape(int radius){GradientDrawable d=shape(panel,radius);d.setStroke(dp(1),line);return d;}
-    private void renderToday(){JSONArray hist=history();dayTotals=DaySteps.allDayTotals(this);loadIdleLocation();renderHeader();renderStepSetup();renderBadgeBanner(hist);renderHero(hist);renderCoach();renderStepsByHour();renderPlan(hist);renderMovementQuality();renderSittingBreaks();renderBento(hist);renderDistanceGoal(hist);
+    private void renderToday(){JSONArray hist=history();dayTotals=DaySteps.allDayTotals(this);loadIdleLocation();renderHeader();renderStepSetup();renderBadgeBanner(hist);renderHero(hist);renderCoach();renderStepsByHour();renderTrainerCard(hist);renderPlan(hist);renderMovementQuality();renderSittingBreaks();renderBento(hist);renderDistanceGoal(hist);
         LinearLayout mapCard=card();trackCard=mapCard;LinearLayout head=row();TextView title=tx("Live route",16,ink,true);head.addView(title,new LinearLayout.LayoutParams(0,dp(26),1));status=tx("● READY",10,lime,true);head.addView(status);mapCard.addView(head);FrameLayout mapFrame=new FrameLayout(this);LinearLayout.LayoutParams mfp=lp(-1,190);mfp.topMargin=dp(8);mapCard.addView(mapFrame,mfp);route=new RouteView(this);route.setTheme(bg,raised,lime,darkTheme);route.setContentDescription("Map. Tap to open full screen");route.setOnClickListener(v->openMapView());mapFrame.addView(route,new FrameLayout.LayoutParams(-1,-1));android.widget.ImageView follow=icon(R.drawable.ic_my_location,ink,10);follow.setBackground(rippleOn(raised,12));FrameLayout.LayoutParams flp=new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.RIGHT|Gravity.TOP);flp.setMargins(0,dp(10),dp(10),0);mapFrame.addView(follow,flp);follow.setContentDescription("Follow my location");follow.setOnClickListener(v->{route.setFollowLocation(true);if(prefs.getBoolean("gpsFix",false))route.setCurrentLocation(prefs.getFloat("latitude",0),prefs.getFloat("longitude",0),prefs.getFloat("accuracy",0));else toast("Waiting for a reliable GPS fix");});LinearLayout mapMeta=row();mapCard.addView(mapMeta,lp(-1,26));accuracyLabel=tx("GPS accuracy · waiting for signal",10,muted,false);mapMeta.addView(accuracyLabel,new LinearLayout.LayoutParams(0,dp(26),1));TextView standard=tx("Tap map to explore",10,lime,true);mapMeta.addView(standard);TextView mapHint=tx("© OpenStreetMap contributors · satellite tiles are not available from this map source",9,muted,false);mapCard.addView(mapHint);
         // Track an activity: four clear choices, one Start button; live numbers only while a session runs.
         boolean running=prefs.getBoolean("active",false);LinearLayout box=card();
@@ -481,6 +481,7 @@ public class MainActivity extends Activity {
             "Stop reading heart rate?","New sessions won't get heart rate from your watch. Heart rate already saved stays.",
             "Read heart rate?","Kadamm will read heart rate for your sessions from Health Connect, about 30 minutes after each one ends.",null);
         Button open=button(connected?"Health Connect permissions":"Connect Health Connect",connected?raised:lime,connected?ink:accentOn);LinearLayout.LayoutParams bp=lp(-1,46);bp.topMargin=dp(12);c.addView(open,bp);
+        Button imp=button("Import past walks and steps",raised,ink);LinearLayout.LayoutParams ip=lp(-1,46);ip.topMargin=dp(8);c.addView(imp,ip);imp.setOnClickListener(v->navigate("Import"));
         open.setOnClickListener(v->{try{startActivity(new Intent(this,HealthConnectActivity.class));}catch(Exception e){toast("Health Connect could not be opened");}});
 
         LinearLayout n=card();n.addView(tx("How the total is worked out",15,ink,true));
@@ -581,7 +582,7 @@ public class MainActivity extends Activity {
         profileLink(links,"Places you walk","Your street map and explorer level",R.drawable.ic_my_location,teal(),()->navigate("Places"));
         profileLink(links,"Achievements",earned+" badges earned",R.drawable.ic_trophy,flame(),()->navigate("Achievements"));
         profileLink(links,"Goals and targets",String.format(Locale.US,"%,d steps a day",dailyGoal()),R.drawable.ic_flag,green(),()->navigate("Goals"));
-        profileLink(links,"Activity calendar","Your days and sessions",R.drawable.ic_calendar,purple(),()->navigate("History"));
+        profileLink(links,"Kadamm Trainer","Your stage, today's workout and the week ahead",R.drawable.ic_bolt,teal(),()->navigate("Trainer"));profileLink(links,"Import history","Walks, runs and steps from Samsung Health, Zepp, Google Fit",R.drawable.ic_download,indigo(),()->navigate("Import"));profileLink(links,"Activity calendar","Your days and sessions",R.drawable.ic_calendar,purple(),()->navigate("History"));
         profileLink(links,"Share Kadamm","Send the app to a friend",R.drawable.ic_share,lime,this::shareApp);
         renderAccount();
         LinearLayout appearance=card();appearance.addView(tx("Appearance",16,ink,true));appearance.addView(tx("Choose how Kadamm looks on this device.",12,muted,false));String selected=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("themeMode","system");LinearLayout choices=row();LinearLayout.LayoutParams chp=lp(-1,42);chp.topMargin=dp(12);appearance.addView(choices,chp);for(String mode:new String[]{"Light","Dark","System"}){boolean active=mode.equalsIgnoreCase(selected);Button b=button(mode,active?lime:raised,active?accentOn:ink);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(0,-1,1);if(choices.getChildCount()>0)bp.leftMargin=dp(7);choices.addView(b,bp);b.setOnClickListener(v->{if(mode.toLowerCase(Locale.US).equals(selected))return;confirmChange("Switch to "+mode.toLowerCase(Locale.US)+" theme?","Kadamm will redraw in the "+mode.toLowerCase(Locale.US)+" theme.",()->{getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("themeMode",mode.toLowerCase(Locale.US)).apply();applyTheme();renderPage();},null);});}
@@ -670,6 +671,94 @@ public class MainActivity extends Activity {
     }
     /** A card peeking out under a stack: neutral, a little closer to the page colour with each layer, with a hairline edge. */
     private GradientDrawable stackLayer(int k,int radius){GradientDrawable g=shape(blend(panel,bg,darkTheme?.30f*k:.38f*k),radius);g.setStroke(dp(1),blend(line,bg,.15f*k));return g;}
+    // ---- Kadamm Trainer ----
+    private Trainer.State trainerState(JSONArray h){return Trainer.build(this,h);}
+    /** Home: today's workout from the trainer, one tap to the full plan. */
+    private void renderTrainerCard(JSONArray hist){
+        if(!SessionMetrics.ready())return;Trainer.State st=trainerState(hist);Trainer.Workout w=st.today;if(w==null)return;
+        LinearLayout c=card();GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(panel,GoalCapsule.COLORS[0],darkTheme?.18f:.10f),panel});g.setCornerRadius(dp(16));g.setStroke(dp(1),blend(line,GoalCapsule.COLORS[0],.3f));c.setBackground(g);
+        LinearLayout r=row();c.addView(r,lp(-1,-2));LinearLayout l=col();r.addView(l,new LinearLayout.LayoutParams(0,-2,1));
+        TextView e=tx("KADAMM TRAINER · STAGE "+(st.stage+1)+" "+Trainer.STAGES[st.stage].toUpperCase(Locale.US),10,GoalCapsule.COLORS[0],true);e.setLetterSpacing(.06f);l.addView(e);
+        l.addView(tx((w.done?"Done today ✓ · ":"Today: ")+w.title,15,ink,true));l.addView(tx(w.detail,12,muted,false));
+        r.addView(tx("›",24,muted,false));c.setOnClickListener(v->navigate("Trainer"));
+    }
+    private void renderTrainer(){
+        JSONArray h=history();brand("KADAMM TRAINER","Your training","A plan built from your own walks, steps and pace.");
+        if(!SessionMetrics.ready()){LinearLayout w=card();w.addView(tx("Analysing your sessions…",13,muted,false));handler.postDelayed(()->{if("Trainer".equals(page))renderPageNow();},800);return;}
+        Trainer.State st=trainerState(h);KadammTheme th=chartTheme();int teal=GoalCapsule.COLORS[0];
+        // Stage ladder
+        LinearLayout sc=card();TextView se=tx("STAGE "+(st.stage+1)+" OF 6",10,teal,true);se.setLetterSpacing(.08f);sc.addView(se);sc.addView(tx(Trainer.STAGES[st.stage],24,ink,true));
+        LinearLayout bar=row();LinearLayout.LayoutParams bp=lp(-1,8);bp.topMargin=dp(10);sc.addView(bar,bp);
+        for(int i=0;i<6;i++){View v=new View(this);v.setBackground(shape(i<=st.stage?teal:raised,4));LinearLayout.LayoutParams vp=new LinearLayout.LayoutParams(0,-1,1);if(i>0)vp.leftMargin=dp(4);bar.addView(v,vp);}
+        LinearLayout names=row();LinearLayout.LayoutParams np=lp(-1,-2);np.topMargin=dp(4);sc.addView(names,np);
+        for(int i=0;i<6;i++){TextView t=tx(Trainer.STAGES[i].replace(" walker","").replace(" runner",""),9,i==st.stage?teal:muted,i==st.stage);t.setGravity(Gravity.CENTER);names.addView(t,new LinearLayout.LayoutParams(0,-2,1));}
+        // Today
+        Trainer.Workout w=st.today;
+        if(w!=null){LinearLayout tc=metricCard("TODAY'S WORKOUT","","Today's part of your weekly plan. Pace ranges come from your pace zones around your threshold pace ("+(st.threshold>0?paceText(st.threshold)+" /km":"not known yet")+"). The plan eases hard days when your form is below −20 or your load ratio above 1.5, and adds a little when you're fresh and under-loaded.");
+            tc.addView(tx((w.done?"✓ ":"")+w.title,19,w.done?positive:ink,true));tc.addView(tx(w.detail,13,muted,false));
+            TextView why=tx(w.why,12,ink,false);LinearLayout.LayoutParams wp=lp(-1,-2);wp.topMargin=dp(8);tc.addView(why,wp);
+            if(!w.rest&&!w.done){Button go=button("▶  Start this workout",teal,Color.WHITE);go.setTextSize(15);LinearLayout.LayoutParams gp=lp(-1,48);gp.topMargin=dp(12);tc.addView(go,gp);
+                go.setOnClickListener(v->{if(prefs.getBoolean("active",false)){openLive();return;}activityType=w.run?"Run":"Walk";prefs.edit().putString("activityMode","outdoor").apply();toast("Target: "+w.detail);beginRecord();});}}
+        // Next stage
+        if(!st.next.isEmpty()){LinearLayout nc=metricCard("NEXT STAGE · "+Trainer.STAGES[st.stage+1].toUpperCase(Locale.US),"","Every check must be met at once, measured over the last three weeks (and 60 days for distance and running). Stages move up automatically.");
+            for(Trainer.Check ch:st.next){TextView t=tx((ch.done?"✓  ":"○  ")+ch.text,13,ch.done?positive:ink,false);t.setPadding(0,dp(6),0,0);nc.addView(t);}}
+        // The week
+        LinearLayout wc=metricCard("THIS WEEK","","Your stage's weekly plan. A day is ticked when that day's sessions add up to 70 % of its minutes; rest and steps days tick once the day has passed or you reach your step goal.");
+        for(Trainer.Workout d:st.week){
+            LinearLayout r=row();r.setPadding(dp(8),dp(8),dp(8),dp(8));if(d.today)r.setBackground(shape(blend(panel,teal,darkTheme?.16f:.10f),10));LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(4);wc.addView(r,rp);
+            r.addView(tx(d.dayName,13,d.today?teal:ink,true),lp(40,-2));LinearLayout l=col();r.addView(l,new LinearLayout.LayoutParams(0,-2,1));l.addView(tx(d.title,13,ink,d.today));l.addView(tx(d.detail,11,muted,false));
+            r.addView(tx(d.done?"✓":d.today?"today":d.past?"missed":"○",12,d.done?positive:d.today?teal:d.past?warning:muted,true));
+        }
+        // Forecast
+        if(st.history!=null&&st.history.length>=2){LinearLayout fc=metricCard("FORECAST","4 weeks","Fitness (the 42-day average of your daily effort, as in Reports) for the last four weeks, then run forward four weeks: teal if you follow this plan, coral if you stop.");
+            double pEnd=st.plan[st.plan.length-1],sEnd=st.stop[st.stop.length-1];
+            fc.addView(tx(String.format(Locale.US,"Fitness %.0f → %.0f with the plan, %.0f if you stop",st.fitness,pEnd,sEnd),13,ink,true));
+            LinearLayout.LayoutParams fp=lp(-1,150);fp.topMargin=dp(8);fc.addView(new MetricViews.Forecast(this,th,st.history,st.plan,st.stop),fp);
+            statGrid(fc,new String[][]{{"Week steps so far",String.format(Locale.US,"%,d",st.weekStepsSoFar),""},{"On track for",String.format(Locale.US,"%,d",st.weekStepsProjected),"this week"},{"Month challenge",Math.round(Math.min(1,st.monthOnTrack)*100)+"","% on track"}},10);}
+        // Tips
+        if(!st.tips.isEmpty()){LinearLayout tc2=card();GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(panel,violet,darkTheme?.20f:.10f),panel});g.setCornerRadius(dp(16));tc2.setBackground(g);
+            TextView h2=tx("✦  COACH'S NOTES",10,violet,true);h2.setLetterSpacing(.08f);tc2.addView(h2);for(String t:st.tips){TextView x=tx("• "+t,13,ink,false);x.setPadding(0,dp(8),0,0);tc2.addView(x);}}
+        TextView imp=tx("Bring in older walks from Samsung Health, Zepp or Google Fit  ›",12,lime,true);imp.setPadding(0,dp(14),0,0);imp.setOnClickListener(v->navigate("Import"));content.addView(imp);
+    }
+    // ---- Import ----
+    private int importDays=180;
+    private boolean installed(String pkg){try{getPackageManager().getPackageInfo(pkg,0);return true;}catch(Exception e){return false;}}
+    private void renderImport(){
+        brand("YOUR DATA","Import history","Walks, runs and daily steps from Samsung Health, Zepp, Google Fit and other apps, through Health Connect.");
+        SharedPreferences hp=getSharedPreferences("kadamm_health",MODE_PRIVATE);boolean hc=hp.getBoolean("healthConnected",false);
+        LinearLayout src=metricCard("SOURCES","","Kadamm reads what these apps share into Health Connect. Google is closing Google Fit's own data access in 2026; Google Fit, Samsung Health and Zepp all share into Health Connect instead, so that's the one path that keeps working.");
+        sourceRow(src,"Samsung Health",installed("com.sec.android.app.shealth")?(hc?"Connected":"Installed · connect Health Connect"):"Not installed",hc&&installed("com.sec.android.app.shealth"),"Steps by day, walks and runs, heart rate");
+        sourceRow(src,"Zepp (Amazfit)",installed("com.huami.watch.hmwatchmanager")?"Installed":"Not installed",false,"In Zepp: Profile → Add accounts → Health Connect, then allow Steps and Exercise");
+        sourceRow(src,"Google Fit",installed("com.google.android.apps.fitness")?"Installed":"Not installed",false,"In Google Fit: Profile → Settings → Manage connected apps → Health Connect");
+        LinearLayout rc=card();rc.addView(tx("How far back",15,ink,true));rc.addView(tx("Past 30 days need no extra permission; further back asks Health Connect for \"past data\".",11,muted,false));
+        LinearLayout chips=row();LinearLayout.LayoutParams cp=lp(-1,38);cp.topMargin=dp(10);rc.addView(chips,cp);int[] opts={30,180,365,730};String[] lab={"30 days","6 months","1 year","2 years"};
+        for(int i=0;i<4;i++){int v=opts[i];boolean on=v==importDays;Button b=button(lab[i],on?lime:raised,on?accentOn:ink);b.setTextSize(12);b.setPadding(0,0,0,0);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1);if(i>0)p.leftMargin=dp(6);chips.addView(b,p);b.setOnClickListener(x->{importDays=v;renderPageNow();});}
+        Button go=button("Import "+lab[java.util.Arrays.binarySearch(opts,importDays)],lime,accentOn);go.setTextSize(15);LinearLayout.LayoutParams gp=lp(-1,50);gp.topMargin=dp(14);rc.addView(go,gp);
+        go.setOnClickListener(v->confirmChange("Import "+lab[java.util.Arrays.binarySearch(opts,importDays)].toLowerCase(Locale.US)+"?","Kadamm will add walks and runs from Health Connect as sessions marked with their source, skipping any that overlap your Kadamm sessions, and fill in daily steps for those days (keeping the larger figure). You can remove imported sessions later.",this::runImport,null));
+        long at=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getLong("importedAt",0);
+        if(at>0){TextView last=tx("Last import: "+new SimpleDateFormat("d MMM, h:mm a",Locale.getDefault()).format(new Date(at)),11,muted,false);LinearLayout.LayoutParams lp2=lp(-1,-2);lp2.topMargin=dp(8);rc.addView(last,lp2);}
+        int imported=0;JSONArray h=history();for(int i=0;i<h.length();i++){JSONObject o=h.optJSONObject(i);if(o!=null&&o.optBoolean("imported",false))imported++;}
+        if(imported>0){LinearLayout ic=card();ic.addView(tx(imported+" imported sessions in History",14,ink,true));Button rm=button("Remove imported sessions",raised,critical);LinearLayout.LayoutParams rp=lp(-1,44);rp.topMargin=dp(10);ic.addView(rm,rp);final int cnt=imported;
+            rm.setOnClickListener(v->dialog().setTitle("Remove "+cnt+" imported sessions?").setMessage("They'll be deleted from Kadamm (not from the other apps). Your own sessions stay.").setNegativeButton("Cancel",null).setPositiveButton("Remove",(d,x)->{JSONArray all=history(),kept=new JSONArray();for(int i=0;i<all.length();i++){JSONObject o=all.optJSONObject(i);if(o!=null&&!o.optBoolean("imported",false))kept.put(o);}historyPrefs.edit().putString("sessions",kept.toString()).apply();toast(cnt+" removed");renderPageNow();}).show());}
+        Button perms=button("Health Connect permissions",raised,ink);LinearLayout.LayoutParams pp=lp(-1,46);pp.topMargin=dp(12);content.addView(perms,pp);perms.setOnClickListener(v->startActivity(new Intent(this,HealthConnectActivity.class)));
+    }
+    private void sourceRow(LinearLayout parent,String name,String state,boolean ok,String how){
+        LinearLayout r=col();r.setPadding(0,dp(10),0,dp(2));parent.addView(r);LinearLayout top=row();r.addView(top,lp(-1,-2));
+        top.addView(tx(name,14,ink,true),new LinearLayout.LayoutParams(0,-2,1));top.addView(tx(state,11,ok?positive:muted,true));r.addView(tx(how,11,muted,false));
+    }
+    private void runImport(){
+        LinearLayout box=col();box.setPadding(dp(22),dp(14),dp(22),dp(6));TextView msg=tx("Starting…",14,ink,false);box.addView(msg);
+        ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setIndeterminate(true);LinearLayout.LayoutParams bp=lp(-1,10);bp.topMargin=dp(12);box.addView(bar,bp);
+        AlertDialog wait=dialog().setTitle("Importing").setView(box).setCancelable(false).create();wait.show();
+        HealthImport.run(this,importDays,new HealthImport.Listener(){
+            @Override public void progress(String m){msg.setText(m);}
+            @Override public void done(int sessions,int days,String note){wait.dismiss();
+                String body=(sessions==0?"No new walks or runs to add.":sessions+(sessions==1?" walk or run added.":" walks and runs added."))+(days>0?String.format(Locale.US,"\nDaily steps filled in for %d days.",days):"")+(note!=null?"\n\n"+note:"");
+                AlertDialog.Builder b=dialog().setTitle(sessions>0||days>0?"Import finished":"Nothing imported").setMessage(body).setPositiveButton("OK",null);
+                if(note!=null&&note.contains("Allow"))b.setNeutralButton("Open permissions",(d,w)->startActivity(new Intent(MainActivity.this,HealthConnectActivity.class)));
+                b.show();SessionMetrics.warm(MainActivity.this,history());renderPageNow();}
+        });
+    }
     private String summaryDay;
     /** All of a day's routes as one route, each session starting after a gap. */
     private String mergedRoute(java.util.List<JSONObject> list){
@@ -1275,7 +1364,6 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         return b.append(n>=goal?"\nGoal done for today ✓":"").toString();
     }
     private android.widget.ImageView shareIcon(String what,Runnable go){android.widget.ImageView s=icon(R.drawable.ic_share,muted,10);s.setContentDescription("Share "+what);s.setFocusable(true);s.setBackground(rippleOn(Color.TRANSPARENT,20));s.setOnClickListener(v->go.run());return s;}
-    private boolean installed(String pkg){try{getPackageManager().getPackageInfo(pkg,0);return true;}catch(Exception e){return false;}}
     private void shareTarget(LinearLayout parent,String label,int res,int color,Runnable go){
         LinearLayout t=col();t.setGravity(Gravity.CENTER_HORIZONTAL);t.setPadding(0,dp(6),0,dp(6));t.setBackground(rippleOn(Color.TRANSPARENT,14));t.setFocusable(true);t.setContentDescription("Share to "+label);
         android.widget.ImageView ic=icon(res,Color.WHITE,13);GradientDrawable g=new GradientDrawable();g.setShape(GradientDrawable.OVAL);g.setColor(color);ic.setBackground(g);t.addView(ic,lp(52,52));

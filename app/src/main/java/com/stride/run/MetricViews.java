@@ -334,6 +334,27 @@ final class MetricViews {
         }
     }
 
+    /** Fitness: the last four weeks as a solid line, then four weeks ahead with the plan (teal, dashed) and without (coral, dotted). */
+    static final class Forecast extends Base {
+        private final double[] hist,plan,stop;
+        Forecast(Context c,KadammTheme t,double[] hist,double[] plan,double[] stop){super(c,t);this.hist=hist;this.plan=plan;this.stop=stop;setContentDescription("Fitness forecast for the next four weeks");}
+        @Override protected void onDraw(Canvas c){
+            int n=hist.length+plan.length;if(n<2)return;float w=getWidth(),h=getHeight(),left=dp(28),top=dp(10),bottom=h-dp(18),cw=w-left-dp(4);
+            double lo=Double.MAX_VALUE,hi=0;for(double[] a:new double[][]{hist,plan,stop})for(double v:a){lo=Math.min(lo,v);hi=Math.max(hi,v);}
+            double pad=Math.max(1,(hi-lo)*.15);lo=Math.max(0,lo-pad);hi+=pad;final double flo=lo,fhi=hi;
+            java.util.function.IntToDoubleFunction xs=i->left+cw*i/(double)(n-1);java.util.function.DoubleUnaryOperator ys=v->top+(bottom-top)*(1-(v-flo)/(fhi-flo));
+            p.setTextSize(dp(9.5f));p.setColor(t.textMuted);p.setTextAlign(Paint.Align.RIGHT);c.drawText(String.valueOf(Math.round(hi)),left-dp(4),top+dp(4),p);c.drawText(String.valueOf(Math.round(lo)),left-dp(4),bottom,p);
+            float nowX=(float)xs.applyAsDouble(hist.length-1);p.setColor(alpha(t.border,255));p.setStrokeWidth(dp(1));c.drawLine(nowX,top,nowX,bottom,p);
+            p.setTextAlign(Paint.Align.CENTER);p.setColor(t.textMuted);c.drawText("now",nowX,h-dp(4),p);p.setTextAlign(Paint.Align.LEFT);c.drawText("4 weeks ago",left,h-dp(4),p);p.setTextAlign(Paint.Align.RIGHT);c.drawText("in 4 weeks",w-dp(2),h-dp(4),p);p.setTextAlign(Paint.Align.LEFT);
+            p.setStyle(Paint.Style.STROKE);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeWidth(dp(2.5f));
+            Path ph=new Path();for(int i=0;i<hist.length;i++){float x=(float)xs.applyAsDouble(i),y=(float)ys.applyAsDouble(hist[i]);if(i==0)ph.moveTo(x,y);else ph.lineTo(x,y);}p.setColor(t.text);c.drawPath(ph,p);
+            double startV=hist.length>0?hist[hist.length-1]:plan[0];
+            for(int k=0;k<2;k++){double[] a=k==0?plan:stop;Path pp=new Path();pp.moveTo(nowX,(float)ys.applyAsDouble(startV));for(int i=0;i<a.length;i++)pp.lineTo((float)xs.applyAsDouble(hist.length+i),(float)ys.applyAsDouble(a[i]));
+                p.setColor(k==0?GoalCapsule.COLORS[0]:GoalCapsule.COLORS[1]);p.setPathEffect(new DashPathEffect(k==0?new float[]{dp(6),dp(4)}:new float[]{dp(2),dp(4)},0));c.drawPath(pp,p);p.setPathEffect(null);}
+            p.setStyle(Paint.Style.FILL);
+        }
+    }
+
     /** Tier colours for badges: bronze (easy), silver (medium), gold (hard), amethyst (extreme). */
     static final int[][] TIER={{Color.rgb(214,140,86),Color.rgb(140,78,40)},{Color.rgb(214,222,232),Color.rgb(120,132,148)},{Color.rgb(255,214,92),Color.rgb(196,128,8)},{Color.rgb(196,140,255),Color.rgb(98,42,190)}};
     static final String[] TIER_NAMES={"Easy","Medium","Hard","Extreme"};

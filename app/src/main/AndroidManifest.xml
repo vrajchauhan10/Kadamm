@@ -2,6 +2,8 @@
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
         <package android:name="com.sec.android.app.shealth" />
+        <package android:name="com.google.android.apps.fitness" />
+        <package android:name="com.huami.watch.hmwatchmanager" />
         <package android:name="com.whatsapp" />
         <package android:name="com.whatsapp.w4b" />
     </queries>
@@ -21,6 +23,9 @@
     <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
     <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE_ROUTES" />
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />

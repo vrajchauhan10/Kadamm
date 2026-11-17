@@ -39,7 +39,7 @@ object HealthSync {
         HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
         HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
         HealthPermission.getReadPermission(HeartRateRecord::class)
-    )
+    ) + HealthImport.wanted()
     @JvmStatic fun isRunning() = running
     /** Lets Kadamm read while closed, so the widget and reminders stay current. Only offered where Health Connect supports it. */
     const val BACKGROUND = HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
@@ -54,6 +54,10 @@ object HealthSync {
         pkg == SAMSUNG -> "Samsung Health"
         pkg.startsWith("com.android.healthconnect.phone") -> "Phone (Health Connect)"
         pkg == "com.google.android.apps.fitness" -> "Google Fit"
+        pkg == "com.huami.watch.hmwatchmanager" || pkg.startsWith("com.huami") || pkg.startsWith("com.zepp") -> "Zepp"
+        pkg == "com.fitbit.FitbitMobile" -> "Fitbit"
+        pkg == "com.garmin.android.apps.connectmobile" -> "Garmin Connect"
+        pkg == "com.strava" -> "Strava"
         pkg.isEmpty() -> "Health Connect"
         else -> pkg.substringAfterLast('.')
     }
@@ -286,6 +290,9 @@ object HealthSync {
         } catch (_: Exception) {
         }
     }
+
+    /** Heart rate for an imported workout, read the same way as for Kadamm's own sessions. */
+    suspend fun importHeartRate(hc: HealthConnectClient, s: JSONObject, range: TimeRangeFilter, from: Long) = heartRate(hc, s, range, from)
 
     /** Heart rate for recent sessions only, when step sharing is off but heart rate is on. */
     private suspend fun heartOnly(context: Context, hc: HealthConnectClient, granted: Set<String>) {

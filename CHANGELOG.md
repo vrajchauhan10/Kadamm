@@ -1,5 +1,10 @@
 # Changelog
 
+## 9.1 (versionCode 44)
+
+- Kadamm Trainer (Trainer.java; Profile → Kadamm Trainer and a Home card): six stages from Starter to 10K runner, worked out from the last three weeks with a checklist for the next one; today's workout with a pace range from your pace zones, the reason, and Start; a 7-day plan per stage, ticked from your sessions, eased when you're tired (form below −20 or load above 1.5) and nudged up when fresh; a 4-week fitness forecast with and without the plan; week-steps and month-challenge projections; coach's notes from your data.
+- Import history (HealthImport.kt): walks and runs from Samsung Health, Zepp, Google Fit and other apps through Health Connect, 30 days to 2 years back (past data permission beyond 30 days), with distance, steps, calories, heart rate and route when shared; marked with their source, skipping anything overlapping a Kadamm session; daily steps filled in for the calendar (larger figure kept); "Remove imported sessions" undoes it. New Health Connect permissions: exercise, exercise routes, past data.
+
 ## 9.0 (versionCode 43)
 
 - A recording becomes a session only at 100 steps: until then an automatic one runs quietly (a minimised "Checking for a walk · 71 of 100 steps" notification, no live card, no mini bar), and one you start shows "71 of 100 steps to count" on the live screen and notification.
