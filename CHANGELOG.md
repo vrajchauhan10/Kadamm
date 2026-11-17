@@ -3,6 +3,7 @@
 ## 9.0 (versionCode 43)
 
 - A recording becomes a session only at 100 steps: until then an automatic one runs quietly (a minimised "Checking for a walk · 71 of 100 steps" notification, no live card, no mini bar), and one you start shows "71 of 100 steps to count" on the live screen and notification.
+- After an automatic recording is dropped for having no steps, new automatic starts are ignored for 10 minutes unless you take 30+ steps, so a phone that keeps "seeing" walking doesn't keep switching the GPS on.
 - Day summary: days with two or more sessions get a "Day summary" entry on top of their sessions, opening a full page: every route on one map, totals and averages (distance, moving time, steps, calories, pace, cadence, climb, effort, intensity), relative effort against your recent active days, intensity and pace zones summed across sessions, best of the day (fastest pace, longest, most steps, highest cadence, biggest effort, most climbing, fastest 1 km) linked to the session, the sessions, Share, and the notification time. The nightly notification opens it.
 
 ## 8.9 (versionCode 42)

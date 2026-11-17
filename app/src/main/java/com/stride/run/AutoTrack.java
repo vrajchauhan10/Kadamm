@@ -68,6 +68,10 @@ final class AutoTrack {
                     return;
                 }
                 if(st.getBoolean("active",false))return;
+                // A recording was just dropped for having no steps: ignore new starts for 10 minutes unless you've
+                // really walked since (30+ steps), so a phone that keeps "seeing" walking doesn't keep the GPS on.
+                long dropped=st.getLong("autoDroppedAt",0);
+                if(System.currentTimeMillis()-dropped<10*60000L&&DaySteps.todayTotal(c)-st.getLong("autoDroppedSteps",0)<30)return;
                 String type=e.getActivityType()==DetectedActivity.RUNNING?"Run":"Walk";
                 c.getSharedPreferences("stride_state",Context.MODE_PRIVATE).edit().putString("activityMode","outdoor").putString("activityType",type).apply();
                 try{

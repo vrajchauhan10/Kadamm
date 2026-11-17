@@ -43,7 +43,7 @@ public class RecorderService extends Service implements LocationListener, Sensor
     private void checkAutoFinish(){
         long now=SystemClock.elapsedRealtime();
         // An automatic session with no steps after two minutes was started by a ride or a shake, not a walk.
-        if(autoSession&&!paused&&stepsAvailable&&now-runStart>=120000L&&prefs.getLong("elapsed",0)>=120000L&&prefs.getInt("steps",0)<20){discardSession();return;}
+        if(autoSession&&!paused&&stepsAvailable&&now-runStart>=120000L&&prefs.getLong("elapsed",0)>=120000L&&prefs.getInt("steps",0)<20){prefs.edit().putLong("autoDroppedAt",System.currentTimeMillis()).putLong("autoDroppedSteps",DaySteps.todayTotal(this)).apply();discardSession();return;}
         int minutes=AutoTrack.stopAfterMin(this);if(minutes<=0){prefs.edit().remove("closesAt").apply();return;}
         long lastMove=paused?pausedAt:Math.max(Math.max(lastMovementElapsed,lastStepElapsed),runStart);
         long closeAt=lastMove+minutes*60000L;
