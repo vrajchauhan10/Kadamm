@@ -1,5 +1,10 @@
 # Changelog
 
+## 8.8 (versionCode 41)
+
+- Home's Daily goals card is now a liquid capsule (GoalCapsule) in place of the rings: steps (teal, up to 60 %), brisk minutes (coral, up to 25 %) and distance (indigo, up to 15 %) stack as wavy layers that drift while on screen, with the day's % under the capsule and bubbles at 100 %. Beside it, each goal shows its value, its share (+35 %), a bar and what's still to go; the line below spells the total out.
+- New "Kadamm daily goals" home-screen widget with the same capsule and the three goals.
+
 ## 8.7 (versionCode 40)
 
 - Home's goal card is now three rings: steps (blue), brisk minutes (green) and distance (amber), each against its own goal, gliding to new values; a ring past its goal keeps going in a deeper shade, and closing all three says "a perfect day". Goals has a new Brisk minutes goal (default 30) used by the ring and Today's plan.

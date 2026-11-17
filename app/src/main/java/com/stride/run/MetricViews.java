@@ -296,18 +296,26 @@ final class MetricViews {
         }
         @Override protected void onDetachedFromWindow(){if(anim!=null)anim.cancel();super.onDetachedFromWindow();}
         @Override protected void onDraw(Canvas c){
-            float s=Math.min(getWidth(),getHeight()),cx=getWidth()/2f,cy=getHeight()/2f,st=s*.085f,gap=st*1.22f;
+            float s=Math.min(getWidth(),getHeight()),cx=getWidth()/2f,cy=getHeight()/2f,st=s*.098f,gap=st*1.16f;
             p.setStyle(Paint.Style.STROKE);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeWidth(st);
             for(int i=0;i<3;i++){
-                float r=s/2-st/2-i*gap;RectF o=new RectF(cx-r,cy-r,cx+r,cy+r);int col=COLORS[i];
-                p.setColor(alpha(col,t.dark?55:45));c.drawOval(o,p);
-                float v=shown[i];if(v<=0)continue;
-                p.setColor(col);c.drawArc(o,-90,360*Math.min(1,v),false,p);
-                if(v>1){p.setColor(blendC(col,Color.BLACK,.28f));c.drawArc(o,-90,360*Math.min(1,v-1),false,p);}
-                // A small bright cap marks where the ring has reached.
-                if(v>=.02){double a=Math.toRadians(-90+360*(v%1==0?1:v%1));p.setStyle(Paint.Style.FILL);p.setColor(blendC(col,Color.WHITE,.35f));c.drawCircle(cx+(float)(r*Math.cos(a)),cy+(float)(r*Math.sin(a)),st*.22f,p);p.setStyle(Paint.Style.STROKE);}
+                float r=s/2-st/2-i*gap;RectF o=new RectF(cx-r,cy-r,cx+r,cy+r);int col=COLORS[i],light=blendC(col,Color.WHITE,.32f),deep=blendC(col,Color.BLACK,.18f);
+                p.setShader(null);p.setColor(alpha(col,t.dark?48:38));c.drawOval(o,p);
+                float v=shown[i];if(v<=0.001f)continue;
+                // The ring shades from light at the start to deep at its leading end, like the ring is filling up.
+                c.save();c.rotate(-90,cx,cy);
+                float sweep=360*Math.min(1,v);
+                android.graphics.SweepGradient g=new android.graphics.SweepGradient(cx,cy,new int[]{light,col,deep,deep},new float[]{0,Math.max(.01f,sweep/360f*.55f),Math.max(.02f,sweep/360f),1});
+                p.setColor(Color.BLACK);p.setShader(g);c.drawArc(o,0,sweep,false,p);p.setShader(null);
+                if(v>1){
+                    // Past the goal: a second lap in the deep shade, with a soft shadow ahead of its end.
+                    float lap=360*Math.min(.999f,v-1),ea=(float)Math.toRadians(lap);float ex=cx+(float)(r*Math.cos(ea)),ey=cy+(float)(r*Math.sin(ea));
+                    p.setStyle(Paint.Style.FILL);p.setColor(Color.argb(t.dark?110:70,0,0,0));c.drawCircle(ex+st*.18f*(float)Math.cos(ea+Math.PI/2),ey+st*.18f*(float)Math.sin(ea+Math.PI/2),st*.52f,p);p.setStyle(Paint.Style.STROKE);
+                    p.setColor(deep);c.drawArc(o,0,lap,false,p);
+                }
+                c.restore();
             }
-            p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);p.setColor(t.text);p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));p.setTextSize(s*.105f);c.drawText(big,cx,cy+s*.025f,p);
+            p.setShader(null);p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);p.setColor(t.text);p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));p.setTextSize(s*.105f);c.drawText(big,cx,cy+s*.025f,p);
             p.setTypeface(null);p.setTextSize(s*.06f);p.setColor(t.textMuted);c.drawText(small,cx,cy+s*.11f,p);p.setTextAlign(Paint.Align.LEFT);
         }
     }

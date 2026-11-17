@@ -32,6 +32,7 @@ public class StepsWidget extends AppWidgetProvider {
         int[] ids=manager.getAppWidgetIds(new ComponentName(c,StepsWidget.class));
         if(ids!=null&&ids.length>0)render(c.getApplicationContext(),manager,ids);
         WeekWidget.refresh(c.getApplicationContext());
+        GoalsWidget.refresh(c.getApplicationContext());
     }
 
     private static void render(Context c,AppWidgetManager manager,int[] ids){

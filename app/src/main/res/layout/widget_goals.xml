@@ -1,0 +1,17 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/goals_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/widget_bg" android:gravity="center_vertical" android:orientation="horizontal" android:padding="12dp">
+    <ImageView android:id="@+id/goals_capsule" android:layout_width="58dp" android:layout_height="match_parent"
+        android:scaleType="fitCenter" android:contentDescription="@string/goals_widget_description" />
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+        android:layout_marginStart="12dp" android:orientation="vertical">
+        <TextView android:id="@+id/goals_title" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#E8EAED" android:textSize="13sp" android:textStyle="bold" android:maxLines="1" />
+        <TextView android:id="@+id/goals_steps" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" android:textColor="#9AA0A6" android:textSize="12sp" android:maxLines="1" />
+        <TextView android:id="@+id/goals_brisk" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" android:textColor="#9AA0A6" android:textSize="12sp" android:maxLines="1" />
+        <TextView android:id="@+id/goals_km" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" android:textColor="#9AA0A6" android:textSize="12sp" android:maxLines="1" />
+    </LinearLayout>
+</LinearLayout>

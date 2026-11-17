@@ -1,4 +1,5 @@
 <resources>
     <string name="widget_description">Steps and move minutes today</string>
+    <string name="goals_widget_description">Daily goals capsule: steps, brisk minutes and distance</string>
     <string name="week_widget_description">Rings, numbers and this week\u2019s steps</string>
 </resources>
