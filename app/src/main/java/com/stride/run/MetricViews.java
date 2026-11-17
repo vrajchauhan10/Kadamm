@@ -320,6 +320,20 @@ final class MetricViews {
         }
     }
 
+    /** Today 7 am–11 pm as a track: sitting stretches as blocks (amber when an hour or longer), and a marker for now. */
+    static final class SitLine extends Base {
+        private final java.util.List<int[]> sits;private final int nowMin;
+        SitLine(Context c,KadammTheme t,java.util.List<int[]> sits,int nowMin){super(c,t);this.sits=sits;this.nowMin=nowMin;setContentDescription("Sitting stretches today from 7 am to 11 pm");}
+        @Override protected void onDraw(Canvas c){
+            float w=getWidth(),top=dp(6),bh=dp(18),start=420,span=960;
+            p.setColor(alpha(ZONE_COLORS[2],t.dark?70:55));c.drawRoundRect(new RectF(0,top,w,top+bh),bh/2,bh/2,p);
+            for(int[] s:sits){float x1=w*(s[0]-start)/span,x2=w*Math.min(span,s[0]+s[1]-start)/span;p.setColor(alpha(s[1]>=60?ZONE_COLORS[3]:t.textMuted,s.length>2?150:(s[1]>=60?255:170)));c.drawRoundRect(new RectF(Math.max(0,x1),top,Math.min(w,Math.max(x1+dp(4),x2)),top+bh),dp(5),dp(5),p);}
+            if(nowMin>start&&nowMin<start+span){float x=w*(nowMin-start)/span;p.setColor(t.text);c.drawRoundRect(new RectF(x-dp(1.2f),top-dp(4),x+dp(1.2f),top+bh+dp(4)),dp(1),dp(1),p);}
+            p.setTextSize(dp(9.5f));p.setColor(t.textMuted);String[] l={"7a","11a","3p","7p","11p"};
+            for(int i=0;i<5;i++){p.setTextAlign(i==0?Paint.Align.LEFT:i==4?Paint.Align.RIGHT:Paint.Align.CENTER);c.drawText(l[i],w*i/4f,top+bh+dp(16),p);}p.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+
     /** Tier colours for badges: bronze (easy), silver (medium), gold (hard), amethyst (extreme). */
     static final int[][] TIER={{Color.rgb(214,140,86),Color.rgb(140,78,40)},{Color.rgb(214,222,232),Color.rgb(120,132,148)},{Color.rgb(255,214,92),Color.rgb(196,128,8)},{Color.rgb(196,140,255),Color.rgb(98,42,190)}};
     static final String[] TIER_NAMES={"Easy","Medium","Hard","Extreme"};

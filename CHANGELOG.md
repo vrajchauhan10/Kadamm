@@ -6,6 +6,7 @@
 - "Your sessions" opens the Sessions page: tidy-up (if any), then every day as a stack; opening a day shows its Day summary (all metrics added up and averaged, with Share) and its sessions. The nightly session summary notification opens it there.
 - The capsule's waves are longer and roll in a slow swell (16-second cycle) at the same capsule size.
 - A pace slower than 30 min per km (2 km/h) shows "—", since it isn't a real walking pace.
+- Sitting breaks on Home: breaks taken (getting up after 30+ still minutes), sits over an hour, the longest sit (including one in progress), "still for" now, and a 7 am–11 pm timeline; from Health Connect minute steps when on, else Kadamm's own readings. The sitting reminder now counts from your last walk (10+ steps) and keeps reminding after the step goal is met. Movement quality shows Active hours (hours with 250+ steps) instead of longest sitting.
 
 ## 8.8 (versionCode 41)
 

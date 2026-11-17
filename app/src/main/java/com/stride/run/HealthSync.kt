@@ -330,10 +330,13 @@ object HealthSync {
             val top = perMinute.sortedDescending().take(30)
             val brisk = perMinute.count { it >= 100L }
             val lastMinute = if (back == 0) ((Instant.now().toEpochMilli() - start.toEpochMilli()) / 60000L).toInt().coerceAtMost(1380) else 1380
-            var sit = 0; var run = 0
-            for (m in 420 until lastMinute) { if (perMinute[m] < 10L) { run++; if (run > sit) sit = run } else run = 0 }
+            var sit = 0; var run = 0; val sits = JSONArray()
+            for (m in 420 until lastMinute) {
+                if (perMinute[m] < 10L) { run++; if (run > sit) sit = run }
+                else { if (run >= 30) sits.put(JSONArray().put(m - run).put(run)); run = 0 }
+            }
             val h = JSONArray(); for (v in hours) h.put(v)
-            days.put(key, JSONObject().put("p30", Math.round(top.average())).put("brisk", brisk).put("sit", sit).put("h", h))
+            days.put(key, JSONObject().put("p30", Math.round(top.average())).put("brisk", brisk).put("sit", sit).put("sits", sits).put("h", h))
         }
         prefs.edit().putString("minuteDays", days.toString()).apply()
     }

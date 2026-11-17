@@ -64,9 +64,10 @@ final class Reminders {
             postTo(c,33,"Your week in Kadamm",String.format(Locale.US,"%,d steps%s, %d of 7 goal days, %d sessions. Tap for your report.",last.steps,change,last.goalDays,last.sessions),"Reports");
             return;
         }
-        long lastMove=steps.getLong("lastMoveAt",0);
+        // Sitting reminder: measured from the last time you walked (10+ steps), and sent whether or not today's goal is met.
+        long lastMove=steps.getLong("activeAt",steps.getLong("lastMoveAt",0));
         boolean inHours=start<=end?minute>=start&&minute<end:minute>=start||minute<end;
-        if(inactiveOn(c)&&inHours&&Messages.countToday(c,"move")<3&&lastMove>0&&now-lastMove>=after*60000L&&now-steps.getLong("inactiveNudgeAt",0)>=Math.max(2*after,60)*60000L&&total<goal){
+        if(inactiveOn(c)&&inHours&&Messages.countToday(c,"move")<3&&lastMove>0&&now-lastMove>=after*60000L&&now-steps.getLong("inactiveNudgeAt",0)>=Math.max(2*after,60)*60000L){
             steps.edit().putLong("inactiveNudgeAt",now).apply();
             String span=after>=60&&after%60==0?(after==60?"an hour":after/60+" hours"):after+" minutes";
             String[] m=Messages.pick(c,"move",Messages.MOVE,span);if(m!=null)post(c,32+Messages.countToday(c,"move"),m[0],Character.toUpperCase(m[1].charAt(0))+m[1].substring(1));
