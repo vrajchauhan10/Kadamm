@@ -279,6 +279,39 @@ final class MetricViews {
         }
     }
 
+    /**
+     * The Home goal rings: steps (outer, blue), brisk minutes (middle, green) and distance (inner, amber), each
+     * against its daily goal. A ring past its goal keeps going round in a deeper shade. Values glide to new
+     * readings instead of jumping, and the steps count sits in the middle.
+     */
+    static final class Rings extends Base {
+        static final int[] COLORS={Color.rgb(77,144,254),Color.rgb(52,168,83),Color.rgb(251,168,4)};
+        private final float[] shown=new float[3],target=new float[3];private String big="—",small="steps";private android.animation.ValueAnimator anim;
+        Rings(Context c,KadammTheme t){super(c,t);}
+        void set(float steps,float brisk,float dist,String bigText,String smallText){
+            big=bigText;small=smallText;target[0]=Math.max(0,steps);target[1]=Math.max(0,brisk);target[2]=Math.max(0,dist);
+            if(Math.abs(target[0]-shown[0])+Math.abs(target[1]-shown[1])+Math.abs(target[2]-shown[2])<.002f){invalidate();return;}
+            float[] from=shown.clone();if(anim!=null)anim.cancel();anim=android.animation.ValueAnimator.ofFloat(0,1);anim.setDuration(900);anim.setInterpolator(new android.view.animation.DecelerateInterpolator(2f));
+            anim.addUpdateListener(a->{float f=(float)a.getAnimatedValue();for(int i=0;i<3;i++)shown[i]=from[i]+(target[i]-from[i])*f;invalidate();});anim.start();
+        }
+        @Override protected void onDetachedFromWindow(){if(anim!=null)anim.cancel();super.onDetachedFromWindow();}
+        @Override protected void onDraw(Canvas c){
+            float s=Math.min(getWidth(),getHeight()),cx=getWidth()/2f,cy=getHeight()/2f,st=s*.085f,gap=st*1.22f;
+            p.setStyle(Paint.Style.STROKE);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeWidth(st);
+            for(int i=0;i<3;i++){
+                float r=s/2-st/2-i*gap;RectF o=new RectF(cx-r,cy-r,cx+r,cy+r);int col=COLORS[i];
+                p.setColor(alpha(col,t.dark?55:45));c.drawOval(o,p);
+                float v=shown[i];if(v<=0)continue;
+                p.setColor(col);c.drawArc(o,-90,360*Math.min(1,v),false,p);
+                if(v>1){p.setColor(blendC(col,Color.BLACK,.28f));c.drawArc(o,-90,360*Math.min(1,v-1),false,p);}
+                // A small bright cap marks where the ring has reached.
+                if(v>=.02){double a=Math.toRadians(-90+360*(v%1==0?1:v%1));p.setStyle(Paint.Style.FILL);p.setColor(blendC(col,Color.WHITE,.35f));c.drawCircle(cx+(float)(r*Math.cos(a)),cy+(float)(r*Math.sin(a)),st*.22f,p);p.setStyle(Paint.Style.STROKE);}
+            }
+            p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);p.setColor(t.text);p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));p.setTextSize(s*.105f);c.drawText(big,cx,cy+s*.025f,p);
+            p.setTypeface(null);p.setTextSize(s*.06f);p.setColor(t.textMuted);c.drawText(small,cx,cy+s*.11f,p);p.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+
     /** Tier colours for badges: bronze (easy), silver (medium), gold (hard), amethyst (extreme). */
     static final int[][] TIER={{Color.rgb(214,140,86),Color.rgb(140,78,40)},{Color.rgb(214,222,232),Color.rgb(120,132,148)},{Color.rgb(255,214,92),Color.rgb(196,128,8)},{Color.rgb(196,140,255),Color.rgb(98,42,190)}};
     static final String[] TIER_NAMES={"Easy","Medium","Hard","Extreme"};

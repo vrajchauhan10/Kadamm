@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="8.6";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="8.7";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -502,7 +502,7 @@ public class MainActivity extends Activity {
         goalProgress(sum,"Move minutes",todayDuration(h)/60000,st.getInt("activeGoalMin",30),violet,String.format(Locale.US,"%d / %d min",todayDuration(h)/60000,st.getInt("activeGoalMin",30)));
         goalCard("Daily steps","Your main goal. The outer ring fills toward it.","▶",lime,"stepGoal",10000,1000,50000,500,new int[]{6000,8000,10000,12000,15000},v->String.format(Locale.US,"%,d steps",v),v->(v/1000)+"k");
         goalCard("Daily distance","From GPS sessions and indoor estimates.","↗",orange(),"distanceGoalM",5000,500,30000,500,new int[]{3000,5000,8000,10000},v->String.format(Locale.US,"%.1f km",v/1000f),v->(v/1000)+" km");
-        goalCard("Move minutes","Time spent in Kadamm sessions. The inner ring.","◷",green(),"activeGoalMin",30,10,180,5,new int[]{20,30,45,60},v->v+" min",v->v+" min");
+        goalCard("Brisk minutes","Minutes at 100 or more steps a minute, a moderate walk. The middle (green) ring on Home.","◷",green(),"briskGoalMin",30,10,120,5,new int[]{20,30,45,60},v->v+" min a day",v->v+" min");
         goalCard("Indoor stride length","Turns treadmill steps into distance. Walk 10 m, count your steps, and divide.","⇅",teal(),"strideLengthCm",72,40,130,1,new int[]{65,72,80},v->String.format(Locale.US,"%.2f m per step",v/100f),v->v+" cm");
         goalCard("Body weight","Used to estimate the calories of your sessions. Stays on this phone.","◉p",indigo(),"weightKg",70,35,180,1,new int[]{55,65,75,85},v->v+" kg",v->v+" kg");
         goalCard("Age","Sets your maximum heart rate (208 − 0.7 × age) for heart-rate zones when a watch adds heart rate. Stays on this phone.","♥",critical,"ageYears",30,12,90,1,new int[]{25,30,40,50},v->v+" years",v->v+" years");
@@ -838,27 +838,42 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     }
     private void renderHero(JSONArray hist){
         LinearLayout c=card();dailyGoalCard=c;c.setBackground(panelShape(20));
-        LinearLayout head=row();head.addView(tx("DAILY STEP GOAL",10,muted,true),new LinearLayout.LayoutParams(0,-2,1));heroSource=tx("",10,positive,true);head.addView(heroSource);head.addView(shareIcon("today",()->shareSheet("Share today",todayShareText(),null,null)),lp(40,40));c.addView(head);
+        LinearLayout head=row();head.addView(tx("DAILY GOALS",10,muted,true),new LinearLayout.LayoutParams(0,-2,1));heroSource=tx("",10,positive,true);head.addView(heroSource);head.addView(shareIcon("today",()->shareSheet("Share today",todayShareText(),null,null)),lp(40,40));c.addView(head);
         LinearLayout body=row();LinearLayout.LayoutParams bp=lp(-1,-2);bp.topMargin=dp(10);c.addView(body,bp);
-        ring=new ProgressRingView(this,chartTheme());body.addView(ring,lp(152,152));
+        // Three rings: steps, brisk minutes and distance, each against its daily goal.
+        rings=new MetricViews.Rings(this,chartTheme());rings.setContentDescription("Daily goals: steps, brisk minutes and distance");body.addView(rings,lp(150,150));
         LinearLayout side=col();LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(0,-2,1);sp.leftMargin=dp(16);body.addView(side,sp);
-        heroPercent=tx("—",30,ink,true);side.addView(heroPercent);side.addView(tx("●  of step goal",11,lime,true));
-        heroRemaining=tx("",13,ink,true);LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(10);side.addView(heroRemaining,rp);
-        heroDistance=tx("",11,violet,true);LinearLayout.LayoutParams dp2=lp(-1,-2);dp2.topMargin=dp(3);side.addView(heroDistance,dp2);heroSessions=tx("",11,muted,false);LinearLayout.LayoutParams hsp=lp(-1,-2);hsp.topMargin=dp(6);side.addView(heroSessions,hsp);
+        ringRows=new TextView[3];String[] names={"steps","brisk min","km"};
+        for(int i=0;i<3;i++){LinearLayout r=col();LinearLayout.LayoutParams rp2=lp(-1,-2);if(i>0)rp2.topMargin=dp(8);side.addView(r,rp2);
+            ringRows[i]=tx("—",18,MetricViews.Rings.COLORS[i],true);r.addView(ringRows[i]);ringSubs[i]=tx(names[i],11,muted,false);r.addView(ringSubs[i]);}
+        heroPercent=tx("",1,ink,false);heroRemaining=tx("",13,ink,true);heroDistance=tx("",11,violet,true);
+        heroSessions=tx("",11,muted,false);LinearLayout.LayoutParams hsp=lp(-1,-2);hsp.topMargin=dp(10);c.addView(heroSessions,hsp);
         dailyGoalMessage=tx("",12,muted,false);LinearLayout.LayoutParams mp=lp(-1,-2);mp.topMargin=dp(12);c.addView(dailyGoalMessage,mp);
         heroStart=button("▶  Start activity",lime,accentOn);heroStart.setTextSize(15);LinearLayout.LayoutParams hp=lp(-1,50);hp.topMargin=dp(12);c.addView(heroStart,hp);
         heroStart.setOnClickListener(v->{if(prefs.getBoolean("active",false))openLive();else onRecord();});
         updateHero(hist);
     }
+    private int briskGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("briskGoalMin",30);}
+    private MetricViews.Rings rings;private TextView[] ringRows;private final TextView[] ringSubs=new TextView[3];
+    /** Brisk minutes today: minutes at 100+ steps a minute from Health Connect, or from today's sessions; the larger. */
+    private double briskToday(JSONArray all){
+        JSONObject d=DaySteps.minuteDays(this).optJSONObject(todayKey());double hc=d!=null?d.optDouble("brisk",0):0,ses=0;
+        if(SessionMetrics.ready())for(int i=0;i<all.length();i++){JSONObject o=all.optJSONObject(i);if(o!=null&&todayKey().equals(o.optString("day",""))&&!Insights.vehicle(o)){SessionMetrics m=SessionMetrics.of(this,o);ses+=(m.zoneS[2]+m.zoneS[3]+m.zoneS[4])/60d;}}
+        return Math.max(hc,ses);
+    }
     private void updateHero(JSONArray all){
-        if(ring==null||heroPercent==null)return;
+        if(rings==null||heroPercent==null)return;
         int goal=dailyGoal();long n=DaySteps.todayTotal(this);boolean data=DaySteps.hasTodayData(this),active=prefs.getBoolean("active",false);double pct=goal>0?n*100d/goal:0;
-        ring.setProgress(n,goal,data);
+        double brisk=briskToday(all),km=DaySteps.distanceToday(this)[0],kmGoal=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("distanceGoalM",5000)/1000d;
+        rings.set(data?(float)(n/(double)Math.max(1,goal)):0,(float)(brisk/Math.max(1,briskGoal())),(float)(km/Math.max(.1,kmGoal)),data?String.format(Locale.US,"%,d",n):"—",data?String.format(Locale.US,"%.0f%% · steps",pct):"steps");
+        ringRows[0].setText(data?String.format(Locale.US,"%,d",n):"—");ringSubs[0].setText(String.format(Locale.US,"of %,d steps",goal));
+        ringRows[1].setText(String.valueOf(Math.round(brisk)));ringSubs[1].setText("of "+briskGoal()+" brisk minutes");
+        ringRows[2].setText(String.format(Locale.US,"%.1f",km));ringSubs[2].setText(String.format(Locale.US,"of %.1f km",kmGoal));
+        int closed=(n>=goal&&data?1:0)+(brisk>=briskGoal()?1:0)+(km>=kmGoal?1:0);
         heroPercent.setText(data?String.format(Locale.US,pct>=100||pct==Math.floor(pct)?"%.0f%%":"%.1f%%",pct):"—");heroPercent.setTextColor(data?(pct>=100?positive:ink):muted);
         heroRemaining.setText(!data?"Steps not counted yet":n>=goal?(n>goal?String.format(Locale.US,"+%,d beyond goal",n-goal):"Goal reached"):String.format(Locale.US,"%,d steps to go",goal-n));
-        long moveMin=todayDuration(all)/60000;SharedPreferences hpm=getSharedPreferences("kadamm_health",MODE_PRIVATE);if(todayKey().equals(hpm.getString("healthDate",""))&&hpm.getBoolean("healthConnected",false))moveMin=Math.max(moveMin,hpm.getInt("healthActiveMin",0));int moveGoal=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("activeGoalMin",30);ring.setInner(moveMin/(float)Math.max(1,moveGoal));heroDistance.setText(String.format(Locale.US,"●  %d of %d move min",moveMin,moveGoal));
         String source=DaySteps.todaySource(this);heroSource.setText("phone".equals(source)?"PHONE SENSOR":"health".equals(source)?"HEALTH CONNECT":"sessions".equals(source)?"SESSIONS ONLY":"");
-        heroStart.setText(active?"View live session":"▶  Start activity");if(heroSessions!=null)heroSessions.setText(String.format(Locale.US,"%.2f km · %,d active kcal",DaySteps.distanceToday(this)[0],DaySteps.activeKcalToday(this)));
+        heroStart.setText(active?"View live session":"▶  Start activity");if(heroSessions!=null){heroSessions.setText(closed==3?"All three rings closed: a perfect day ✦":closed+" of 3 rings closed · close all three for a perfect day · "+String.format(Locale.US,"%,d active kcal",DaySteps.activeKcalToday(this)));heroSessions.setTextColor(closed==3?positive:muted);}
         if(heroNote!=null)heroNote.setText(!data?"Let's get your steps counting.":pct>=100?"Goal done. Anything from here is a bonus.":pct>=80?"Nearly there. One short walk finishes it.":pct>=50?"Over halfway. Keep the rhythm going.":pct>=10?"Good start. Keep the momentum.":"Every step counts. Let's get moving.");
         if(n>=goal&&data){
             if(!todayKey().equals(prefs.getString("goalShownDay",""))){prefs.edit().putString("goalShownDay",todayKey()).apply();if(!reducedMotion())dailyGoalCard.animate().scaleX(1.015f).scaleY(1.015f).setDuration(180).withEndAction(()->dailyGoalCard.animate().scaleX(1f).scaleY(1f).setDuration(180).start()).start();}
@@ -1752,7 +1767,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         double brisk=d!=null&&d.has("brisk")?d.optDouble("brisk"):-1;
         // Without Health Connect minutes, fall back to session zones once they are analysed (never on a cold start).
         if(brisk<0){brisk=0;if(SessionMetrics.ready())for(int i=0;i<hist.length();i++){JSONObject o=hist.optJSONObject(i);if(o!=null&&day.equals(o.optString("day"))&&!Insights.vehicle(o)){SessionMetrics m=SessionMetrics.of(this,o);brisk+=(m.zoneS[2]+m.zoneS[3]+m.zoneS[4])/60d;}}}
-        return 100*(.6*Math.min(1.5,steps/Math.max(1,dailyGoal()))+.4*Math.min(1.5,brisk/30d));
+        return 100*(.6*Math.min(1.5,steps/Math.max(1,dailyGoal()))+.4*Math.min(1.5,brisk/Math.max(1,briskGoal())));
     }
     private void renderPlan(JSONArray hist){
         Map<String,Long> totals=dayTotals!=null?dayTotals:DaySteps.allDayTotals(this);JSONObject md=DaySteps.minuteDays(this);String today=todayKey();
@@ -1766,7 +1781,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         big.addView(valueUnit(String.valueOf(Math.round(plan)),"%",36,plan>=100?positive:ink));
         big.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
         JSONObject d=md.optJSONObject(today);
-        big.addView(tx(plan>=100?"Plan complete":d!=null&&d.has("brisk")?d.optInt("brisk")+" of 30 brisk min":"Brisk minutes from sessions",12,plan>=100?positive:muted,true));
+        big.addView(tx(plan>=100?"Plan complete":d!=null&&d.has("brisk")?d.optInt("brisk")+" of "+briskGoal()+" brisk min":"Brisk minutes from sessions",12,plan>=100?positive:muted,true));
         LinearLayout.LayoutParams pp=lp(-1,30);pp.topMargin=dp(6);c.addView(new MetricViews.PlanBar(this,chartTheme(),(float)(plan/100),flame()),pp);
         LinearLayout wk=row();LinearLayout.LayoutParams wkp=lp(-1,-2);wkp.topMargin=dp(14);c.addView(wk,wkp);
         wk.addView(tx("This week",14,ink,true),new LinearLayout.LayoutParams(0,-2,1));wk.addView(valueUnit(String.valueOf(Math.round(sum/7)),"%",18,ink));

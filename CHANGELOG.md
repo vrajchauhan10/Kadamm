@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.7 (versionCode 40)
+
+- Home's goal card is now three rings: steps (blue), brisk minutes (green) and distance (amber), each against its own goal, gliding to new values; a ring past its goal keeps going in a deeper shade, and closing all three says "a perfect day". Goals has a new Brisk minutes goal (default 30) used by the ring and Today's plan.
+
 ## 8.6 (versionCode 39)
 
 - Smart sessions (SessionRules): a session needs 100 steps to be saved (shorter ones still count toward the day); vehicle stretches (15 km/h+ with almost no steps) are cut from any session and pure rides dropped; an automatic session with no steps after 2 minutes is discarded and getting into a vehicle closes it; stepping in place (treadmill, shop) is counted as indoor walking, and a session that is mostly that becomes an indoor session.
