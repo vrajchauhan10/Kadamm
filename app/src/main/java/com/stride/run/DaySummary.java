@@ -31,7 +31,7 @@ final class DaySummary {
         return d;
     }
     /** Average pace over the day's whole distance and moving time, seconds per km; -1 when there's too little distance. */
-    double pace(){return km>=.05&&movingS>0&&movingS/km<3600?movingS/km:-1;}
+    double pace(){return km>=.05&&movingS>0&&movingS/km<1800?movingS/km:-1;}
     static String clock(long s){return s>=3600?String.format(Locale.US,"%dh %02dm",s/3600,(s/60)%60):String.format(Locale.US,"%d min",Math.max(0,Math.round(s/60d)));}
     static String pace(double s){return s>0?String.format(Locale.US,"%d:%02d /km",Math.round(s)/60,Math.round(s)%60):"—";}
 

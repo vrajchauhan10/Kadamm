@@ -75,8 +75,8 @@ final class Reminders {
     /** The nightly session summary, with View (opens the day in History) and Share. */
     static void postSessions(Context c,String day,DaySummary d){
         String title="Today's sessions";String body=d.text("").trim();
-        PendingIntent view=PendingIntent.getActivity(c,71,new Intent(c,MainActivity.class).putExtra("page","History").putExtra("openDay",day),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-        PendingIntent share=PendingIntent.getActivity(c,72,new Intent(c,MainActivity.class).putExtra("page","History").putExtra("openDay",day).putExtra("shareDay",day),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent view=PendingIntent.getActivity(c,71,new Intent(c,MainActivity.class).putExtra("page","Sessions").putExtra("openDay",day),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent share=PendingIntent.getActivity(c,72,new Intent(c,MainActivity.class).putExtra("page","Sessions").putExtra("openDay",day).putExtra("shareDay",day),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(c,CHANNEL):new Notification.Builder(c);
         b.setSmallIcon(R.drawable.ic_stat_kadamm).setColor(Color.rgb(26,115,232)).setContentTitle(title).setContentText(d.headline())
             .setStyle(new Notification.BigTextStyle().bigText(body)).setContentIntent(view).setAutoCancel(true)

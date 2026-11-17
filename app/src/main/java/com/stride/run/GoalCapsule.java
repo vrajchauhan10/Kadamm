@@ -75,7 +75,7 @@ final class GoalCapsule {
         // Layers from the top one down, so each lower layer's wave is drawn over the one above's bottom edge.
         float[] tops=new float[3];double cum=0;for(int i=0;i<3;i++){cum+=share[i];tops[i]=(float)(y0+ch-ch*Math.min(1,cum/100));}
         for(int i=2;i>=0;i--){
-            if(share[i]<=0)continue;float amp=dp*(3.2f+i*1.1f),len=cw*(1.15f-i*.18f),ph=phase*(1+i*.35f)+i*1.9f;int col=COLORS[i];
+            if(share[i]<=0)continue;float swell=1f+.35f*(float)Math.sin(phase*.5f+i),amp=dp*(5f+i*1.4f)*swell,len=cw*(1.6f-i*.22f),ph=phase*(1+i*.35f)+i*1.9f;int col=COLORS[i];
             p.setColor(Color.BLACK);p.setShader(new LinearGradient(0,tops[i],0,y0+ch,blend(col,Color.WHITE,.12f),blend(col,Color.BLACK,.10f),Shader.TileMode.CLAMP));
             c.drawPath(wave(x0-dp,x0+cw+dp,tops[i],y0+ch,amp,ph,len),p);p.setShader(null);
             p.setColor(Color.argb(70,Color.red(col),Color.green(col),Color.blue(col)));c.drawPath(wave(x0-dp,x0+cw+dp,tops[i]+dp*2.5f,y0+ch,amp*.7f,ph+1.3f,len*1.35f),p);
@@ -113,7 +113,7 @@ final class GoalCapsule {
         private void startDrift(){
             float scale=1f;try{scale=android.provider.Settings.Global.getFloat(getContext().getContentResolver(),"animator_duration_scale",1f);}catch(Exception ignored){}
             if(scale<=0)return;if(drift!=null){if(drift.isPaused())drift.resume();return;}
-            drift=ValueAnimator.ofFloat(0,(float)(Math.PI*2));drift.setDuration(9000);drift.setRepeatCount(ValueAnimator.INFINITE);drift.setInterpolator(new LinearInterpolator());
+            drift=ValueAnimator.ofFloat(0,(float)(Math.PI*2));drift.setDuration(16000);drift.setRepeatCount(ValueAnimator.INFINITE);drift.setInterpolator(new LinearInterpolator());
             drift.addUpdateListener(a->{phase=(float)a.getAnimatedValue();invalidate();});drift.start();
         }
         @Override protected void onDraw(Canvas c){GoalCapsule.draw(c,getWidth(),getHeight(),shown,phase,dark,getResources().getDisplayMetrics().density);}

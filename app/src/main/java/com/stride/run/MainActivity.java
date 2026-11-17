@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="8.8";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="8.9";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -287,7 +287,7 @@ public class MainActivity extends Activity {
         Button openLive=button("Live screen",raised,ink),finish=button("Finish",raised,ink),discard=button("Discard",raised,critical);
         trackEnd.addView(openLive,new LinearLayout.LayoutParams(0,-1,1));LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(0,-1,1);fp.leftMargin=dp(8);trackEnd.addView(finish,fp);LinearLayout.LayoutParams dsp=new LinearLayout.LayoutParams(0,-1,1);dsp.leftMargin=dp(8);trackEnd.addView(discard,dsp);
         openLive.setOnClickListener(v->openLive());finish.setOnClickListener(v->finishActivity());discard.setOnClickListener(v->discardActivity());
-        renderDailyInsights(hist);renderReportsLink();renderTrackingHealth();renderSessionsEntry(history());
+        renderDailyInsights(hist);renderReportsLink();renderTrackingHealth();
     }
     private void renderActivityInsights(JSONArray all){LinearLayout c=card();LinearLayout hd=row();hd.addView(tx("Activity overview",16,ink,true),new LinearLayout.LayoutParams(0,dp(28),1));c.addView(hd);c.addView(tx("Completed sessions · local workout data",11,muted,false));LinearLayout ranges=row();LinearLayout.LayoutParams rlp=lp(-1,38);rlp.topMargin=dp(10);c.addView(ranges,rlp);for(String range:new String[]{"7D","30D","12M","ALL"}){boolean selected=range.equals(activityRange);Button b=button(range,selected?lime:raised,selected?accentOn:ink);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(0,-1,1);if(ranges.getChildCount()>0)bp.leftMargin=dp(5);ranges.addView(b,bp);b.setOnClickListener(v->{activityRange=range;renderPage();});}
         JSONArray visible=sessionsInRange(all,activityRange);double km=distanceAll(visible);long duration=0,totalSteps=0;for(int i=0;i<visible.length();i++){JSONObject o=visible.optJSONObject(i);if(o!=null){duration+=o.optLong("durationMs");if(o.optBoolean("stepsAvailable",false))totalSteps+=o.optInt("steps");}}LinearLayout row1=row();LinearLayout.LayoutParams st=lp(-1,58);st.topMargin=dp(15);c.addView(row1,st);summaryValue(row1,"SESSIONS",String.valueOf(visible.length()));summaryValue(row1,"DISTANCE",String.format(Locale.US,"%.2f km",km));LinearLayout row2=row();c.addView(row2,lp(-1,52));summaryValue(row2,"TIME",formatDuration(duration));summaryValue(row2,"VERIFIED STEPS",String.format(Locale.US,"%,d",totalSteps));TextView chartTitle=tx("Distance",10,muted,true);LinearLayout.LayoutParams ct=lp(-1,20);ct.topMargin=dp(9);c.addView(chartTitle,ct);ActivityChartView chart=new ActivityChartView(this,visible,activityRange,chartTheme());LinearLayout.LayoutParams ch=lp(-1,128);ch.topMargin=dp(3);c.addView(chart,ch);}
@@ -418,15 +418,8 @@ public class MainActivity extends Activity {
         double km=Math.max(totalDistanceOn(h,sk),sk.equals(todayKey())?DaySteps.distanceToday(this)[0]:DaySteps.stepKm(this,Math.max(0,sSteps)));long ms=durationOn(h,sk);int count=countOn(h,sk,null);
         detailRow(sel,"DISTANCE",String.format(Locale.US,"%.2f km",km),"ACTIVE TIME",formatDuration(ms));
         long dayKcal=0;for(int i=0;i<h.length();i++){JSONObject o=h.optJSONObject(i);if(o!=null&&dateKey(o).equals(sk))dayKcal+=o.optLong("calories",Math.round(o.optDouble("distanceKm",0)*65));}detailRow(sel,"SESSION CALORIES",dayKcal+" kcal active","SESSIONS",String.valueOf(count));
-        TextView dayLabel=tx(count==0?"No sessions on this day":count==1?"1 session":count+" sessions",11,muted,true);LinearLayout.LayoutParams dlp=lp(-1,-2);dlp.topMargin=dp(16);content.addView(dayLabel,dlp);
-        for(int i=h.length()-1;i>=0;i--){JSONObject o=h.optJSONObject(i);if(o!=null&&dateKey(o).equals(sk))sessionRow(o,()->{lastSession=o;page="Detail";renderPage();});}
-        // Every session by day, as stacks you can open (also where Home's "Your sessions" card leads).
-        View anchor=new View(this);content.addView(anchor,lp(-1,12));
-        TextView sbd=tx("SESSIONS BY DAY",11,ink,true);sbd.setLetterSpacing(.06f);LinearLayout.LayoutParams shp=lp(-1,-2);shp.topMargin=dp(14);content.addView(sbd,shp);
-        content.addView(tx(h.length()+(h.length()==1?" walk or run":" walks and runs")+". Tap a day to open it.",12,muted,false));
-        renderTidyUp(h);
-        renderRecentDays(h);
-        if(scrollToSessions){scrollToSessions=false;anchor.post(()->scroller.smoothScrollTo(0,anchor.getTop()));}
+        // Sessions live behind one stacked card; this day's are opened there.
+        renderSessionsEntry(h);
     }
     /**
      * Sessions saved before 8.6 that today's rules would not keep (under 100 steps, or a ride). Offered for
@@ -680,6 +673,7 @@ public class MainActivity extends Activity {
     /** The Sessions page: every walk and run, grouped by day as stacks you can open. */
     private void renderSessions(){
         JSONArray all=history();brand("YOUR ACTIVITY","Sessions",all.length()+(all.length()==1?" walk or run":" walks and runs")+", grouped by day. Tap a day to open it.");
+        renderTidyUp(all);
         renderRecentDays(all);
     }
     /**
@@ -687,7 +681,7 @@ public class MainActivity extends Activity {
      * Opens the Sessions page, where every day is listed.
      */
     private void renderSessionsEntry(JSONArray all){
-        TextView label=tx("RECENT ACTIVITY",11,muted,true);label.setLetterSpacing(.06f);LinearLayout.LayoutParams rl=lp(-1,34);rl.topMargin=dp(20);content.addView(label,rl);
+        TextView label=tx("YOUR SESSIONS",11,muted,true);label.setLetterSpacing(.06f);LinearLayout.LayoutParams rl=lp(-1,34);rl.topMargin=dp(20);content.addView(label,rl);
         if(all.length()==0){LinearLayout empty=card();empty.addView(tx("Your sessions will show up here.",13,muted,false));return;}
         JSONObject last=all.optJSONObject(all.length()-1);String day=last==null?"":last.optString("day","");
         int n=0,auto=0;double km=0;java.util.HashSet<String> dayset=new java.util.HashSet<>();
@@ -707,7 +701,7 @@ public class MainActivity extends Activity {
         mid.addView(tx(all.length()+" in total across "+dayset.size()+" days",12,lime,true));
         front.addView(tx("›",26,muted,false));
         front.setContentDescription("Your sessions. Latest: "+dayTitle(day)+", "+kinds+". Opens every session by day.");
-        front.setOnClickListener(v->{scrollToSessions=true;navigate("History");});
+        front.setOnClickListener(v->navigate("Sessions"));
     }
     private String dayTitle(String day){
         Calendar c=Calendar.getInstance();String today=DaySteps.key(c.getTimeInMillis());c.add(Calendar.DAY_OF_YEAR,-1);String yest=DaySteps.key(c.getTimeInMillis());
@@ -775,7 +769,7 @@ public class MainActivity extends Activity {
         });
     }
     private void sessionRow(JSONObject o,Runnable click){sessionRow(content,o,click,false);}
-    private void sessionRow(LinearLayout parent,JSONObject o,Runnable click,boolean nested){if(o==null)return;LinearLayout r=row();r.setPadding(dp(nested?12:14),dp(12),dp(12),dp(12));r.setBackground(nested?ripple(shape(raised,14)):panelShape(14));LinearLayout.LayoutParams p=lp(-1,82);p.topMargin=dp(8);parent.addView(r,p);LinearLayout desc=col();r.addView(desc,new LinearLayout.LayoutParams(0,-1,1));desc.addView(tx((o.optBoolean("auto",false)?"Auto · ":"")+sessionLabel(o)+"  ·  "+formatDuration(o.optLong("durationMs")),14,ink,true));double km=o.optDouble("distanceKm",0);long ms=o.optLong("durationMs",0);long sec=km>0?Math.round(ms/1000d/km):0;desc.addView(tx(String.format(Locale.US,"%.2f km  ·  %s  ·  %,d steps",km,o.optString("time",""),o.optInt("steps")),10,muted,false));desc.addView(tx((sec>0&&sec<3600&&km>=.05?String.format(Locale.US,"%d:%02d /km",sec/60,sec%60):"— /km")+String.format(Locale.US,"  ·  ~%d kcal",o.optInt("calories",(int)Math.round(km*65))),10,muted,false));String savedRoute=o.optString("route", "[]");if(!"[]".equals(savedRoute)){RouteView preview=new RouteView(this);preview.setTheme(bg,raised,lime,darkTheme);preview.setMarkers(false);preview.setRoute(savedRoute);LinearLayout.LayoutParams pv=lp(58,58);pv.setMargins(dp(5),0,dp(5),0);r.addView(preview,pv);}r.addView(tx("›",25,muted,false));r.setOnClickListener(v->click.run());}
+    private void sessionRow(LinearLayout parent,JSONObject o,Runnable click,boolean nested){if(o==null)return;LinearLayout r=row();r.setPadding(dp(nested?12:14),dp(12),dp(12),dp(12));r.setBackground(nested?ripple(shape(raised,14)):panelShape(14));LinearLayout.LayoutParams p=lp(-1,82);p.topMargin=dp(8);parent.addView(r,p);LinearLayout desc=col();r.addView(desc,new LinearLayout.LayoutParams(0,-1,1));desc.addView(tx((o.optBoolean("auto",false)?"Auto · ":"")+sessionLabel(o)+"  ·  "+formatDuration(o.optLong("durationMs")),14,ink,true));double km=o.optDouble("distanceKm",0);long ms=o.optLong("durationMs",0);long sec=km>0?Math.round(ms/1000d/km):0;desc.addView(tx(String.format(Locale.US,"%.2f km  ·  %s  ·  %,d steps",km,o.optString("time",""),o.optInt("steps")),10,muted,false));desc.addView(tx((sec>0&&sec<1800&&km>=.05?String.format(Locale.US,"%d:%02d /km",sec/60,sec%60):"— /km")+String.format(Locale.US,"  ·  ~%d kcal",o.optInt("calories",(int)Math.round(km*65))),10,muted,false));String savedRoute=o.optString("route", "[]");if(!"[]".equals(savedRoute)){RouteView preview=new RouteView(this);preview.setTheme(bg,raised,lime,darkTheme);preview.setMarkers(false);preview.setRoute(savedRoute);LinearLayout.LayoutParams pv=lp(58,58);pv.setMargins(dp(5),0,dp(5),0);r.addView(preview,pv);}r.addView(tx("›",25,muted,false));r.setOnClickListener(v->click.run());}
     private void finishActivity(){if(!prefs.getBoolean("active",false)){toast("No activity to finish");return;}dialog().setTitle("Finish activity?").setMessage("Save this route and its session statistics to History?").setNegativeButton("Keep tracking",null).setPositiveButton("Finish",(d,w)->{int before=history().length();closeLive();command(RecorderService.ACTION_STOP);new Handler(Looper.getMainLooper()).postDelayed(()->{JSONArray h=history();if(h.length()==before){dialog().setTitle("Not saved as a session").setMessage("It had fewer than "+SessionRules.MIN_STEPS+" steps (or was a ride), so it isn't kept as a session. Any steps still count toward today's total.").setPositiveButton("OK",null).show();renderPage();return;}lastSession=h.optJSONObject(h.length()-1);if(lastSession!=null){page="Detail";renderPage();}else renderPage();},700);}).show();}
     private void hideMiniBar(){if(miniBar!=null)miniBar.setVisibility(View.GONE);}
     private void discardActivity(){if(!prefs.getBoolean("active",false)){toast("No activity to discard");return;}dialog().setTitle("Discard activity?").setMessage("This session and its route will be deleted without saving.").setNegativeButton("Keep tracking",null).setPositiveButton("Discard",(d,w)->{command(RecorderService.ACTION_DISCARD);toast("Activity discarded");renderPage();}).show();}
@@ -841,7 +835,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         LinearLayout head=row();head.addView(tx("DAILY GOALS",10,muted,true),new LinearLayout.LayoutParams(0,-2,1));heroSource=tx("",10,positive,true);head.addView(heroSource);head.addView(shareIcon("today",()->shareSheet("Share today",todayShareText(),null,null)),lp(40,40));c.addView(head);
         LinearLayout body=row();LinearLayout.LayoutParams bp=lp(-1,-2);bp.topMargin=dp(10);c.addView(body,bp);
         // The goals capsule: steps, brisk minutes and distance layered into one day's %.
-        capsule=new GoalCapsule.CapsuleView(this,darkTheme);body.addView(capsule,lp(96,190));
+        capsule=new GoalCapsule.CapsuleView(this,darkTheme);body.addView(capsule,lp(96,214));
         LinearLayout side=col();LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(0,-2,1);sp.leftMargin=dp(14);body.addView(side,sp);
         ringRows=new TextView[3];
         for(int i=0;i<3;i++){
@@ -1435,7 +1429,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     /** From the session-summary notification: open that day in History, and share it when asked. */
     private void handleDayIntent(Intent intent){
         if(intent==null)return;String day=intent.getStringExtra("openDay");if(day==null)return;
-        openDays.add(day);scrollToSessions=true;String share=intent.getStringExtra("shareDay");intent.removeExtra("openDay");intent.removeExtra("shareDay");
+        openDays.add(day);page="Sessions";String share=intent.getStringExtra("shareDay");intent.removeExtra("openDay");intent.removeExtra("shareDay");
         if(share!=null)handler.postDelayed(()->shareDay(share),600);
     }
     private void shareDay(String day){DaySummary d=DaySummary.of(this,history(),day);if(d.sessions==0)return;shareSheet("Share your day",d.text(dayTitle(day)+" in Kadamm")+"\nTracked with Kadamm",null,null);}
@@ -1515,8 +1509,8 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         }
         if(r!=null)for(int k=cells.length%3;k>0&&k<3;k++)r.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
     }
-    /** Pace as 14'16" (minutes and seconds per km); "—" when there is no meaningful pace (under 50 m, or slower than 60 min per km). */
-    private String paceText(double sec){return sec>0&&sec<3600?String.format(Locale.US,"%d'%02d\"",Math.round(sec)/60,Math.round(sec)%60):"—";}
+    /** Pace as 14'16" (minutes and seconds per km); "—" when there is no meaningful pace (under 50 m, or slower than 30 min per km, i.e. 2 km/h). */
+    private String paceText(double sec){return sec>0&&sec<1800?String.format(Locale.US,"%d'%02d\"",Math.round(sec)/60,Math.round(sec)%60):"—";}
 
     /**
      * Map colouring, chosen with a small segmented control on the map: the plain route, the route coloured by

@@ -1,5 +1,12 @@
 # Changelog
 
+## 8.9 (versionCode 42)
+
+- History's outer page is just the calendar, the month chart, the day's details and one stacked "Your sessions" card; Home no longer has a sessions card.
+- "Your sessions" opens the Sessions page: tidy-up (if any), then every day as a stack; opening a day shows its Day summary (all metrics added up and averaged, with Share) and its sessions. The nightly session summary notification opens it there.
+- The capsule's waves are longer and roll in a slow swell (16-second cycle) at the same capsule size.
+- A pace slower than 30 min per km (2 km/h) shows "—", since it isn't a real walking pace.
+
 ## 8.8 (versionCode 41)
 
 - Home's Daily goals card is now a liquid capsule (GoalCapsule) in place of the rings: steps (teal, up to 60 %), brisk minutes (coral, up to 25 %) and distance (indigo, up to 15 %) stack as wavy layers that drift while on screen, with the day's % under the capsule and bubbles at 100 %. Beside it, each goal shows its value, its share (+35 %), a bar and what's still to go; the line below spells the total out.
