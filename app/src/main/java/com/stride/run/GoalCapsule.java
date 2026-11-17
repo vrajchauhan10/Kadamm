@@ -98,12 +98,16 @@ final class GoalCapsule {
         draw(new Canvas(b),b.getWidth(),b.getHeight(),d.share,1.2f,true,dp);return b;
     }
 
-    /** The animated capsule: the waves drift only while it is on screen, and the level glides to new values. */
+    /**
+     * The animated capsule: the waves roll for a few seconds when it appears or a value changes, then settle, so
+     * the screen can go idle (better for battery, and for screen readers that wait for stillness).
+     */
     static final class CapsuleView extends View {
         private final boolean dark;private final double[] shown=new double[3],target=new double[3];private float phase;private ValueAnimator drift,level;
         CapsuleView(Context c,boolean dark){super(c);this.dark=dark;setContentDescription("Daily goals capsule");}
         void set(Day d){
             double[] from=shown.clone();System.arraycopy(d.share,0,target,0,3);boolean same=true;for(int i=0;i<3;i++)if(Math.abs(target[i]-shown[i])>.05)same=false;if(same)return;
+            if(isAttachedToWindow())startDrift();
             if(level!=null)level.cancel();level=ValueAnimator.ofFloat(0,1);level.setDuration(1100);level.setInterpolator(new android.view.animation.DecelerateInterpolator(2f));
             level.addUpdateListener(a->{float f=(float)a.getAnimatedValue();for(int i=0;i<3;i++)shown[i]=from[i]+(target[i]-from[i])*f;invalidate();});level.start();
         }
@@ -113,7 +117,8 @@ final class GoalCapsule {
         private void startDrift(){
             float scale=1f;try{scale=android.provider.Settings.Global.getFloat(getContext().getContentResolver(),"animator_duration_scale",1f);}catch(Exception ignored){}
             if(scale<=0)return;if(drift!=null){if(drift.isPaused())drift.resume();return;}
-            drift=ValueAnimator.ofFloat(0,(float)(Math.PI*2));drift.setDuration(16000);drift.setRepeatCount(ValueAnimator.INFINITE);drift.setInterpolator(new LinearInterpolator());
+            float from=phase;drift=ValueAnimator.ofFloat(from,from+(float)(Math.PI*2)*.85f);drift.setDuration(12000);drift.setInterpolator(new android.view.animation.DecelerateInterpolator(1.4f));
+            drift.addListener(new android.animation.AnimatorListenerAdapter(){@Override public void onAnimationEnd(android.animation.Animator a){drift=null;}});
             drift.addUpdateListener(a->{phase=(float)a.getAnimatedValue();invalidate();});drift.start();
         }
         @Override protected void onDraw(Canvas c){GoalCapsule.draw(c,getWidth(),getHeight(),shown,phase,dark,getResources().getDisplayMetrics().density);}
