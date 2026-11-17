@@ -33,7 +33,7 @@ import java.util.Locale;
 public class RecorderService extends Service implements LocationListener, SensorEventListener {
     public static final String ACTION_START="com.stride.run.START", ACTION_TOGGLE="com.stride.run.TOGGLE", ACTION_STOP="com.stride.run.STOP", ACTION_DISCARD="com.stride.run.DISCARD", ACTION_SET_TYPE="com.stride.run.SET_TYPE", ACTION_NOTIFICATION_TOGGLE="com.stride.run.NOTIFICATION_TOGGLE", ACTION_NOTIFICATION_FINISH="com.stride.run.NOTIFICATION_FINISH", ACTION_RESTORE="com.stride.run.RESTORE";
     static volatile boolean running=false;
-    private static final String CHANNEL="kadamm_live";private static final int NOTIFICATION=7;private int dailyStepGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String CHANNEL="kadamm_live",CHECK_CHANNEL="kadamm_check";private static final int NOTIFICATION=7;private int dailyStepGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private android.content.SharedPreferences prefs;private LocationManager locations;private SensorManager sensors;private Sensor stepCounter,stepDetector;private Handler handler;private JSONArray route,timeline;private long lastSampleS=-10;private Sensor barometer;private float baroAlt=Float.NaN;private Location last;private boolean active=false,paused=false,manualType=false,stepsAvailable=false,gpsConfirmed=false;private long elapsedBase=0,runStart=0,lastMovementElapsed=0,lastStepElapsed=0,lastStatsElapsed=0,sessionStartedAt=0,lastNotificationElapsed=0;private float rawStepStart=-1,lastRawStep=-1;private int lastDistanceStepCount=0;private int detectedSteps=0,baseSteps=0,runCandidates=0,walkCandidates=0,gpsCandidateCount=0;private double gpsCandidateDistance=0;private String currentType="Walk",candidateType="Walk";private long walkDuration=0,runDuration=0;private double walkDistance=0,runDistance=0,smoothedSpeed=-1;
     private final Runnable ticker=new Runnable(){public void run(){if(active){if(!paused)save();updateTrackingNotification();if(active)checkAutoFinish();if(active)handler.postDelayed(this,1000);}}};
     /**
@@ -191,11 +191,12 @@ public class RecorderService extends Service implements LocationListener, Sensor
         try{JSONArray row=new JSONArray();row.put(sec);row.put(stepsAvailable?prefs.getInt("steps",0):-1);row.put(Math.round(prefs.getFloat("distance",0)*1000));row.put(Float.isNaN(baroAlt)?JSONObject.NULL:Math.round(baroAlt*10)/10.0);timeline.put(row);prefs.edit().putString("timeline",timeline.toString()).apply();}catch(Exception ignored){}
     }
     @Override public void onAccuracyChanged(Sensor sensor,int accuracy){}
-    private void save(){sample();long now=SystemClock.elapsedRealtime();long elapsed=elapsedBase+(active&&!paused?now-runStart:0);long segment=active&&!paused?Math.max(0,now-lastStatsElapsed):0;lastStatsElapsed=now;if("Run".equals(currentType))runDuration+=segment;else walkDuration+=segment;prefs.edit().putBoolean("stepsEstimated",false).putInt("steps",stepCounter==null&&stepDetector==null?0:prefs.getInt("steps",0)).apply();boolean moving=active&&!paused&&((lastStepElapsed>0&&now-lastStepElapsed<=8000)||(lastMovementElapsed>0&&now-lastMovementElapsed<=8000));if(moving)movingDuration+=segment;else prefs.edit().putFloat("speedKmh",0).apply();prefs.edit().putBoolean("moving",moving).putLong("heartbeatMs",System.currentTimeMillis()).putLong("movingMs",movingDuration).putLong("elapsed",elapsed).putLong("walkDurationMs",walkDuration).putLong("runDurationMs",runDuration).putFloat("walkDistanceKm",(float)walkDistance).putFloat("runDistanceKm",(float)runDistance).apply();writeRoute(false);if(gpsConfirmed&&lastMovementElapsed>0&&now-lastMovementElapsed>10000)gpsConfirmed=false;}
+    private void save(){sample();prefs.edit().putBoolean("confirming",autoSession&&confirming()).apply();long now=SystemClock.elapsedRealtime();long elapsed=elapsedBase+(active&&!paused?now-runStart:0);long segment=active&&!paused?Math.max(0,now-lastStatsElapsed):0;lastStatsElapsed=now;if("Run".equals(currentType))runDuration+=segment;else walkDuration+=segment;prefs.edit().putBoolean("stepsEstimated",false).putInt("steps",stepCounter==null&&stepDetector==null?0:prefs.getInt("steps",0)).apply();boolean moving=active&&!paused&&((lastStepElapsed>0&&now-lastStepElapsed<=8000)||(lastMovementElapsed>0&&now-lastMovementElapsed<=8000));if(moving)movingDuration+=segment;else prefs.edit().putFloat("speedKmh",0).apply();prefs.edit().putBoolean("moving",moving).putLong("heartbeatMs",System.currentTimeMillis()).putLong("movingMs",movingDuration).putLong("elapsed",elapsed).putLong("walkDurationMs",walkDuration).putLong("runDurationMs",runDuration).putFloat("walkDistanceKm",(float)walkDistance).putFloat("runDistanceKm",(float)runDistance).apply();writeRoute(false);if(gpsConfirmed&&lastMovementElapsed>0&&now-lastMovementElapsed>10000)gpsConfirmed=false;}
     private boolean promoteForeground(Notification notification){try{if(Build.VERSION.SDK_INT>=29){int type=0;if(Build.VERSION.SDK_INT>=34)type="indoor".equals(prefs.getString("activityMode","outdoor"))?android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH:android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;else if(!"indoor".equals(prefs.getString("activityMode","outdoor")))type=android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;startForeground(NOTIFICATION,notification,type);}else startForeground(NOTIFICATION,notification);return true;}catch(Exception e){return false;}}
     private void updateTrackingNotification(){if(Build.VERSION.SDK_INT<24||!active)return;long now=SystemClock.elapsedRealtime();if(now-lastNotificationElapsed<5000)return;lastNotificationElapsed=now;String mode=prefs.getString("activityMode","outdoor");String msg=paused?"Activity paused":!"indoor".equals(mode)&&!prefs.getBoolean("gpsFix",false)?"GPS signal weak · route paused":prefs.getBoolean("moving",false)?currentType+" · "+String.format(Locale.US,"%.2f km",prefs.getFloat("distance",0))+" · "+(prefs.getInt("steps",0))+" session steps":("indoor".equals(mode)?"No steps detected":"Not moving")+" · recording";getSystemService(NotificationManager.class).notify(NOTIFICATION,notification(msg));}
     private void createChannel(){
         if(Build.VERSION.SDK_INT<26)return;NotificationManager nm=getSystemService(NotificationManager.class);
+        NotificationChannel check=new NotificationChannel(CHECK_CHANNEL,"Checking for a walk",NotificationManager.IMPORTANCE_MIN);check.setSound(null,null);check.enableVibration(false);check.setShowBadge(false);nm.createNotificationChannel(check);
         // Default importance so the card shows in full on the lock screen; silent, and alerting only once.
         NotificationChannel c=new NotificationChannel(CHANNEL,"Live session",NotificationManager.IMPORTANCE_DEFAULT);
         c.setDescription("Time, distance and pace while a walk or run is recorded");c.setSound(null,null);c.enableVibration(false);c.setShowBadge(false);c.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
@@ -205,6 +206,17 @@ public class RecorderService extends Service implements LocationListener, Sensor
      * The live-session card: a time that ticks on its own (no updates needed), distance, pace, steps, calories,
      * speed and today's goal, with Pause/Resume and Finish. Public on the lock screen, like a workout should be.
      */
+    /**
+     * A recording only becomes a session at {@link SessionRules#MIN_STEPS} steps. Until then an automatic one runs
+     * quietly (a minimised "checking" notification, no live card, no mini bar); one you started shows the count.
+     */
+    private boolean confirming(){return active&&stepsAvailable&&prefs.getInt("steps",0)<SessionRules.MIN_STEPS;}
+    private Notification quietCheck(PendingIntent pi){
+        Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,CHECK_CHANNEL):new Notification.Builder(this);
+        int st=prefs.getInt("steps",0);
+        return b.setSmallIcon(R.drawable.ic_stat_kadamm).setContentTitle("Checking for a walk").setContentText(st+" of "+SessionRules.MIN_STEPS+" steps · becomes a session at "+SessionRules.MIN_STEPS)
+            .setContentIntent(pi).setOngoing(true).setOnlyAlertOnce(true).setShowWhen(false).setCategory("workout").build();
+    }
     private Notification notification(String text){
         Intent open=new Intent(this,MainActivity.class).putExtra("openLive",true).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi=PendingIntent.getActivity(this,0,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
@@ -213,6 +225,8 @@ public class RecorderService extends Service implements LocationListener, Sensor
         boolean indoor="indoor".equals(prefs.getString("activityMode","outdoor"));String type="Run".equals(currentType)?"Running":"Walking";
         String title=(paused?"Paused · ":"")+(indoor?"Indoor "+type.toLowerCase(Locale.US):type);
         int goal=dailyStepGoal(),today=dailyStepTotal();float kmh=paused?0:prefs.getFloat("speedKmh",0);
+        if(autoSession&&confirming())return quietCheck(pi);
+        if(confirming())text=prefs.getInt("steps",0)+" of "+SessionRules.MIN_STEPS+" steps · saved as a session from "+SessionRules.MIN_STEPS;
         if(Build.VERSION.SDK_INT>=36)return liveUpdate(title,ms,km,pace,today,goal,text,pi);
         android.widget.RemoteViews small=new android.widget.RemoteViews(getPackageName(),R.layout.notif_live_small),big=new android.widget.RemoteViews(getPackageName(),R.layout.notif_live_big);
         for(android.widget.RemoteViews v:new android.widget.RemoteViews[]{small,big}){

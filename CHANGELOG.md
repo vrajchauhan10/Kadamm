@@ -1,5 +1,10 @@
 # Changelog
 
+## 9.0 (versionCode 43)
+
+- A recording becomes a session only at 100 steps: until then an automatic one runs quietly (a minimised "Checking for a walk · 71 of 100 steps" notification, no live card, no mini bar), and one you start shows "71 of 100 steps to count" on the live screen and notification.
+- Day summary: days with two or more sessions get a "Day summary" entry on top of their sessions, opening a full page: every route on one map, totals and averages (distance, moving time, steps, calories, pace, cadence, climb, effort, intensity), relative effort against your recent active days, intensity and pace zones summed across sessions, best of the day (fastest pace, longest, most steps, highest cadence, biggest effort, most climbing, fastest 1 km) linked to the session, the sessions, Share, and the notification time. The nightly notification opens it.
+
 ## 8.9 (versionCode 42)
 
 - History's outer page is just the calendar, the month chart, the day's details and one stacked "Your sessions" card; Home no longer has a sessions card.

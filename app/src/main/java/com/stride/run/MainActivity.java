@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="8.9";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="9.0";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -130,7 +130,7 @@ public class MainActivity extends Activity {
         miniBar.setOnClickListener(v->openLive());
     }
     /** Shows the bar while a session runs with the live screen closed; only the essentials: type, time, distance, steps to go. */
-    private void updateMiniBar(){
+    private void updateMiniBar(){if(prefs!=null&&prefs.getBoolean("confirming",false)&&prefs.getBoolean("active",false)){hideMiniBar();return;}
         if(miniBar==null)return;boolean active=prefs.getBoolean("active",false),liveOpen=liveLayer!=null&&liveLayer.getVisibility()==View.VISIBLE&&!liveClosing;
         boolean show=active&&!liveOpen&&authLayer==null;
         if(!show){if(miniBar.getVisibility()==View.VISIBLE&&!liveOpen)miniBar.setVisibility(View.GONE);return;}
@@ -260,8 +260,8 @@ public class MainActivity extends Activity {
         goingBack=false;
     }
     private void goBack(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.pop();Integer y=scrollMemory.get(to);restoreScroll=y==null?-1:y;goingBack=true;page=to;closeDrawer();renderPage();}
-    private String backLabel(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.peek();return "Detail".equals(to)?"Session":"Auto".equals(to)?"Auto tracking":"Today".equals(to)?"Home":to;}
-    private void renderPageInner(){trackBack();if(replayAnim!=null){replayAnim.cancel();replayAnim=null;}if(!page.equals(renderedPage)&&scroller!=null)scroller.scrollTo(0,0);renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else if(page.equals("Routes"))renderRoutes();else if(page.equals("Notifications"))renderNotifications();else if(page.equals("Reports"))renderReports();else if(page.equals("Achievements"))renderAchievements();else if(page.equals("Permissions"))renderPermissions();else if(page.equals("Auto"))renderAutoTracking();else if(page.equals("Storage"))renderStorage();else if(page.equals("Places"))renderPlaces();else if(page.equals("Sessions"))renderSessions();else renderDetail(lastSession);if(content.getChildCount()>0)signatureAtEnd();}
+    private String backLabel(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.peek();return "DaySummary".equals(to)?"Day summary":"Detail".equals(to)?"Session":"Auto".equals(to)?"Auto tracking":"Today".equals(to)?"Home":to;}
+    private void renderPageInner(){trackBack();if(replayAnim!=null){replayAnim.cancel();replayAnim=null;}if(!page.equals(renderedPage)&&scroller!=null)scroller.scrollTo(0,0);renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else if(page.equals("Routes"))renderRoutes();else if(page.equals("Notifications"))renderNotifications();else if(page.equals("Reports"))renderReports();else if(page.equals("Achievements"))renderAchievements();else if(page.equals("Permissions"))renderPermissions();else if(page.equals("Auto"))renderAutoTracking();else if(page.equals("Storage"))renderStorage();else if(page.equals("Places"))renderPlaces();else if(page.equals("Sessions"))renderSessions();else if(page.equals("DaySummary"))renderDaySummary();else renderDetail(lastSession);if(content.getChildCount()>0)signatureAtEnd();}
     private void styleNavItem(LinearLayout item,boolean selected){int color=selected?lime:muted;item.setBackground(rippleOn(selected?raised:Color.TRANSPARENT,14));((android.widget.ImageView)item.getChildAt(0)).setImageTintList(android.content.res.ColorStateList.valueOf(color));((TextView)item.getChildAt(1)).setTextColor(selected?ink:muted);}
     private void brand(String eyebrow,String headline,String sub){LinearLayout brand=row();content.addView(brand,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);brand.addView(brandButton(),bbp);if(tabIndex(page)<0){brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));TextView bk=tx("‹  "+backLabel(),13,ink,true);bk.setGravity(Gravity.CENTER);bk.setPadding(dp(14),0,dp(16),0);bk.setBackground(rippleOn(raised,18));bk.setContentDescription("Back to "+backLabel());bk.setOnClickListener(v->goBack());brand.addView(bk,lp(-2,36));}TextView e=tx(eyebrow.toUpperCase(Locale.US),10,muted,true);LinearLayout.LayoutParams ep=lp(-1,25);ep.topMargin=dp(8);content.addView(e,ep);TextView h=tx(headline,29,ink,true);content.addView(h);if(sub!=null){TextView s=tx(sub,13,muted,false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(5);sp.bottomMargin=dp(16);content.addView(s,sp);}}
     private LinearLayout card(){LinearLayout c=col();c.setPadding(dp(16),dp(16),dp(16),dp(16));c.setBackground(panelShape(16));LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(12);content.addView(c,p);return c;}
@@ -670,6 +670,92 @@ public class MainActivity extends Activity {
     }
     /** A card peeking out under a stack: neutral, a little closer to the page colour with each layer, with a hairline edge. */
     private GradientDrawable stackLayer(int k,int radius){GradientDrawable g=shape(blend(panel,bg,darkTheme?.30f*k:.38f*k),radius);g.setStroke(dp(1),blend(line,bg,.15f*k));return g;}
+    private String summaryDay;
+    /** All of a day's routes as one route, each session starting after a gap. */
+    private String mergedRoute(java.util.List<JSONObject> list){
+        JSONArray out=new JSONArray();
+        // Sessions that barely moved (under 50 m) add a stray point, not a route, and would zoom the map out.
+        for(JSONObject o:list){if(o.optDouble("distanceKm",0)<.05)continue;try{JSONArray r=new JSONArray(o.optString("route","[]"));for(int i=0;i<r.length();i++){JSONObject p=new JSONObject(r.getJSONObject(i).toString());if(i==0&&out.length()>0)p.put("break",true);out.put(p);}}catch(Exception ignored){}}
+        return out.toString();
+    }
+    /** Which session did best on a measure: {value, session}; higher is better unless {@code low}. */
+    private Object[] bestOf(java.util.List<JSONObject> list,java.util.function.ToDoubleFunction<JSONObject> f,boolean low){
+        JSONObject best=null;double bv=low?Double.MAX_VALUE:-Double.MAX_VALUE;for(JSONObject o:list){double v=f.applyAsDouble(o);if(v<=0||Double.isNaN(v))continue;if(low?v<bv:v>bv){bv=v;best=o;}}return best==null?null:new Object[]{bv,best};
+    }
+    /**
+     * A day's sessions as one: the routes together on a map, totals and averages, relative effort against your
+     * recent days, intensity and pace zones summed, and which session was best at each thing.
+     */
+    private void renderDaySummary(){
+        String day=summaryDay==null?todayKey():summaryDay;JSONArray h=history();KadammTheme th=chartTheme();
+        java.util.List<JSONObject> list=new java.util.ArrayList<>();for(int i=0;i<h.length();i++){JSONObject o=h.optJSONObject(i);if(o!=null&&day.equals(o.optString("day","")))list.add(o);}
+        DaySummary d=DaySummary.of(this,h,day);
+        brand(dayTitle(day).toUpperCase(Locale.getDefault()),"Day summary",d.sessions+(d.sessions==1?" session":" sessions")+(d.auto>0?" · "+d.auto+" auto":"")+" · everything added up");
+        if(list.isEmpty()){LinearLayout e=card();e.addView(tx("No sessions on this day.",13,muted,false));return;}
+        // Map of every route
+        String merged=mergedRoute(list);
+        if(merged.contains("lat")){RouteView rv=new RouteView(this);rv.setInteractive(true);rv.setTheme(bg,raised,lime,darkTheme);rv.setOverview(true);rv.setRoute(merged);rv.setClipToOutline(true);rv.setBackground(shape(panel,16));content.addView(rv,lp(-1,280));
+            content.addView(tx("Every route you walked this day · © OpenStreetMap contributors",10,muted,false));}
+        LinearLayout ov=card();
+        ov.addView(valueUnit(String.format(Locale.US,"%.2f",d.km),"km in total",34,ink));
+        double gain=0;for(JSONObject o:list){SessionMetrics m=SessionMetrics.of(this,o);if(m.gain>0)gain+=m.gain;}
+        statGrid(ov,new String[][]{{"Moving time",DaySummary.clock(d.movingS),""},{"Steps",d.steps>0?String.format(Locale.US,"%,d",d.steps):"—",""},{"Active",String.valueOf(Math.round(d.kcal)),"kcal"},
+            {"Avg pace",paceText(d.pace()),"/km"},{"Avg cadence",d.cadence>0?String.valueOf(Math.round(d.cadence)):"—",d.cadence>0?"spm":""},{"Climb",gain>0?String.format(Locale.US,"%.0f",gain):"—",gain>0?"m":""},
+            {"Effort",String.valueOf(Math.round(d.effort)),""},{"Intensity",String.valueOf(Math.round(d.intensity)),"min"},{"Sessions",String.valueOf(d.sessions),""}},12);
+        // Relative effort: this day against your recent active days
+        java.util.Map<String,Double> byDay=new java.util.HashMap<>();String from=DaySteps.key(dayMillis(day)-21L*86400000L);
+        for(int i=0;i<h.length();i++){JSONObject o=h.optJSONObject(i);if(o==null)continue;String k=o.optString("day","");if(k.compareTo(from)>=0&&k.compareTo(day)<0&&!Insights.vehicle(o)){Double v=byDay.get(k);byDay.put(k,(v==null?0:v)+SessionMetrics.of(this,o).effort);}}
+        LinearLayout ef=metricCard("RELATIVE EFFORT","day","The day's effort is all its sessions' effort added together. The bands compare it with your average day with sessions over the 21 days before.");
+        Object[] topE=bestOf(list,o->SessionMetrics.of(this,o).effort,false);
+        LinearLayout er=row();LinearLayout.LayoutParams erp=lp(-1,-2);erp.topMargin=dp(8);ef.addView(er,erp);er.addView(valueUnit(String.valueOf(Math.round(d.effort)),"effort",30,ink),new LinearLayout.LayoutParams(0,-2,1));
+        if(topE!=null)er.addView(tx("Biggest: "+((JSONObject)topE[1]).optString("time"),12,muted,false));
+        if(byDay.size()>=3){double avg=0;for(double v:byDay.values())avg+=v;avg/=byDay.size();LinearLayout.LayoutParams bp=lp(-1,126);bp.topMargin=dp(12);MetricViews.Bands bands=new MetricViews.Bands(this,th,d.effort/avg,violet);bands.setClipToOutline(true);bands.setBackground(shape(panel,12));ef.addView(bands,bp);
+            TextView cap=tx(String.format(Locale.US,"Your average active day is %.0f, from %d days.",avg,byDay.size()),11,muted,false);LinearLayout.LayoutParams cp=lp(-1,-2);cp.topMargin=dp(8);ef.addView(cap,cp);}
+        // Intensity zones summed
+        long[] z=new long[5];for(JSONObject o:list){SessionMetrics m=SessionMetrics.of(this,o);long[] q=m.hrZoneS!=null?m.hrZoneS:m.zoneS;for(int i=0;i<5;i++)z[i]+=q[i];}long zt=0;for(long v:z)zt+=v;
+        if(zt>=60){LinearLayout zc=metricCard("INTENSITY ZONES","all sessions","Time in each intensity zone, added up across the day's sessions (from cadence, GPS speed or heart rate, as each session allows).");
+            zoneBars(zc,z,zt,MetricViews.ZONE_COLORS,SessionMetrics.ZONES);
+            Object[] mi=bestOf(list,o->{SessionMetrics m=SessionMetrics.of(this,o);return m.intensityMin;},false);
+            if(mi!=null){TextView t=tx(String.format(Locale.US,"%.0f intensity minutes in total · most from the %s session (%.0f min)",d.intensity,((JSONObject)mi[1]).optString("time"),(double)mi[0]),11,muted,false);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(10);zc.addView(t,tp);}}
+        // Pace zones summed
+        double thr=SessionMetrics.thresholdPace(this,h);long[] pz=new long[6];boolean anyPz=false;
+        for(JSONObject o:list){long[] q=SessionMetrics.of(this,o).paceZones(thr);if(q!=null){anyPz=true;for(int i=0;i<6;i++)pz[i]+=q[i];}}
+        long pt=0;for(long v:pz)pt+=v;
+        if(anyPz&&pt>=60){LinearLayout pc=metricCard("PACE ZONES","all sessions","Time in each pace zone across the day's outdoor sessions, around your threshold pace ("+paceText(thr)+" /km): your best 30-minute pace.");
+            String[] names=new String[6];for(int i=0;i<6;i++)names[i]="Z"+(i+1)+" "+SessionMetrics.PACE_ZONES[i];
+            int[] blues={Color.rgb(181,212,244),Color.rgb(133,183,235),Color.rgb(55,138,221),Color.rgb(24,95,165),Color.rgb(12,68,124),Color.rgb(4,44,83)};zoneBars(pc,pz,pt,blues,names);}
+        // Best of the day
+        LinearLayout bc=metricCard("BEST OF THE DAY","","Which of the day's sessions did best at each measure. Tap one to open it.");
+        bestRow(bc,"Fastest pace",bestOf(list,o->SessionMetrics.of(this,o).paceMoving,true),v->paceText(v)+" /km");
+        bestRow(bc,"Longest distance",bestOf(list,o->o.optDouble("distanceKm",0),false),v->String.format(Locale.US,"%.2f km",v));
+        bestRow(bc,"Most steps",bestOf(list,o->o.optBoolean("stepsAvailable",false)?o.optLong("steps",0):0,false),v->String.format(Locale.US,"%,d",Math.round(v)));
+        bestRow(bc,"Highest cadence",bestOf(list,o->SessionMetrics.of(this,o).cadenceAvg,false),v->Math.round(v)+" spm");
+        bestRow(bc,"Biggest effort",bestOf(list,o->SessionMetrics.of(this,o).effort,false),v->String.valueOf(Math.round(v)));
+        bestRow(bc,"Most climbing",bestOf(list,o->SessionMetrics.of(this,o).gain,false),v->String.format(Locale.US,"+%.0f m",v));
+        bestRow(bc,"Fastest 1 km",bestOf(list,o->{Double t=SessionMetrics.of(this,o).best.get(1000);return t==null?0:t;},true),MetricViews::mmss);
+        // The sessions
+        TextView sl=tx("SESSIONS",11,muted,true);sl.setLetterSpacing(.06f);LinearLayout.LayoutParams slp=lp(-1,-2);slp.topMargin=dp(18);content.addView(sl,slp);
+        for(JSONObject o:list)sessionRow(o,()->{lastSession=o;page="Detail";renderPage();});
+        Button share=button("Share this day",lime,accentOn);share.setTextSize(15);LinearLayout.LayoutParams shp=lp(-1,50);shp.topMargin=dp(14);content.addView(share,shp);share.setOnClickListener(v->shareDay(day));
+        TextView when=tx("The day's summary also arrives as a notification at "+clock12(Reminders.get(this,"sesAt",23*60))+" · change in Notifications  ›",12,lime,true);when.setPadding(0,dp(12),0,0);when.setOnClickListener(v->navigate("Notifications"));content.addView(when);
+    }
+    private long dayMillis(String day){try{return new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US).parse(day).getTime();}catch(Exception e){return System.currentTimeMillis();}}
+    private void zoneBars(LinearLayout parent,long[] z,long total,int[] colors,String[] names){
+        for(int i=z.length-1;i>=0;i--){
+            LinearLayout zr=col();LinearLayout.LayoutParams zp=lp(-1,-2);zp.topMargin=dp(i==z.length-1?10:10);parent.addView(zr,zp);
+            LinearLayout l1=row();zr.addView(l1,lp(-1,-2));l1.addView(tx(names[i],13,ink,true),new LinearLayout.LayoutParams(0,-2,1));
+            l1.addView(tx(String.format(Locale.US,"%d%%   ",Math.round(z[i]*100d/total)),12,ink,true));l1.addView(tx(MetricViews.mmss(z[i]),12,muted,false));
+            FrameLayout track=new FrameLayout(this);track.setBackground(shape(raised,4));LinearLayout.LayoutParams tp=lp(-1,7);tp.topMargin=dp(5);zr.addView(track,tp);
+            View fill=new View(this);fill.setBackground(shape(colors[i],4));track.addView(fill,new FrameLayout.LayoutParams(0,-1));final float f=(float)z[i]/total;track.post(()->{FrameLayout.LayoutParams fl=(FrameLayout.LayoutParams)fill.getLayoutParams();fl.width=f>0?Math.max(dp(5),(int)(track.getWidth()*f)):0;fill.setLayoutParams(fl);});
+        }
+    }
+    private void bestRow(LinearLayout parent,String label,Object[] best,java.util.function.DoubleFunction<String> fmt){
+        if(best==null)return;JSONObject o=(JSONObject)best[1];
+        LinearLayout r=row();r.setPadding(0,dp(10),0,dp(4));r.setBackground(rippleOn(Color.TRANSPARENT,8));parent.addView(r,lp(-1,-2));
+        LinearLayout l=col();r.addView(l,new LinearLayout.LayoutParams(0,-2,1));l.addView(tx(label,13,ink,true));l.addView(tx((o.optBoolean("auto",false)?"Auto · ":"")+sessionLabel(o)+" at "+o.optString("time",""),11,muted,false));
+        r.addView(tx(fmt.apply((double)best[0]),15,lime,true));r.addView(tx("  ›",16,muted,false));
+        r.setOnClickListener(v->{lastSession=o;page="Detail";renderPage();});
+    }
     /** The Sessions page: every walk and run, grouped by day as stacks you can open. */
     private void renderSessions(){
         JSONArray all=history();brand("YOUR ACTIVITY","Sessions",all.length()+(all.length()==1?" walk or run":" walks and runs")+", grouped by day. Tap a day to open it.");
@@ -741,14 +827,18 @@ public class MainActivity extends Activity {
         // Sessions, shown when the stack is open.
         LinearLayout body=col();body.setVisibility(open?View.VISIBLE:View.GONE);front.addView(body,lp(-1,-2));
         View div=new View(this);div.setBackgroundColor(line);LinearLayout.LayoutParams dvp=lp(-1,1);dvp.topMargin=dp(12);dvp.bottomMargin=dp(2);body.addView(div,dvp);
-        {
+        if(n>=2){
+            // The day's summary, first in the list, as its own entry that opens a full page.
             DaySummary ds=DaySummary.of(this,history(),day);
-            LinearLayout sum=col();sum.setPadding(dp(12),dp(12),dp(12),dp(12));sum.setBackground(shape(blend(raised,lime,darkTheme?.10f:.06f),14));LinearLayout.LayoutParams smp=lp(-1,-2);smp.topMargin=dp(8);body.addView(sum,smp);
-            LinearLayout sh=row();sum.addView(sh,lp(-1,-2));TextView st=tx("DAY SUMMARY",10,lime,true);st.setLetterSpacing(.08f);sh.addView(st,new LinearLayout.LayoutParams(0,-2,1));
-            TextView shareB=tx("Share  ↗",12,lime,true);shareB.setPadding(dp(10),dp(4),dp(4),dp(4));shareB.setOnClickListener(v->shareDay(day));sh.addView(shareB);
-            statGrid(sum,new String[][]{{"Distance",String.format(Locale.US,"%.2f",ds.km),"km"},{"Moving time",DaySummary.clock(ds.movingS),""},{"Steps",ds.steps>0?String.format(Locale.US,"%,d",ds.steps):"—",""},
-                {"Avg pace",paceText(ds.pace()),"/km"},{"Avg cadence",ds.cadence>0?String.valueOf(Math.round(ds.cadence)):"—",ds.cadence>0?"spm":""},{"Active",String.valueOf(Math.round(ds.kcal)),"kcal"},
-                {"Effort",String.valueOf(Math.round(ds.effort)),""},{"Intensity",String.valueOf(Math.round(ds.intensity)),"min"},{"Sessions",ds.sessions+(ds.auto>0?" ("+ds.auto+" auto)":""),""}},6);
+            LinearLayout sr=row();sr.setPadding(dp(12),dp(12),dp(12),dp(12));GradientDrawable sg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(raised,lime,darkTheme?.22f:.12f),blend(raised,violet,darkTheme?.16f:.08f)});sg.setCornerRadius(dp(14));sr.setBackground(ripple(sg));
+            LinearLayout.LayoutParams srp=lp(-1,-2);srp.topMargin=dp(8);body.addView(sr,srp);
+            LinearLayout sd=col();sr.addView(sd,new LinearLayout.LayoutParams(0,-2,1));
+            TextView chip=tx("DAY SUMMARY",9,lime,true);chip.setLetterSpacing(.08f);chip.setPadding(dp(7),dp(2),dp(7),dp(2));chip.setBackground(shape(blend(raised,lime,.2f),8));LinearLayout.LayoutParams chp=lp(-2,-2);chp.bottomMargin=dp(3);sd.addView(chip,chp);
+            sd.addView(tx("All "+n+" sessions together",14,ink,true));
+            sd.addView(tx(String.format(Locale.US,"%.2f km · %s · %,d steps",ds.km,DaySummary.clock(ds.movingS),ds.steps),11,muted,false));
+            sd.addView(tx("Effort "+Math.round(ds.effort)+" · "+Math.round(ds.intensity)+" intensity min · tap for everything",11,muted,false));
+            RouteView pv=new RouteView(this);pv.setTheme(bg,raised,lime,darkTheme);pv.setMarkers(false);pv.setOverview(true);pv.setRoute(mergedRoute(list));pv.setClipToOutline(true);pv.setBackground(shape(raised,10));LinearLayout.LayoutParams pvp=lp(58,58);pvp.setMargins(dp(5),0,dp(5),0);sr.addView(pv,pvp);
+            sr.addView(tx("›",25,muted,false));sr.setOnClickListener(v->{summaryDay=day;navigate("DaySummary");});
         }
         for(JSONObject o:list){
             LinearLayout wrap=col();body.addView(wrap,lp(-1,-2));
@@ -1279,6 +1369,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         long fixAge=android.os.SystemClock.elapsedRealtime()-prefs.getLong("lastFixElapsed",0);boolean gps=prefs.getBoolean("gpsFix",false)&&fixAge<12000;
         lvTitle.setText((indoor?"Indoor ":"")+("Run".equals(prefs.getString("currentType","Walk"))?"Run":"Walk")+(paused?"  ·  Paused":""));
         lvStatus.setText(paused?"●  Paused":indoor?"●  Counting steps":gps?String.format(Locale.US,"●  GPS ±%.0f m",prefs.getFloat("accuracy",0)):"●  Finding GPS");lvStatus.setTextColor(paused?Color.rgb(154,160,166):indoor||gps?positive:warning);
+        int liveSteps=prefs.getInt("steps",0);if(!paused&&prefs.getBoolean("stepsAvailable",false)&&liveSteps<SessionRules.MIN_STEPS){lvStatus.setText("●  "+liveSteps+" of "+SessionRules.MIN_STEPS+" steps to count");lvStatus.setTextColor(Color.rgb(251,188,4));}
         lvTime.setText(formatDuration(ms));lvPace.setText(ps>0?String.format(Locale.US,"%d:%02d",ps/60,ps%60):"—:—");lvDist.setText(String.format(Locale.US,"%.2f",km));
         lvSteps.setText(String.format(Locale.US,"%,d",prefs.getInt("steps",0)));lvKcal.setText(String.valueOf(Calories.live(this)));float kmh=paused?0:prefs.getFloat("speedKmh",0);lvSpeed.setText(kmh>0?String.format(Locale.US,"%.1f",kmh):"—");
         lvMain.setText(paused?"Resume":"Pause");lvFinish.setVisibility(View.VISIBLE);
@@ -1429,7 +1520,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     /** From the session-summary notification: open that day in History, and share it when asked. */
     private void handleDayIntent(Intent intent){
         if(intent==null)return;String day=intent.getStringExtra("openDay");if(day==null)return;
-        openDays.add(day);page="Sessions";String share=intent.getStringExtra("shareDay");intent.removeExtra("openDay");intent.removeExtra("shareDay");
+        openDays.add(day);summaryDay=day;page="DaySummary";String share=intent.getStringExtra("shareDay");intent.removeExtra("openDay");intent.removeExtra("shareDay");
         if(share!=null)handler.postDelayed(()->shareDay(share),600);
     }
     private void shareDay(String day){DaySummary d=DaySummary.of(this,history(),day);if(d.sessions==0)return;shareSheet("Share your day",d.text(dayTitle(day)+" in Kadamm")+"\nTracked with Kadamm",null,null);}
