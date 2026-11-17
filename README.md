@@ -1,26 +1,61 @@
-# Kadamm for Android
+# Kadamm
 
-Kadamm is a native Android walking and running tracker. It records outdoor routes with GPS and OpenStreetMap road tiles, and supports indoor/treadmill sessions using the phone step sensor and a configurable stride estimate. Sessions are stored locally. Google sign-in is not integrated.
+**A walking and running tracker for Android that turns your steps into real insight.** No watch needed: Kadamm works from your phone's step counter, GPS and barometer, and adds heart rate automatically when a watch shares it through Health Connect.
 
-The app includes Light, Dark, and System themes; configurable daily step and distance targets; indoor stride calibration; an activity calendar and history; weekly activity charts; estimated calories; and walk/run classification. During outdoor sessions the map follows location and shows GPS accuracy. Indoor sessions do not require GPS and do not create a route map. Users can correct estimated treadmill distance from the treadmill display after finishing.
+[**⬇ Download the latest version**](https://github.com/vrajchauhan10/Kadamm/releases/latest) · Android 8.0+ · Updates itself from inside the app
 
-Daily steps come from the phone's hardware step counter (`TYPE_STEP_COUNTER`), read by `DaySteps` while the app is open, during sessions, and every 15 minutes in the background by `StepSyncJob`. This needs the Physical activity permission and no other app. Counting starts from the first reading after the permission is granted, so steps taken earlier that day are not included. Android only guarantees the hardware counter keeps running while some app is listening; on Samsung phones Samsung Health keeps it running.
+<p>
+  <img src="docs/screenshots/daily-goals.png" width="32%" alt="Daily goals capsule" />
+  <img src="docs/screenshots/trainer.png" width="32%" alt="Kadamm Trainer" />
+  <img src="docs/screenshots/effort-zones.png" width="32%" alt="Relative effort and intensity zones" />
+</p>
 
-Android Health Connect is an optional second source. The day's total is the larger of the phone count and the Health Connect count, never their sum. Kadamm requests only READ_STEPS and aggregates records outside Kadamm session time windows, then adds verified session steps. Samsung Health data must first be shared to Health Connect in Samsung Health settings; granting Kadamm access to Health Connect alone does not expose Samsung Health's private total. Health Connect access is optional; denial or provider unavailability leaves session-based data available. The Health Connect implementation uses the AndroidX 1.1.0-alpha12 client to remain compatible with this project's Android SDK 35 / Android Gradle Plugin 8.7.3 toolchain. See the Android Developers guidance for Health Connect step access: https://developer.android.com/health-and-fitness/health-connect/features/steps
+## What it does
 
-The map uses standard OpenStreetMap tiles. They do not provide satellite imagery; satellite mode is unavailable until a separately licensed provider and credentials are configured.
+### Your day at a glance
+- **Daily goals capsule:** steps, brisk minutes and distance fill one capsule in layers, each worth its share of the day; all three make a perfect day.
+- **Steps through the day:** every hour as a column of dots, with your most active hour marked.
+- **Movement quality:** peak-30 cadence, brisk minutes and active hours.
+- **Sitting breaks:** how often you got up after sitting, your longest sit, and a gentle reminder after an hour still.
 
-Calories are estimates (65 kcal/km). Indoor distance is marked estimated until corrected and uses the user-configured stride length (default 0.72 m per step). Without an available step sensor, indoor step and distance tracking are unavailable rather than fabricated.
+<p>
+  <img src="docs/screenshots/steps-through-the-day.png" width="32%" alt="Steps through the day" />
+  <img src="docs/screenshots/sitting-breaks.png" width="32%" alt="Sitting breaks" />
+  <img src="docs/screenshots/reports.png" width="32%" alt="Reports" />
+</p>
 
-## Build
+### Every walk, analysed
+- **Smart sessions:** auto-detects walks, starts only after 100 steps, leaves out car rides, and recognises treadmill or indoor walking.
+- **Relative effort, intensity zones and pace zones,** with WHO intensity minutes.
+- **Details per km:** pace, cadence and climb for every kilometre.
+- **Cadence and stride charts, grade-adjusted pace, and elevation from the barometer.**
+- **Best efforts** from 400 m to half marathon, ranked against all your history.
+- **Route replay** as a shareable video, and **day summaries** that add up all of a day's sessions.
 
-Run `./build.sh` to build with the bundled toolchain in `tools/android-build` (JDK 17, Android SDK 35, Gradle 8.9). The APK is copied to `releases/kadamm-v<version>.apk`. `./build.sh install` also installs it on a USB-connected phone. The folder also opens in Android Studio. The application ID remains com.stride.run so updates preserve installed app data.
+<p>
+  <img src="docs/screenshots/splits-cadence.png" width="32%" alt="Details per km and cadence" />
+  <img src="docs/screenshots/best-efforts.png" width="32%" alt="Best efforts and health markers" />
+  <img src="docs/screenshots/achievements.png" width="32%" alt="Achievements" />
+</p>
 
-Kadamm 5.0 is versionCode 12. Every released APK is kept in `releases/`.
+### Training and progress
+- **Kadamm Trainer:** six stages from Starter to 10K runner, today's workout with pace targets, a weekly plan that adapts to your form, and a 4-week fitness forecast.
+- **Reports:** weekly, monthly and custom ranges, with fitness and form, training load, a pace curve and a when-you-move heatmap.
+- **45 badges** in four tiers, from easy to extreme, plus streaks and personal records.
 
-## Device capabilities
+### Your data, your phone
+- **Stays on your phone:** everything is stored on your phone, and accounts are local.
+- **Health Connect is optional:** Kadamm can add steps and heart rate from Samsung Health, Zepp, Google Fit and others, and import months of past walks. Switch it off and Kadamm counts on its own.
+- **No double counting:** step sources are never added together; Kadamm takes the most complete count.
+- **Nothing made up:** when a sensor isn't available, Kadamm shows it as unavailable instead of guessing.
 
-- Outdoor recording requires location permission and an enabled location provider.
-- All-day step counting and indoor recording require Android activity recognition permission and a hardware step counter (indoor sessions can also use a step detector).
-- Health Connect requires the provider to be installed and updated, plus user-granted step access.
-- OpenStreetMap tiles require internet access. Route records and activity history remain stored on device.
+## Install and update
+
+1. **Install:** download `Kadamm-<version>.apk` from the [latest release](https://github.com/vrajchauhan10/Kadamm/releases/latest) and open it, allowing installs from your browser when Android asks.
+2. **Update:** from 9.2 on, Kadamm checks for new versions itself and offers **Update now**. Your sessions and settings stay.
+
+## Build from source
+
+`./build.sh` builds with the bundled toolchain in `tools/android-build` (JDK 17, Android SDK 35, Gradle 8.9) and writes `releases/kadamm-v<version>.apk`; `./build.sh install` also installs it on a USB-connected phone. `./release.sh` publishes the current version as a GitHub release. The application id stays `com.stride.run`, so updates keep installed data. See [CHANGELOG.md](CHANGELOG.md) for every version.
+
+<sub>Map data © OpenStreetMap contributors. Crafted by V.</sub>
