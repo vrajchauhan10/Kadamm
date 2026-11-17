@@ -1,5 +1,11 @@
 # Changelog
 
+## 9.2 (versionCode 45)
+
+- No notification before 100 steps: when Android notices walking, Kadamm quietly checks the step counter every 75 seconds (up to 6 minutes) with nothing on screen, and only starts the session once you pass 100 steps, back-dated to when you started and keeping those steps.
+- Sitting breaks reads plainly: where you are now ("Sitting for 42 min" or "Moving now"), one sentence about the day, three labelled numbers, and a list of each sit with its times and length.
+- Updates for everyone (like Aalap): Kadamm checks its GitHub releases, offers a newer version on opening (once a day), on Profile and by notification every 3 days, downloads it, checks it's Kadamm, newer and signed with the same key, and opens Android's installer; all data stays. `release.sh` publishes a version as a GitHub release.
+
 ## 9.1 (versionCode 44)
 
 - Kadamm Trainer (Trainer.java; Profile → Kadamm Trainer and a Home card): six stages from Starter to 10K runner, worked out from the last three weeks with a checklist for the next one; today's workout with a pace range from your pace zones, the reason, and Start; a 7-day plan per stage, ticked from your sessions, eased when you're tired (form below −20 or load above 1.5) and nudged up when fresh; a 4-week fitness forecast with and without the plan; week-steps and month-challenge projections; coach's notes from your data.

@@ -11,7 +11,7 @@ Native Android walk/run tracker (app id `com.stride.run`, originally "Stride"). 
 
 ## Releasing a change
 
-Every round of changes gets a new version: bump `version.properties`, set `APP_VERSION` in `MainActivity.java` to match, add a `CHANGELOG.md` entry, and keep the old APKs in `releases/`. Keep the application id and debug signing key so updates preserve installed data.
+Every round of changes gets a new version: bump `version.properties`, set `APP_VERSION` in `MainActivity.java` to match, add a `CHANGELOG.md` entry, and keep the old APKs in `releases/`. Bump the version before the first build of a round, so the previous APK isn't overwritten. `./release.sh` publishes the version as a GitHub release (asset `Kadamm-<version>.apk`), which installed apps (9.2+) offer as an update. Keep the application id and debug signing key so updates preserve installed data.
 
 ## Code map
 

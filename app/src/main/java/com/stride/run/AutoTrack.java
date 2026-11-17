@@ -53,6 +53,41 @@ final class AutoTrack {
         }catch(SecurityException ignored){}
     }
 
+    /**
+     * The silent check before a session: when Android sees walking, Kadamm notes the step counter and looks again
+     * every 75 seconds for up to 6 minutes, showing nothing. Once 100 steps are taken it starts the real session,
+     * back-dated to when the walking began and keeping those steps. If walking stops first, nothing happens.
+     */
+    static final long CHECK_EVERY_MS=75000L,CHECK_FOR_MS=6*60000L;
+    private static PendingIntent checkIntent(Context c){return PendingIntent.getBroadcast(c,10,new Intent(c,Check.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);}
+    static void scheduleCheck(Context c){
+        android.app.AlarmManager am=c.getSystemService(android.app.AlarmManager.class);if(am==null)return;
+        am.setAndAllowWhileIdle(android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP,android.os.SystemClock.elapsedRealtime()+CHECK_EVERY_MS,checkIntent(c));
+    }
+    static void clearCandidate(Context c){
+        c.getSharedPreferences("stride_state",Context.MODE_PRIVATE).edit().remove("candidateAt").remove("candidateBase").apply();
+        android.app.AlarmManager am=c.getSystemService(android.app.AlarmManager.class);if(am!=null)am.cancel(checkIntent(c));
+    }
+    public static class Check extends BroadcastReceiver {
+        @Override public void onReceive(Context c,Intent i){
+            SharedPreferences st=c.getSharedPreferences("stride_state",Context.MODE_PRIVATE);long at=st.getLong("candidateAt",0);
+            if(at<=0||st.getBoolean("active",false)||!enabled(c)){clearCandidate(c);return;}
+            PendingResult pr=goAsync();
+            DaySteps.sample(c,()->{
+                try{
+                    long now=System.currentTimeMillis(),raw=DaySteps.rawCounter(c),base=st.getLong("candidateBase",raw);long steps=raw>=base?raw-base:raw;
+                    if(steps>=SessionRules.MIN_STEPS){
+                        String type=st.getString("candidateType","Walk");clearCandidate(c);
+                        st.edit().putString("activityMode","outdoor").putString("activityType",type).apply();
+                        Intent start=new Intent(c,RecorderService.class).setAction(RecorderService.ACTION_START).putExtra("auto",true).putExtra("type",type).putExtra("preSteps",(int)steps).putExtra("preMs",now-at);
+                        try{if(Build.VERSION.SDK_INT>=26)c.startForegroundService(start);else c.startService(start);}catch(Exception ignored){}
+                    }else if(now-at<CHECK_FOR_MS)scheduleCheck(c);
+                    else clearCandidate(c);
+                }finally{pr.finish();}
+            });
+        }
+    }
+
     /** Receives walking/running transitions, and re-registers after a reboot or app update. */
     public static class Receiver extends BroadcastReceiver {
         @Override public void onReceive(Context c,Intent i){
@@ -61,8 +96,10 @@ final class AutoTrack {
             if(!enabled(c)||!ActivityTransitionResult.hasResult(i))return;
             ActivityTransitionResult result=ActivityTransitionResult.extractResult(i);if(result==null)return;
             for(ActivityTransitionEvent e:result.getTransitionEvents()){
+                if(e.getTransitionType()==ActivityTransition.ACTIVITY_TRANSITION_EXIT){clearCandidate(c);continue;}
                 if(e.getTransitionType()!=ActivityTransition.ACTIVITY_TRANSITION_ENTER)continue;
                 android.content.SharedPreferences st=c.getSharedPreferences("stride_state",Context.MODE_PRIVATE);
+                if(e.getActivityType()==DetectedActivity.IN_VEHICLE)clearCandidate(c);
                 if(e.getActivityType()==DetectedActivity.IN_VEHICLE){
                     if(st.getBoolean("active",false)&&st.getBoolean("autoSession",false))try{c.startService(new Intent(c,RecorderService.class).setAction(RecorderService.ACTION_STOP));}catch(Exception ignored){}
                     return;
@@ -73,13 +110,10 @@ final class AutoTrack {
                 long dropped=st.getLong("autoDroppedAt",0);
                 if(System.currentTimeMillis()-dropped<10*60000L&&DaySteps.todayTotal(c)-st.getLong("autoDroppedSteps",0)<30)return;
                 String type=e.getActivityType()==DetectedActivity.RUNNING?"Run":"Walk";
-                c.getSharedPreferences("stride_state",Context.MODE_PRIVATE).edit().putString("activityMode","outdoor").putString("activityType",type).apply();
-                try{
-                    Intent start=new Intent(c,RecorderService.class).setAction(RecorderService.ACTION_START).putExtra("auto",true).putExtra("type",type);
-                    if(Build.VERSION.SDK_INT>=26)c.startForegroundService(start);else c.startService(start);
-                }catch(Exception ignored){
-                    // Android refused a background start (battery optimisation on): the next transition will retry.
-                }
+                if(st.getLong("candidateAt",0)>0&&System.currentTimeMillis()-st.getLong("candidateAt",0)<CHECK_FOR_MS)return;
+                // Not a session yet: note the step counter and check back quietly, with no notification.
+                PendingResult pr=goAsync();
+                DaySteps.sample(c,()->{st.edit().putLong("candidateAt",System.currentTimeMillis()).putLong("candidateBase",DaySteps.rawCounter(c)).putString("candidateType",type).apply();scheduleCheck(c);pr.finish();});
                 return;
             }
         }

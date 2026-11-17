@@ -149,6 +149,8 @@ final class DaySteps {
     }
     /** Minutes since you last walked (10+ steps), or -1 if unknown. */
     static long stillMinutes(Context c){long a=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getLong("activeAt",0);return a<=0?-1:(System.currentTimeMillis()-a)/60000;}
+    /** The phone step counter's last raw reading (since boot), or 0. */
+    static long rawCounter(Context c){return c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getLong("lastCounter",0);}
     /** Whether Health Connect's step figures are used at all (Settings: Step sources). Off means Kadamm counts on its own. */
     static boolean hcSteps(Context c){return c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getBoolean("hcSteps",true);}
     private static void prune(JSONObject days){

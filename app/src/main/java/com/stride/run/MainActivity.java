@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="9.1";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="9.2";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -585,6 +585,7 @@ public class MainActivity extends Activity {
         profileLink(links,"Kadamm Trainer","Your stage, today's workout and the week ahead",R.drawable.ic_bolt,teal(),()->navigate("Trainer"));profileLink(links,"Import history","Walks, runs and steps from Samsung Health, Zepp, Google Fit",R.drawable.ic_download,indigo(),()->navigate("Import"));profileLink(links,"Activity calendar","Your days and sessions",R.drawable.ic_calendar,purple(),()->navigate("History"));
         profileLink(links,"Share Kadamm","Send the app to a friend",R.drawable.ic_share,lime,this::shareApp);
         renderAccount();
+        renderAppVersion();
         LinearLayout appearance=card();appearance.addView(tx("Appearance",16,ink,true));appearance.addView(tx("Choose how Kadamm looks on this device.",12,muted,false));String selected=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("themeMode","system");LinearLayout choices=row();LinearLayout.LayoutParams chp=lp(-1,42);chp.topMargin=dp(12);appearance.addView(choices,chp);for(String mode:new String[]{"Light","Dark","System"}){boolean active=mode.equalsIgnoreCase(selected);Button b=button(mode,active?lime:raised,active?accentOn:ink);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(0,-1,1);if(choices.getChildCount()>0)bp.leftMargin=dp(7);choices.addView(b,bp);b.setOnClickListener(v->{if(mode.toLowerCase(Locale.US).equals(selected))return;confirmChange("Switch to "+mode.toLowerCase(Locale.US)+" theme?","Kadamm will redraw in the "+mode.toLowerCase(Locale.US)+" theme.",()->{getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("themeMode",mode.toLowerCase(Locale.US)).apply();applyTheme();renderPage();},null);});}
     }
     private void changePassword(){
@@ -758,6 +759,37 @@ public class MainActivity extends Activity {
                 if(note!=null&&note.contains("Allow"))b.setNeutralButton("Open permissions",(d,w)->startActivity(new Intent(MainActivity.this,HealthConnectActivity.class)));
                 b.show();SessionMetrics.warm(MainActivity.this,history());renderPageNow();}
         });
+    }
+    // ---- App updates (from Kadamm's GitHub releases, like Aalap) ----
+    private static boolean updateChecked;
+    /** Once per app start: offers a newer Kadamm on opening, at most once a day for the same version. */
+    private void checkForUpdateOnce(){
+        if(updateChecked)return;updateChecked=true;
+        AppUpdate.check(this,false,(r,ok)->{if(r!=null&&AppUpdate.offerOnLaunch(this,r.version)&&resumed&&authLayer==null)showUpdate(r);if("Profile".equals(page))renderPageNow();});
+    }
+    private void showUpdate(AppUpdate.Release r){
+        String notes=AppUpdate.notesPreview(r);
+        dialog().setTitle("Kadamm "+r.version+" is available").setMessage("You have "+AppUpdate.current(this)+". Updating keeps all your sessions, steps and settings."+(notes.isEmpty()?"":"\n\nWhat's new\n"+notes)).setNegativeButton("Later",null).setPositiveButton("Update now",(d,w)->startUpdate(r)).show();
+    }
+    private void startUpdate(AppUpdate.Release r){
+        if(!AppUpdate.canInstall(this)){dialog().setTitle("Allow Kadamm to install updates").setMessage("Android asks once: turn on \"Allow from this source\" for Kadamm on the next screen, then come back and tap Update now again.").setNegativeButton("Cancel",null).setPositiveButton("Open setting",(d,w)->AppUpdate.askInstallPermission(this)).show();return;}
+        LinearLayout box=col();box.setPadding(dp(22),dp(14),dp(22),dp(6));TextView msg=tx("Downloading… 0%",14,ink,false);box.addView(msg);
+        ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(100);bar.setProgressTintList(android.content.res.ColorStateList.valueOf(lime));LinearLayout.LayoutParams bp=lp(-1,10);bp.topMargin=dp(12);box.addView(bar,bp);
+        AlertDialog wait=dialog().setTitle("Updating to "+r.version).setView(box).setCancelable(false).create();wait.show();
+        AppUpdate.download(this,r,pc->{bar.setProgress(pc);msg.setText(pc>=100?"Checking the download…":"Downloading… "+pc+"%");},(apk,problem)->{
+            wait.dismiss();if(problem!=null){dialog().setTitle("Update not installed").setMessage(problem).setPositiveButton("OK",null).show();return;}
+            try{AppUpdate.install(this,apk);}catch(Exception e){toast("Couldn't open the installer");}
+        });
+    }
+    /** Profile: this version, and an update when there is one. */
+    private void renderAppVersion(){
+        AppUpdate.Release r=AppUpdate.known(this);LinearLayout c=card();
+        LinearLayout row=row();c.addView(row,lp(-1,-2));android.widget.ImageView ic=icon(R.drawable.ic_download,r!=null?accentOn:muted,9);ic.setBackground(shape(r!=null?lime:raised,12));row.addView(ic,lp(40,40));
+        LinearLayout l=col();LinearLayout.LayoutParams lp2=new LinearLayout.LayoutParams(0,-2,1);lp2.leftMargin=dp(12);row.addView(l,lp2);
+        l.addView(tx(r!=null?"Kadamm "+r.version+" is available":"Kadamm "+AppUpdate.current(this),15,ink,true));
+        l.addView(tx(r!=null?"You have "+AppUpdate.current(this)+" · your data stays":AppUpdate.fresh(this)?"Up to date":"Checking for updates…",11,r!=null?lime:muted,false));
+        if(r!=null){Button b=button("Update now",lime,accentOn);LinearLayout.LayoutParams bp=lp(-1,46);bp.topMargin=dp(12);c.addView(b,bp);b.setOnClickListener(v->startUpdate(r));}
+        else{TextView chk=tx("Check now",12,lime,true);chk.setPadding(dp(10),dp(6),0,dp(6));row.addView(chk);chk.setOnClickListener(v->{toast("Checking…");AppUpdate.check(this,true,(x,ok)->{if(!ok)toast("Couldn't reach GitHub");else if(x==null)toast("You're on the latest version");renderPageNow();if(x!=null)showUpdate(x);});});}
     }
     private String summaryDay;
     /** All of a day's routes as one route, each session starting after a gap. */
@@ -1194,7 +1226,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         try{HealthSync.refresh(this,()->{StepsWidget.refresh(this);if(resumed&&!dragging&&("Health".equals(page)||"Today".equals(page))){int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));}syncing=false;});}catch(Throwable ignored){}
     }
     @Override protected void onResume(){
-        super.onResume();resumed=true;handler.removeCallbacks(refresh);handler.post(refresh);startStepCounting();refreshHealth(true);handler.postDelayed(()->SessionMetrics.warm(this,history()),1500);
+        super.onResume();resumed=true;checkForUpdateOnce();handler.removeCallbacks(refresh);handler.post(refresh);startStepCounting();refreshHealth(true);handler.postDelayed(()->SessionMetrics.warm(this,history()),1500);
         if(content!=null&&(("Today".equals(page)&&stepSetupShown&&DaySteps.permitted(this))||"Health".equals(page)||"Notifications".equals(page)||"Permissions".equals(page)||"Auto".equals(page)||"Storage".equals(page)))renderPageNow();
     }
     @Override protected void onPause(){
@@ -1607,7 +1639,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     /** Tapping the live notification (also from the lock screen) brings up the live session screen. */
     /** From the session-summary notification: open that day in History, and share it when asked. */
     private void handleDayIntent(Intent intent){
-        if(intent==null)return;String day=intent.getStringExtra("openDay");if(day==null)return;
+        if(intent==null)return;if(intent.getBooleanExtra("offerUpdate",false)){intent.removeExtra("offerUpdate");handler.postDelayed(()->{AppUpdate.Release r=AppUpdate.known(this);if(r!=null)showUpdate(r);},700);}String day=intent.getStringExtra("openDay");if(day==null)return;
         openDays.add(day);summaryDay=day;page="DaySummary";String share=intent.getStringExtra("shareDay");intent.removeExtra("openDay");intent.removeExtra("shareDay");
         if(share!=null)handler.postDelayed(()->shareDay(share),600);
     }
@@ -1981,20 +2013,35 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     private void renderSittingBreaks(){
         java.util.List<int[]> sits=DaySteps.sitsToday(this);Calendar now=Calendar.getInstance();int nowMin=now.get(Calendar.HOUR_OF_DAY)*60+now.get(Calendar.MINUTE);
         long still=DaySteps.stillMinutes(this);if(sits.isEmpty()&&still<0)return;
-        boolean resting=nowMin<420||nowMin>=1380;
-        // A stretch still going on counts too, from Kadamm's live readings.
-        if(!resting&&still>=30){java.util.List<int[]> all=new java.util.ArrayList<>(sits);int st0=(int)Math.max(420,nowMin-still);all.add(new int[]{st0,nowMin-st0,1});sits=all;}
-        int longSits=0,longest=0,breaks=0;for(int[] x:sits){if(x[1]>=60)longSits++;longest=Math.max(longest,x[1]);if(x.length<3)breaks++;}
-        LinearLayout c=metricCard("SITTING BREAKS","today","A break is each time you got up and walked (10 or more steps) after sitting or standing still for 30 minutes or more, between 7 am and 11 pm. Research links long unbroken sitting with higher blood sugar and heart risk, even in people who exercise; getting up every 30–60 minutes helps.\n\n"+(DaySteps.minuteDays(this).optJSONObject(todayKey())!=null?"Times come from Samsung Health's minute steps through Health Connect.":"Times come from Kadamm's own step readings: a few minutes apart while Kadamm is open, up to 15 minutes when it's closed, so edges are approximate.")+"\n\nThe reminder comes after the time you choose in Notifications (an hour by default), during the hours you set.");
-        statGrid(c,new String[][]{{"Breaks",String.valueOf(breaks),""},{"Over an hour",String.valueOf(longSits),longSits==1?"sit":"sits"},{"Longest",longest>=60?String.format(Locale.US,"%dh %02d",longest/60,longest%60):longest+" min",""}},10);
-        if(!resting&&still>=20){TextView st=tx(String.format(Locale.US,"Still for %s now · a short walk resets it",still>=60?String.format(Locale.US,"%dh %02dm",still/60,still%60):still+" min"),12,still>=60?warning:muted,true);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(10);c.addView(st,sp);}
-        LinearLayout.LayoutParams lp1=lp(-1,46);lp1.topMargin=dp(10);c.addView(new MetricViews.SitLine(this,chartTheme(),sits,nowMin),lp1);
-        android.text.SpannableStringBuilder key=new android.text.SpannableStringBuilder();append(key,"■ ",MetricViews.ZONE_COLORS[3]);key.append("1 hour+   ");append(key,"■ ",MetricViews.alpha(muted,170));key.append("30–59 min   ");append(key,"■ ",MetricViews.alpha(MetricViews.ZONE_COLORS[2],120));key.append("moving");
-        TextView k=tx("",10,muted,false);k.setText(key);c.addView(k);
-        TextView verdict=tx(longSits==0?"No sit longer than an hour today. Nicely broken up.":longSits==1?"One sit went past an hour; try a 2-minute walk every 30–60 minutes.":longSits+" sits went past an hour; try a 2-minute walk every 30–60 minutes.",12,longSits==0?positive:ink,false);LinearLayout.LayoutParams vp=lp(-1,-2);vp.topMargin=dp(8);c.addView(verdict,vp);
+        boolean resting=nowMin<420||nowMin>=1380,sittingNow=!resting&&still>=20;
+        int longSits=0,longest=0,longIdx=-1;for(int i=0;i<sits.size();i++){int[] x=sits.get(i);if(x[1]>=60)longSits++;if(x[1]>longest){longest=x[1];longIdx=i;}}
+        int breaks=sits.size();int stillNow=(int)Math.max(0,still);if(sittingNow&&stillNow>longest){longest=stillNow;longIdx=-2;}
+        LinearLayout c=metricCard("SITTING BREAKS","today","A sit is 30 minutes or more without walking (fewer than 10 steps), between 7 am and 11 pm. A break is when you get up and walk after one. Long unbroken sitting raises blood sugar and heart risk even in people who exercise; standing up and walking for 2 minutes every 30–60 minutes helps.\n\n"+(DaySteps.minuteDays(this).optJSONObject(todayKey())!=null?"Times come from Samsung Health's minute steps through Health Connect.":"Times come from Kadamm's own step readings, so start and end can be a few minutes off."));
+        // Right now
+        String head=sittingNow?"Sitting for "+mins(stillNow):still>=0&&!resting?(still<2?"Moving now":"Last moved "+mins(stillNow)+" ago"):"Resting hours";
+        int headCol=sittingNow?(stillNow>=60?critical:warning):positive;
+        TextView h=tx(head,22,headCol,true);LinearLayout.LayoutParams hp=lp(-1,-2);hp.topMargin=dp(4);c.addView(h,hp);
+        c.addView(tx(sittingNow?(stillNow>=60?"Over an hour: stand up and walk for 2 minutes now.":"Try to get up before it reaches an hour."):"Getting up every 30–60 minutes is the healthy rhythm.",12,muted,false));
+        // Summary sentence
+        String sum=breaks==0?"No long sits finished yet today.":"Today you got up "+breaks+(breaks==1?" time":" times")+" after sitting a while."+(longest>0?" Your longest sit was "+mins(longest)+(longIdx>=0?" ("+clock12(sits.get(longIdx)[0])+"–"+clock12(sits.get(longIdx)[0]+sits.get(longIdx)[1])+")":" (still going)")+".":"")+(longSits==0?" None went past an hour. Good.":" "+longSits+(longSits==1?" went":" went")+" past an hour.");
+        TextView st=tx(sum,13,ink,false);st.setLineSpacing(dp(2),1f);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(12);c.addView(st,sp);
+        statGrid(c,new String[][]{{"Breaks taken",String.valueOf(breaks),""},{"Sits over 1 hour",String.valueOf(longSits),""},{"Longest sit",longest>0?mins(longest):"—",""}},12);
+        // Each sit, as a time range with a bar for its length
+        if(!sits.isEmpty()){
+            TextView lh=tx("YOUR SITS TODAY",10,muted,true);lh.setLetterSpacing(.06f);LinearLayout.LayoutParams lhp=lp(-1,-2);lhp.topMargin=dp(16);c.addView(lh,lhp);
+            int maxLen=60;for(int[] x:sits)maxLen=Math.max(maxLen,x[1]);
+            for(int[] x:sits){
+                LinearLayout r=row();r.setPadding(0,dp(8),0,0);c.addView(r,lp(-1,-2));
+                r.addView(tx(clock12(x[0])+" – "+clock12(x[0]+x[1]),12,ink,false),lp(130,-2));
+                FrameLayout track=new FrameLayout(this);track.setBackground(shape(raised,4));r.addView(track,new LinearLayout.LayoutParams(0,dp(8),1));
+                View fill=new View(this);fill.setBackground(shape(x[1]>=60?MetricViews.ZONE_COLORS[3]:MetricViews.alpha(muted,170),4));track.addView(fill,new FrameLayout.LayoutParams(0,-1));final float f=(float)x[1]/maxLen;track.post(()->{FrameLayout.LayoutParams fl=(FrameLayout.LayoutParams)fill.getLayoutParams();fl.width=(int)(track.getWidth()*f);fill.setLayoutParams(fl);});
+                TextView len=tx(mins(x[1]),12,x[1]>=60?MetricViews.ZONE_COLORS[3]:muted,true);len.setGravity(Gravity.END);r.addView(len,lp(64,-2));
+            }
+        }
         boolean remind=Reminders.inactiveOn(this);int after=Reminders.get(this,"remAfter",Reminders.DEF_AFTER);
-        TextView rem=tx((remind?"🔔  Reminder after "+(after%60==0?after/60+(after==60?" hour":" hours"):after+" min")+" still · change":"🔕  Sitting reminder is off · turn on")+"  ›",12,lime,true);rem.setPadding(0,dp(10),0,dp(2));rem.setOnClickListener(v->navigate("Notifications"));c.addView(rem);
+        TextView rem=tx((remind?"Reminder after "+mins(after)+" still · change":"Sitting reminder is off · turn on")+"  ›",12,lime,true);rem.setPadding(0,dp(14),0,dp(2));rem.setOnClickListener(v->navigate("Notifications"));c.addView(rem);
     }
+    private String mins(long m){return m>=60?(m%60==0?(m/60)+(m/60==1?" hour":" hours"):String.format(Locale.US,"%dh %02dm",m/60,m%60)):m+" min";}
     /** Home: today's steps hour by hour as a dot matrix, from Kadamm's own step counting (Health Connect's hours when that is on and fuller). */
     private void renderStepsByHour(){
         String today=todayKey();double[] own=DaySteps.hoursOn(this,today),hc=null;
