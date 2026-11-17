@@ -28,7 +28,7 @@ final class AutoTrack {
     static SharedPreferences s(Context c){return c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE);}
     static boolean enabled(Context c){return s(c).getBoolean("autoTrack",false);}
     /** Minutes without movement before any session finishes by itself; 0 turns it off. */
-    static int stopAfterMin(Context c){return s(c).getInt("autoStopMin",5);}
+    static int stopAfterMin(Context c){return s(c).getInt("autoStopMin",3);}
     static boolean backgroundLocation(Context c){
         return Build.VERSION.SDK_INT<29||c.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)==PackageManager.PERMISSION_GRANTED;
     }
@@ -43,6 +43,8 @@ final class AutoTrack {
         try{
             if(!enabled(c)){ActivityRecognition.getClient(c).removeActivityTransitionUpdates(intent(c));return;}
             List<ActivityTransition> t=new ArrayList<>();
+            // Getting into a vehicle finishes an automatic session; SessionRules then cuts the ride out.
+            t.add(new ActivityTransition.Builder().setActivityType(DetectedActivity.IN_VEHICLE).setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER).build());
             for(int type:new int[]{DetectedActivity.WALKING,DetectedActivity.RUNNING}){
                 t.add(new ActivityTransition.Builder().setActivityType(type).setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER).build());
                 t.add(new ActivityTransition.Builder().setActivityType(type).setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_EXIT).build());
@@ -60,7 +62,12 @@ final class AutoTrack {
             ActivityTransitionResult result=ActivityTransitionResult.extractResult(i);if(result==null)return;
             for(ActivityTransitionEvent e:result.getTransitionEvents()){
                 if(e.getTransitionType()!=ActivityTransition.ACTIVITY_TRANSITION_ENTER)continue;
-                if(c.getSharedPreferences("stride_state",Context.MODE_PRIVATE).getBoolean("active",false))return;
+                android.content.SharedPreferences st=c.getSharedPreferences("stride_state",Context.MODE_PRIVATE);
+                if(e.getActivityType()==DetectedActivity.IN_VEHICLE){
+                    if(st.getBoolean("active",false)&&st.getBoolean("autoSession",false))try{c.startService(new Intent(c,RecorderService.class).setAction(RecorderService.ACTION_STOP));}catch(Exception ignored){}
+                    return;
+                }
+                if(st.getBoolean("active",false))return;
                 String type=e.getActivityType()==DetectedActivity.RUNNING?"Run":"Walk";
                 c.getSharedPreferences("stride_state",Context.MODE_PRIVATE).edit().putString("activityMode","outdoor").putString("activityType",type).apply();
                 try{

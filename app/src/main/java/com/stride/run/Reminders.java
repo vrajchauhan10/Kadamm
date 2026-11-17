@@ -48,6 +48,12 @@ final class Reminders {
         if(c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getBoolean("notifySummary",true)&&minute>=sumAt&&!today.equals(steps.getString("summarySent",""))){
             steps.edit().putString("summarySent",today).apply();postSummary(c,34,"");return;
         }
+        // Session summary: the day's sessions added up, once a day from the chosen time (default 11 pm), only on days with sessions.
+        int sesAt=get(c,"sesAt",23*60);
+        if(c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getBoolean("notifySessions",true)&&minute>=sesAt&&!today.equals(steps.getString("sessionsSent",""))){
+            org.json.JSONArray hist=DaySteps.sessions(c);DaySummary d=DaySummary.of(c,hist,today);
+            if(d.sessions>0){steps.edit().putString("sessionsSent",today).apply();postSessions(c,today,d);return;}
+        }
         // Weekly report: Monday from 9 am, once per week.
         String weekKey=DaySteps.key(Progress.week(0).start.getTimeInMillis());
         if(c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getBoolean("notifyWeekly",true)&&cal.get(Calendar.DAY_OF_WEEK)==Calendar.MONDAY&&minute>=9*60&&!weekKey.equals(steps.getString("weeklySent",""))){
@@ -65,6 +71,18 @@ final class Reminders {
             String span=after>=60&&after%60==0?(after==60?"an hour":after/60+" hours"):after+" minutes";
             String[] m=Messages.pick(c,"move",Messages.MOVE,span);if(m!=null)post(c,32+Messages.countToday(c,"move"),m[0],Character.toUpperCase(m[1].charAt(0))+m[1].substring(1));
         }
+    }
+    /** The nightly session summary, with View (opens the day in History) and Share. */
+    static void postSessions(Context c,String day,DaySummary d){
+        String title="Today's sessions";String body=d.text("").trim();
+        PendingIntent view=PendingIntent.getActivity(c,71,new Intent(c,MainActivity.class).putExtra("page","History").putExtra("openDay",day),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent share=PendingIntent.getActivity(c,72,new Intent(c,MainActivity.class).putExtra("page","History").putExtra("openDay",day).putExtra("shareDay",day),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(c,CHANNEL):new Notification.Builder(c);
+        b.setSmallIcon(R.drawable.ic_stat_kadamm).setColor(Color.rgb(26,115,232)).setContentTitle(title).setContentText(d.headline())
+            .setStyle(new Notification.BigTextStyle().bigText(body)).setContentIntent(view).setAutoCancel(true)
+            .addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(c,R.drawable.ic_layers),"View",view).build())
+            .addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(c,R.drawable.ic_share),"Share",share).build());
+        NotificationManager nm=c.getSystemService(NotificationManager.class);if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CHANNEL,"Reminders",NotificationManager.IMPORTANCE_DEFAULT));nm.notify(35,b.build());
     }
     /** Posts one sample of every Kadamm notification, labelled as a preview, so the user can see them in advance. */
     static void preview(Context c){

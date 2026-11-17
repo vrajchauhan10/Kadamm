@@ -73,10 +73,11 @@ final class SessionMetrics {
     private SessionMetrics(long id){this.id=id;}
 
     // ---- Cache: sessions don't change once saved, apart from Health Connect extras ----
-    private static final Map<Long,Object[]> cache=new HashMap<>();
+    /** Bounded: the least recently used analyses are dropped past 250 sessions, so memory stays flat over years of use. */
+    private static final Map<Long,Object[]> cache=new java.util.LinkedHashMap<Long,Object[]>(64,.75f,true){@Override protected boolean removeEldestEntry(Map.Entry<Long,Object[]> e){return size()>250;}};
     private static String signature(JSONObject o){return o.optString("route","").length()+"/"+o.optString("timeline","").length()+"/"+o.optString("hr","").length()+"/"+o.optString("hcMin","").length()+"/"+o.optDouble("distanceKm")+"/"+o.optLong("steps")+"/"+o.optString("activityMode");}
     static SessionMetrics of(Context c,JSONObject o){
-        long id=o.optLong("id");String sig=signature(o)+"/"+settingsKey(c);
+        long id=o.optLong("id");String sig=signature(o)+"/"+settingsKey(c)+"/"+DaySteps.hcSteps(c);
         synchronized(cache){Object[] hit=cache.get(id);if(hit!=null&&sig.equals(hit[0]))return (SessionMetrics)hit[1];}
         if(appContext==null)appContext=c.getApplicationContext();SessionMetrics m=compute(c,o);
         synchronized(cache){cache.put(id,new Object[]{sig,m});}
@@ -109,8 +110,8 @@ final class SessionMetrics {
         x.steps=o.optLong("steps",0);x.stepsOk=o.optBoolean("stepsAvailable",false)&&x.steps>0;x.indoor="indoor".equals(o.optString("activityMode"));
         x.estimatedDistance=o.optBoolean("distanceEstimated",false)||x.indoor;x.vehicle=Insights.vehicle(o);
         x.run=o.optDouble("runDistanceKm",0)>Math.max(.05,x.km*.5)||"Run".equals(o.optString("type"));
-        if(x.movingS>0&&x.km>0){x.kmh=x.km/(x.movingS/3600d);x.paceMoving=x.movingS/x.km;}
-        if(x.elapsedS>0&&x.km>0)x.paceElapsed=x.elapsedS/x.km;
+        if(x.movingS>0&&x.km>=.05){x.kmh=x.km/(x.movingS/3600d);x.paceMoving=x.movingS/x.km;}
+        if(x.elapsedS>0&&x.km>=.05)x.paceElapsed=x.elapsedS/x.km;
 
         List<P> pts=points(o.optString("route","[]"));x.gps=!x.indoor&&pts.size()>=2;
         long[][] tl=timeline(o.optString("timeline","[]"));
@@ -121,7 +122,7 @@ final class SessionMetrics {
         if(!stepSeries.isEmpty())x.stepSource="Kadamm";
         else{
             // Older sessions: Samsung Health's per-minute steps, read through Health Connect, summed into a running total.
-            JSONArray hm=o.optJSONArray("hcMin");if(hm==null)try{String v=o.optString("hcMin","");if(!v.isEmpty())hm=new JSONArray(v);}catch(Exception ignored){}
+            JSONArray hm=DaySteps.hcSteps(c)?o.optJSONArray("hcMin"):null;if(hm==null&&DaySteps.hcSteps(c))try{String v=o.optString("hcMin","");if(!v.isEmpty())hm=new JSONArray(v);}catch(Exception ignored){}
             if(hm!=null&&hm.length()>=3){long cum=0;stepSeries.add(new long[]{Math.max(0,hm.optJSONArray(0).optLong(0)),0});
                 for(int i=0;i<hm.length();i++){JSONArray r=hm.optJSONArray(i);if(r==null)continue;cum+=r.optLong(1);stepSeries.add(new long[]{r.optLong(0)+60,cum});}
                 if(cum>0)x.stepSource="Health Connect";else stepSeries.clear();}

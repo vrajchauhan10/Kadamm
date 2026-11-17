@@ -69,7 +69,11 @@ object HealthSync {
         scope.launch {
             try {
                 val client = HealthConnectClient.getOrCreate(app)
-                if (client.permissionController.getGrantedPermissions().containsAll(readSteps)) sync(app, client)
+                val settings = app.getSharedPreferences("kadamm_settings", Context.MODE_PRIVATE)
+                val granted = client.permissionController.getGrantedPermissions()
+                // Step sources switched off: Kadamm counts on its own; only a watch's heart rate is still read.
+                if (!settings.getBoolean("hcSteps", true)) { if (settings.getBoolean("hcHeart", true)) heartOnly(app, client, granted) }
+                else if (granted.containsAll(readSteps)) sync(app, client)
                 else app.getSharedPreferences("kadamm_health", Context.MODE_PRIVATE).edit()
                     .putBoolean("healthConnected", false).apply()
             } catch (_: Exception) {
@@ -201,7 +205,7 @@ object HealthSync {
             val sessionsAll = JSONArray(history.getString("sessions", "[]"))
             val now = System.currentTimeMillis(); var changed = false
             val activeAllowed = granted.contains(HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class))
-            val hrAllowed = granted.contains(HealthPermission.getReadPermission(HeartRateRecord::class))
+            val hrAllowed = granted.contains(HealthPermission.getReadPermission(HeartRateRecord::class)) && context.getSharedPreferences("kadamm_settings", Context.MODE_PRIVATE).getBoolean("hcHeart", true)
             for (i in 0 until sessionsAll.length()) {
                 val s = sessionsAll.optJSONObject(i) ?: continue
                 val from = s.optLong("startTimeMs", 0L); val to = s.optLong("endTimeMs", 0L)
@@ -281,6 +285,20 @@ object HealthSync {
             s.put("hrChecked", true)
         } catch (_: Exception) {
         }
+    }
+
+    /** Heart rate for recent sessions only, when step sharing is off but heart rate is on. */
+    private suspend fun heartOnly(context: Context, hc: HealthConnectClient, granted: Set<String>) {
+        if (!granted.contains(HealthPermission.getReadPermission(HeartRateRecord::class))) return
+        val history = context.getSharedPreferences("kadamm_history", Context.MODE_PRIVATE)
+        val all = JSONArray(history.getString("sessions", "[]")); val now = System.currentTimeMillis(); var changed = false
+        for (i in 0 until all.length()) {
+            val s = all.optJSONObject(i) ?: continue
+            val from = s.optLong("startTimeMs", 0L); val to = s.optLong("endTimeMs", 0L)
+            if (to <= from || now - to > 30L * 86400000L || s.optBoolean("hrChecked", false) || now - to < 30L * 60000L) continue
+            heartRate(hc, s, TimeRangeFilter.between(Instant.ofEpochMilli(from), Instant.ofEpochMilli(to)), from); changed = true
+        }
+        if (changed) history.edit().putString("sessions", all.toString()).apply()
     }
 
     /** {seconds since start, steps in that minute} for a session, from Health Connect's per-minute step totals. */

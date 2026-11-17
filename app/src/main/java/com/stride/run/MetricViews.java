@@ -210,6 +210,75 @@ final class MetricViews {
         }
     }
 
+    /**
+     * Today's steps as a dot matrix: one column per hour, one dot per step unit (chosen so the busiest hour is
+     * at most 12 dots tall). Dots warm from the accent to amber as an hour gets busier; the peak hour carries a
+     * label, the current hour a ring underneath. Touch a column to read that hour.
+     */
+    static final class DotDay extends Base {
+        private final double[] h;private final int nowHour,accent;private int picked=-1;
+        DotDay(Context c,KadammTheme t,double[] hours,int nowHour,int accent){super(c,t);h=hours;this.nowHour=nowHour;this.accent=accent;setContentDescription("Steps by hour today. Touch a column to read it.");}
+        int unit(){double mx=0;for(double v:h)mx=Math.max(mx,v);int u=50;while(mx/u>12)u+=50;return u;}
+        private float downX,downY;private boolean reading;
+        /** A tap reads one hour; a sideways drag scrubs. A vertical drag is left to the page so it still scrolls. */
+        @Override public boolean onTouchEvent(android.view.MotionEvent e){
+            float slot=(getWidth()-dp(4))/24f;int k=(int)Math.max(0,Math.min(23,(e.getX()-dp(2))/slot));int a=e.getActionMasked();
+            if(a==android.view.MotionEvent.ACTION_DOWN){downX=e.getX();downY=e.getY();reading=false;return true;}
+            if(a==android.view.MotionEvent.ACTION_MOVE){float dx=Math.abs(e.getX()-downX),dy=Math.abs(e.getY()-downY);
+                if(!reading&&dy>dp(8)&&dy>dx)return false;
+                if(!reading&&dx>dp(8)){reading=true;RouteView.gestureActive=true;if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);}}
+            if(reading||a==android.view.MotionEvent.ACTION_UP){if(k!=picked){picked=k;performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);invalidate();}}
+            if(a==android.view.MotionEvent.ACTION_UP||a==android.view.MotionEvent.ACTION_CANCEL){reading=false;RouteView.gestureActive=false;}
+            return true;
+        }
+        @Override protected void onDraw(Canvas c){
+            float w=getWidth(),hgt=getHeight(),top=dp(30),bottom=hgt-dp(18),slot=(w-dp(4))/24f,r=Math.min(slot*.32f,dp(3.6f)),gap=r*2.6f;int u=unit();
+            int peak=0;for(int i=1;i<24;i++)if(h[i]>h[peak])peak=i;
+            int rows=(int)Math.floor((bottom-top)/gap);
+            for(int i=0;i<24;i++){
+                float cx=dp(2)+slot*i+slot/2;int dots=(int)Math.round(h[i]/u);if(h[i]>0&&dots==0)dots=1;dots=Math.min(dots,rows);
+                boolean future=i>nowHour;
+                p.setColor(future?alpha(t.border,120):alpha(t.textMuted,50));c.drawCircle(cx,bottom-r,r*.55f,p);
+                for(int d=0;d<dots;d++){float f=(float)d/Math.max(1,rows-1);int col=blendC(accent,ZONE_COLORS[3],Math.min(1,f*1.4f));p.setColor(i==picked||picked<0?col:alpha(col,110));c.drawCircle(cx,bottom-r-d*gap,r,p);}
+                if(i==nowHour){p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(1.2f));p.setColor(t.text);c.drawCircle(cx,bottom-r,r+dp(2.2f),p);p.setStyle(Paint.Style.FILL);}
+            }
+            p.setTextSize(dp(9.5f));p.setColor(t.textMuted);p.setTextAlign(Paint.Align.CENTER);String[] l={"12a","6a","12p","6p","12a"};for(int i=0;i<5;i++)c.drawText(l[i],dp(2)+slot*(i*6)+(i==4?-slot/2:slot/2),hgt-dp(3),p);
+            int show=picked>=0?picked:h[peak]>0?peak:-1;
+            if(show>=0){String txt=(picked>=0?"":"Peak ")+hourName(show)+" · "+String.format(Locale.US,"%,d",Math.round(h[show]))+" steps";
+                p.setTextSize(dp(11));p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));float tw=p.measureText(txt)+dp(16);float cx=dp(2)+slot*show+slot/2,bx=Math.max(0,Math.min(w-tw,cx-tw/2));
+                p.setColor(picked>=0?t.text:ZONE_COLORS[3]);c.drawRoundRect(new RectF(bx,dp(2),bx+tw,dp(24)),dp(12),dp(12),p);p.setColor(picked>=0?t.background:Color.rgb(60,36,0));p.setTextAlign(Paint.Align.LEFT);c.drawText(txt,bx+dp(8),dp(17),p);p.setTypeface(null);}
+            p.setTextAlign(Paint.Align.LEFT);
+        }
+        static String hourName(int hr){int a=hr%12==0?12:hr%12,b=(hr+1)%12==0?12:(hr+1)%12;return a+"–"+b+((hr+1)%24<12?" am":" pm");}
+    }
+
+    /**
+     * Kadamm's gradient view: the walk drawn as one hill. The climb rises on the left, the flat stretch is the
+     * plateau and the descent falls on the right, each as wide as its share of time, with % and time under it.
+     */
+    static final class Terrain extends Base {
+        private final long up,flat,down;
+        Terrain(Context c,KadammTheme t,long up,long flat,long down){super(c,t);this.up=up;this.flat=flat;this.down=down;}
+        @Override protected void onDraw(Canvas c){
+            float w=getWidth(),h=getHeight(),base=h-dp(46),top=dp(10);double tot=Math.max(1,up+flat+down);
+            float wu=(float)(w*up/tot),wf=(float)(w*flat/tot),wd=w-wu-wf,mid=top+dp(14);
+            int[] cs={ZONE_COLORS[4],ZONE_COLORS[3],ZONE_COLORS[1]};
+            p.setColor(alpha(t.border,255));c.drawRect(0,base,w,base+dp(2),p);
+            Path u=new Path();u.moveTo(0,base);u.cubicTo(wu*.5f,base,wu*.6f,mid,wu,mid);u.lineTo(wu,base);u.close();
+            Path f=new Path();f.moveTo(wu,base);f.lineTo(wu,mid);f.lineTo(wu+wf,mid);f.lineTo(wu+wf,base);f.close();
+            Path d=new Path();d.moveTo(wu+wf,base);d.lineTo(wu+wf,mid);d.cubicTo(wu+wf+wd*.4f,mid,wu+wf+wd*.5f,base,w,base);d.close();
+            Path[] parts={u,f,d};
+            for(int i=0;i<3;i++){p.setColor(Color.BLACK);p.setShader(new LinearGradient(0,mid,0,base,cs[i],alpha(cs[i],t.dark?60:40),Shader.TileMode.CLAMP));c.drawPath(parts[i],p);p.setShader(null);}
+            Path ridge=new Path();ridge.moveTo(0,base);ridge.cubicTo(wu*.5f,base,wu*.6f,mid,wu,mid);ridge.lineTo(wu+wf,mid);ridge.cubicTo(wu+wf+wd*.4f,mid,wu+wf+wd*.5f,base,w,base);
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(2.5f));p.setStrokeCap(Paint.Cap.ROUND);p.setColor(t.text);c.drawPath(ridge,p);p.setStyle(Paint.Style.FILL);
+            String[] names={"↗ Uphill","→ Flat","↘ Downhill"};long[] v={up,flat,down};float[] cx={wu/2,wu+wf/2,wu+wf+wd/2};
+            cx[0]=Math.max(dp(36),Math.min(cx[0],cx[1]-dp(76)));cx[2]=Math.min(w-dp(40),Math.max(cx[2],cx[1]+dp(76)));
+            for(int i=0;i<3;i++){p.setTextAlign(Paint.Align.CENTER);p.setTextSize(dp(11));p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));p.setColor(cs[i]);c.drawText(names[i]+"  "+Math.round(v[i]*100/tot)+"%",cx[i],base+dp(20),p);
+                p.setTypeface(null);p.setTextSize(dp(10));p.setColor(t.textMuted);c.drawText(mmss(v[i]),cx[i],base+dp(36),p);}
+            p.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+
     /** Tier colours for badges: bronze (easy), silver (medium), gold (hard), amethyst (extreme). */
     static final int[][] TIER={{Color.rgb(214,140,86),Color.rgb(140,78,40)},{Color.rgb(214,222,232),Color.rgb(120,132,148)},{Color.rgb(255,214,92),Color.rgb(196,128,8)},{Color.rgb(196,140,255),Color.rgb(98,42,190)}};
     static final String[] TIER_NAMES={"Easy","Medium","Hard","Extreme"};

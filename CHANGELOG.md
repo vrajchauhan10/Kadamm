@@ -1,5 +1,17 @@
 # Changelog
 
+## 8.6 (versionCode 39)
+
+- Smart sessions (SessionRules): a session needs 100 steps to be saved (shorter ones still count toward the day); vehicle stretches (15 km/h+ with almost no steps) are cut from any session and pure rides dropped; an automatic session with no steps after 2 minutes is discarded and getting into a vehicle closes it; stepping in place (treadmill, shop) is counted as indoor walking, and a session that is mostly that becomes an indoor session.
+- Auto-close replaces waiting on Pause: any session (paused or not) closes after 2, 3, 5 or 10 idle minutes (default 3), changeable on the live screen with a countdown; Finish is always visible.
+- Health Connect can be switched off: "Use Health Connect steps" and "Heart rate from a watch" switches; with steps off Kadamm counts only with the phone sensor and sessions.
+- Every settings change asks to confirm: goal cards hold changes until Save, choices and theme ask first, switches revert on Cancel.
+- Home: tab renamed Home, header "Today's insights"; new "Steps through the day" dot-matrix chart (Kadamm's own hourly counting, Health Connect when fuller), tap or slide to read an hour.
+- Readable numbers: pace shows "—" under 50 m or slower than 60 min/km; every ⓘ has a "How to read it" guide for its units.
+- Elevation's gradient is now a "Terrain" hill drawing (climb, plateau, descent) instead of a donut.
+- Sessions by day moved into History (Home's "Your sessions" opens it); an open day shows a Day summary (totals and averages) with Share; nightly "Today's sessions" notification at a chosen time (default 11 pm) with View and Share; History offers to tidy up old sessions under 100 steps or rides (asks first).
+- Lighter in the background: the 1-second screen refresh stops when Kadamm isn't on screen, the recorder writes the route only when it changes (every 3 s at most), the barometer samples at 1 Hz batched, and the analysis cache is capped.
+
 ## 8.5 (versionCode 38)
 
 - Today keeps Recent activity to one "Your sessions" card with two neutral cards stacked under it (latest day, its sessions and distance, and the total) with a new layers icon; it opens a Sessions page where every day is listed as an expandable stack, 7 days at a time.

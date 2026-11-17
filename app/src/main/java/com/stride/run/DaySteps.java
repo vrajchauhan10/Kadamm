@@ -77,6 +77,7 @@ final class DaySteps {
                     try{
                         JSONObject days=new JSONObject(p.getString("days","{}"));
                         distribute(days,lastAt,now,delta);
+                        try{JSONObject hours=new JSONObject(p.getString("hours","{}"));spreadHours(hours,lastAt,now,delta);e.putString("hours",hours.toString());}catch(Exception ignored){}
                         prune(days);
                         e.putString("days",days.toString()).putLong("lastMoveAt",now);
                         changed=true;
@@ -102,6 +103,28 @@ final class DaySteps {
         }
     }
     private static void add(JSONObject days,String day,long n) throws Exception{days.put(day,days.optLong(day,0)+n);}
+    /**
+     * Kadamm's own steps per hour {day: [24]}, from the phone's step counter: each reading's steps are spread
+     * evenly over the time since the last reading (minutes apart while Kadamm is open or recording, up to 15
+     * when it's closed). Kept for 35 days.
+     */
+    private static void spreadHours(JSONObject hours,long from,long to,long delta)throws Exception{
+        if(from<=0||to-from>6*3600000L)from=to-60000L;long span=Math.max(1,to-from);double left=delta;
+        Calendar c=Calendar.getInstance();c.setTimeInMillis(from);
+        while(from<to&&left>0){
+            c.setTimeInMillis(from);c.set(Calendar.MINUTE,0);c.set(Calendar.SECOND,0);c.set(Calendar.MILLISECOND,0);c.add(Calendar.HOUR_OF_DAY,1);
+            long end=Math.min(c.getTimeInMillis(),to);double share=end>=to?left:delta*(end-from)/(double)span;
+            Calendar at=Calendar.getInstance();at.setTimeInMillis(from);String k=key(from);JSONArray h=hours.optJSONArray(k);if(h==null){h=new JSONArray();for(int i=0;i<24;i++)h.put(0);hours.put(k,h);}
+            int hr=at.get(Calendar.HOUR_OF_DAY);h.put(hr,h.optDouble(hr)+share);left-=share;from=end;
+        }
+        if(hours.length()>36){String cutoff=key(System.currentTimeMillis()-35L*86400000L);for(Iterator<String> it=hours.keys();it.hasNext();)if(it.next().compareTo(cutoff)<0)it.remove();}
+    }
+    /** Kadamm's own steps per hour for a day, or null before Kadamm counted that day. */
+    static double[] hoursOn(Context c,String day){
+        try{JSONArray h=new JSONObject(c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getString("hours","{}")).optJSONArray(day);if(h==null)return null;double[] out=new double[24];for(int i=0;i<24;i++)out[i]=Math.round(h.optDouble(i));return out;}catch(Exception e){return null;}
+    }
+    /** Whether Health Connect's step figures are used at all (Settings: Step sources). Off means Kadamm counts on its own. */
+    static boolean hcSteps(Context c){return c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getBoolean("hcSteps",true);}
     private static void prune(JSONObject days){
         if(days.length()<=420)return;
         String cutoff=key(System.currentTimeMillis()-400L*86400000L);
@@ -136,7 +159,7 @@ final class DaySteps {
     static long startedAt(Context c){return c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getLong("startedAt",0);}
 
     /** Per-day movement quality from Health Connect minute steps: {day: {p30, brisk, sit, h[24]}} (see HealthSync.dailyMinutes). */
-    static JSONObject minuteDays(Context c){try{return new JSONObject(c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getString("minuteDays","{}"));}catch(Exception e){return new JSONObject();}}
+    static JSONObject minuteDays(Context c){if(!hcSteps(c))return new JSONObject();try{return new JSONObject(c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getString("minuteDays","{}"));}catch(Exception e){return new JSONObject();}}
     private static String parsedRaw;private static JSONArray parsed=new JSONArray();
     /**
      * Saved sessions, parsed once and reused until the stored text changes. The history is about a megabyte of
@@ -171,7 +194,7 @@ final class DaySteps {
     /** Today's full-day Health Connect total from the preferred source (Samsung Health first), or -1 when not synced today. */
     static long healthImportedToday(Context c){
         SharedPreferences h=c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE);
-        if(!h.getBoolean("healthConnected",false)||!todayKey().equals(h.getString("healthDate","")))return -1;
+        if(!hcSteps(c)||!h.getBoolean("healthConnected",false)||!todayKey().equals(h.getString("healthDate","")))return -1;
         return h.getLong("healthDayTotal",h.getLong("healthImportedSteps",0));
     }
     /**
@@ -248,7 +271,7 @@ final class DaySteps {
     static Map<String,Long> allDayTotals(Context c){
         HashMap<String,Long> out=new HashMap<>();
         merge(out,c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getString("days","{}"));
-        merge(out,c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getString("healthDays","{}"));
+        if(hcSteps(c))merge(out,c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getString("healthDays","{}"));
         HashMap<String,Long> bySession=new HashMap<>();JSONArray all=sessions(c);
         for(int i=0;i<all.length();i++){
             JSONObject s=all.optJSONObject(i);

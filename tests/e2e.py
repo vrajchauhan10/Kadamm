@@ -182,7 +182,7 @@ def test_health_screens():
     tap("Step sources & health", at="right")
     assert wait("Phone step sensor") and visible("Health Connect")
     shot("06_step_sources")
-    n = find("Refresh or manage") or find("Connect Health Connect")
+    n = find("Health Connect permissions") or find("Connect Health Connect")
     assert n, "no Health Connect button"
     tap(n["text"])
     assert wait("Bring in your health data"), "Health Connect screen did not open"
@@ -284,7 +284,7 @@ def test_recording():
         # The live map animates continuously, so uiautomator cannot read this screen: use its fixed button
         # positions (bottom sheet, 1080-wide screen) and check the result through the saved session state.
         W, H = [int(v) for v in re.search(r"(\d+)x(\d+)", sh("wm size")).groups()]
-        y = H - int(H * .072); pause, resume, finish = (W // 2, y), (W // 4 + 10, y), (W * 3 // 4 - 10, y)
+        y = H - int(H * .072); pause, resume, finish = (W // 4 + 10, y), (W // 4 + 10, y), (W * 3 // 4 - 10, y)  # Pause/Resume left, Finish right (8.6)
         shot("10_live")
         sh("input tap %d %d" % pause); time.sleep(1.5)
         p1 = _value(_state(), "elapsed"); time.sleep(3); p2 = _value(_state(), "elapsed")
@@ -300,18 +300,26 @@ def test_recording():
         assert samples >= 2, f"step timeline has {samples} samples"
         sh("input tap %d %d" % finish)
         _confirm("Finish activity?", "Finish")
-        assert wait("Session summary"), "summary screen did not open"
-        time.sleep(2)
-        shot("11_summary")
-        assert '"active" value="false"' in _state(), "session still active after finish"
-        assert scroll_to("Delete"), "no Delete action on the summary"
-        tap("Delete", exact=True)
-        _confirm("Delete this activity?", "Delete")
+        # 8.6: under 100 steps (a phone lying still) isn't saved; a real walk opens its summary.
+        if wait("Not saved as a session", 6):
+            shot("11_not_saved")
+            tap("OK", exact=True)
+            assert '"active" value="false"' in _state(), "session still active after finish"
+            dropped = True
+        else:
+            assert wait("Session summary"), "summary screen did not open"
+            time.sleep(2)
+            shot("11_summary")
+            assert '"active" value="false"' in _state(), "session still active after finish"
+            assert scroll_to("Delete"), "no Delete action on the summary"
+            tap("Delete", exact=True)
+            _confirm("Delete this activity?", "Delete")
+            dropped = False
         if mock:
             assert 0.24 <= km <= 0.33, f"expected about 0.30 km, recorded {km:.3f} km"
             assert points >= 20, f"route has only {points} points"
             return f"mock walk 300 m, {km * 1000:.0f} m recorded, {points} route points, {samples} timeline samples, {baro} barometer points"
-        return f"real GPS: {km * 1000:.0f} m, {points} route points, {samples} timeline samples, {baro} barometer points; mock route skipped (Shell is not the mock location app)"
+        return ("under 100 steps, not saved (as designed); " if dropped else "") + f"real GPS: {km * 1000:.0f} m, {points} route points, {samples} timeline samples, {baro} barometer points; mock route skipped (Shell is not the mock location app)"
     finally:
         if mock:
             sh("cmd location providers remove-test-provider gps")
