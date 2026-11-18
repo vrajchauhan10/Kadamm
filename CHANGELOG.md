@@ -1,5 +1,11 @@
 # Changelog
 
+## 9.3 (versionCode 46)
+
+- Automatic sessions start the moment Android detects walking, with a visible notification from the first step: "Walking detected · 42 steps · it becomes a session at 100" (updating every 2 seconds), then the normal live session; the mini bar shows too. After you stop, the notification reads "You stopped walking · finishes in 2:40 unless you move again". Recordings under 100 steps still aren't saved. Replaces 9.2's quiet check, which Android delayed until hundreds of steps had passed.
+- Widgets update in close to real time: every 5 seconds during a session and while Kadamm is open, and every 5 minutes otherwise while a Kadamm widget is placed (one quick step-counter reading).
+- Day summary: totals (total time, moving time, sessions, steps, calories, climb, effort, intensity, distance) and averages (pace, cadence, time, distance, steps and effort per session) shown separately; short recordings under 100 steps and rides are left out (and said so); marked "So far today" until your chosen summary time, then "Final summary". The notification uses the same totals and averages.
+
 ## 9.2 (versionCode 45)
 
 - No notification before 100 steps: when Android notices walking, Kadamm quietly checks the step counter every 75 seconds (up to 6 minutes) with nothing on screen, and only starts the session once you pass 100 steps, back-dated to when you started and keeping those steps.

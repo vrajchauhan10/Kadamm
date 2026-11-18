@@ -13,7 +13,7 @@ import android.widget.RemoteViews;
 
 /** Home-screen widget: the daily-goals capsule with steps, brisk minutes and distance, and what's still to go. */
 public class GoalsWidget extends AppWidgetProvider {
-    @Override public void onUpdate(Context c,AppWidgetManager manager,int[] ids){DaySteps.sample(c,()->render(c,manager,ids));}
+    @Override public void onUpdate(Context c,AppWidgetManager manager,int[] ids){DaySteps.sample(c,()->render(c,manager,ids));WidgetTick.schedule(c);}
 
     /** Redraws placed widgets; called with the steps widget's refresh, so at most every 30 seconds. */
     static void refresh(Context c){

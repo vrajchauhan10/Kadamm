@@ -22,12 +22,12 @@ public class StepsWidget extends AppWidgetProvider {
     private static long lastRefresh=0;
 
     @Override public void onUpdate(Context c,AppWidgetManager manager,int[] ids){
-        DaySteps.sample(c,()->render(c,manager,ids));
+        DaySteps.sample(c,()->render(c,manager,ids));WidgetTick.schedule(c);
     }
 
     /** Redraws every placed widget, at most once every 30 seconds. */
     static void refresh(Context c){
-        long now=SystemClock.elapsedRealtime();if(now-lastRefresh<30000&&lastRefresh>0)return;lastRefresh=now;
+        long now=SystemClock.elapsedRealtime();if(now-lastRefresh<5000&&lastRefresh>0)return;lastRefresh=now;
         AppWidgetManager manager=AppWidgetManager.getInstance(c);
         int[] ids=manager.getAppWidgetIds(new ComponentName(c,StepsWidget.class));
         if(ids!=null&&ids.length>0)render(c.getApplicationContext(),manager,ids);

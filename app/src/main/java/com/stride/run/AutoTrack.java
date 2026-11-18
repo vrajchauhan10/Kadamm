@@ -110,10 +110,12 @@ final class AutoTrack {
                 long dropped=st.getLong("autoDroppedAt",0);
                 if(System.currentTimeMillis()-dropped<10*60000L&&DaySteps.todayTotal(c)-st.getLong("autoDroppedSteps",0)<30)return;
                 String type=e.getActivityType()==DetectedActivity.RUNNING?"Run":"Walk";
-                if(st.getLong("candidateAt",0)>0&&System.currentTimeMillis()-st.getLong("candidateAt",0)<CHECK_FOR_MS)return;
-                // Not a session yet: note the step counter and check back quietly, with no notification.
-                PendingResult pr=goAsync();
-                DaySteps.sample(c,()->{st.edit().putLong("candidateAt",System.currentTimeMillis()).putLong("candidateBase",DaySteps.rawCounter(c)).putString("candidateType",type).apply();scheduleCheck(c);pr.finish();});
+                // Start straight away, so the notification shows from the first step; a recording under 100 steps
+                // is never saved, and its notification says so while it counts.
+                android.util.Log.i("KadammAuto","walking detected, starting "+type);
+                st.edit().putString("activityMode","outdoor").putString("activityType",type).apply();
+                try{Intent start=new Intent(c,RecorderService.class).setAction(RecorderService.ACTION_START).putExtra("auto",true).putExtra("type",type);
+                    if(Build.VERSION.SDK_INT>=26)c.startForegroundService(start);else c.startService(start);}catch(Exception ex){android.util.Log.w("KadammAuto","start refused",ex);}
                 return;
             }
         }
