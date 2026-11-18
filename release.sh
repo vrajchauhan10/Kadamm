@@ -8,7 +8,7 @@
 #
 # Uses the GitHub CLI (gh) if installed and logged in; otherwise a token from the Keychain (asked for once, hidden
 # typing) or GITHUB_TOKEN from the environment: a fine-grained token with "Contents: read and write" on vrajchauhan10/Kadamm.
-# The token is never stored.
+# The token is kept only in the Keychain, never in a file. Remove it: security delete-generic-password -s kadamm-release
 set -euo pipefail
 cd "$(dirname "$0")"
 REPO="vrajchauhan10/Kadamm"
