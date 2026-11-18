@@ -1088,7 +1088,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         if(capsule==null||heroPercent==null)return;
         int goal=dailyGoal();long n=DaySteps.todayTotal(this);boolean data=DaySteps.hasTodayData(this),active=prefs.getBoolean("active",false);double pct=goal>0?n*100d/goal:0;
         GoalCapsule.Day day=GoalCapsule.today(this);capsule.set(day);
-        if(stepsBig!=null){android.text.SpannableStringBuilder sb=new android.text.SpannableStringBuilder(data?String.format(Locale.US,"%,d",n):"—");int e=sb.length();sb.append(" steps");sb.setSpan(new android.text.style.RelativeSizeSpan(.4f),e,sb.length(),0);sb.setSpan(new android.text.style.ForegroundColorSpan(muted),e,sb.length(),0);stepsBig.setText(sb);}
+        if(stepsBig!=null){android.text.SpannableStringBuilder sb=new android.text.SpannableStringBuilder(data?String.format(Locale.US,"%,d",n):"—");stepsBig.setText(sb);}
         for(int i=0;i<3;i++){
             ringRows[i].setText(i==0?String.format(Locale.US,"goal %,d",day.stepGoal):day.value(i)+"  "+day.goal(i));ringPct[i].setText("+"+Math.round(day.share[i])+"%");
             ringSubs[i].setText(day.pending(i));ringSubs[i].setTextColor(day.done[i]>=1?positive:muted);
