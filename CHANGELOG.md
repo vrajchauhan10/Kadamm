@@ -3,6 +3,7 @@
 ## 9.4 (versionCode 47)
 
 - Steps through the day shows the same total as the top of Home. Day totals and the hourly record now treat a reading after more than 6 hours (overnight) the same way, so they add up alike; a note explains any steps Health Connect hasn't placed in an hour yet.
+- Home's Daily goals card shows today's steps as one large number above the goal rows.
 - Widgets: the step count is the big main number (larger in the steps ring, and a new large line in the daily goals widget).
 
 ## 9.3 (versionCode 46)

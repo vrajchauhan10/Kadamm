@@ -1056,6 +1056,8 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         capsule=new GoalCapsule.CapsuleView(this,darkTheme);body.addView(capsule,lp(96,214));
         LinearLayout side=col();LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(0,-2,1);sp.leftMargin=dp(14);body.addView(side,sp);
         ringRows=new TextView[3];
+        // Steps first and biggest: the day's main number, then brisk minutes and distance under it.
+        stepsBig=tx("—",34,GoalCapsule.COLORS[0],true);side.addView(stepsBig);
         for(int i=0;i<3;i++){
             int col=GoalCapsule.COLORS[i];LinearLayout r=col();LinearLayout.LayoutParams rp2=lp(-1,-2);if(i>0)rp2.topMargin=dp(10);side.addView(r,rp2);
             LinearLayout top=row();r.addView(top,lp(-1,-2));
@@ -1075,7 +1077,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         updateHero(hist);
     }
     private int briskGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("briskGoalMin",30);}
-    private GoalCapsule.CapsuleView capsule;private final View[] goalFills=new View[3];private MetricViews.Rings rings;private TextView[] ringRows;private final TextView[] ringSubs=new TextView[3],ringPct=new TextView[3];
+    private GoalCapsule.CapsuleView capsule;private TextView stepsBig;private final View[] goalFills=new View[3];private MetricViews.Rings rings;private TextView[] ringRows;private final TextView[] ringSubs=new TextView[3],ringPct=new TextView[3];
     /** Brisk minutes today: minutes at 100+ steps a minute from Health Connect, or from today's sessions; the larger. */
     private double briskToday(JSONArray all){
         JSONObject d=DaySteps.minuteDays(this).optJSONObject(todayKey());double hc=d!=null?d.optDouble("brisk",0):0,ses=0;
@@ -1086,8 +1088,9 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         if(capsule==null||heroPercent==null)return;
         int goal=dailyGoal();long n=DaySteps.todayTotal(this);boolean data=DaySteps.hasTodayData(this),active=prefs.getBoolean("active",false);double pct=goal>0?n*100d/goal:0;
         GoalCapsule.Day day=GoalCapsule.today(this);capsule.set(day);
+        if(stepsBig!=null){android.text.SpannableStringBuilder sb=new android.text.SpannableStringBuilder(data?String.format(Locale.US,"%,d",n):"—");int e=sb.length();sb.append(" steps");sb.setSpan(new android.text.style.RelativeSizeSpan(.4f),e,sb.length(),0);sb.setSpan(new android.text.style.ForegroundColorSpan(muted),e,sb.length(),0);stepsBig.setText(sb);}
         for(int i=0;i<3;i++){
-            ringRows[i].setText(day.value(i)+"  "+day.goal(i));ringPct[i].setText("+"+Math.round(day.share[i])+"%");
+            ringRows[i].setText(i==0?String.format(Locale.US,"goal %,d",day.stepGoal):day.value(i)+"  "+day.goal(i));ringPct[i].setText("+"+Math.round(day.share[i])+"%");
             ringSubs[i].setText(day.pending(i));ringSubs[i].setTextColor(day.done[i]>=1?positive:muted);
             View f=goalFills[i];double fr=day.done[i];f.post(()->{View tr=(View)f.getParent();FrameLayout.LayoutParams fl=(FrameLayout.LayoutParams)f.getLayoutParams();int w=(int)(tr.getWidth()*fr);if(fl.width!=w){fl.width=w;f.setLayoutParams(fl);}});
         }
