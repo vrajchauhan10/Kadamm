@@ -32,6 +32,8 @@ public class GoalsWidget extends AppWidgetProvider {
         RemoteViews v=new RemoteViews(c.getPackageName(),R.layout.widget_goals);
         v.setImageViewBitmap(R.id.goals_capsule,GoalCapsule.bitmap(c,d,58,120));
         v.setTextViewText(R.id.goals_title,total>=100?"Perfect day ✦":"Daily goals · "+total+"%");
+        SpannableStringBuilder big=new SpannableStringBuilder(String.format(java.util.Locale.US,"%,d",d.steps));int e=big.length();big.append(" steps");big.setSpan(new android.text.style.RelativeSizeSpan(.42f),e,big.length(),0);big.setSpan(new ForegroundColorSpan(0xFF9AA0A6),e,big.length(),0);
+        v.setTextViewText(R.id.goals_big,big);
         v.setTextViewText(R.id.goals_steps,line(d,0));v.setTextViewText(R.id.goals_brisk,line(d,1));v.setTextViewText(R.id.goals_km,line(d,2));
         v.setOnClickPendingIntent(R.id.goals_root,PendingIntent.getActivity(c,8,new Intent(c,MainActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
         for(int id:ids)manager.updateAppWidget(id,v);

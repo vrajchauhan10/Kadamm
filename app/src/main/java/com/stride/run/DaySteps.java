@@ -93,7 +93,8 @@ final class DaySteps {
 
     /** Splits a delta across local days in proportion to the time spent in each. */
     private static void distribute(JSONObject days,long from,long to,long delta) throws Exception{
-        if(to<=from||key(from).equals(key(to))){add(days,key(to),delta);return;}
+        // After more than 6 hours without a reading (overnight), the steps belong to now, as in the hourly record.
+        if(to<=from||to-from>6*3600000L||key(from).equals(key(to))){add(days,key(to),delta);return;}
         long total=to-from,cursor=from,remaining=delta;
         while(cursor<to&&remaining>0){
             Calendar next=Calendar.getInstance();next.setTimeInMillis(cursor);

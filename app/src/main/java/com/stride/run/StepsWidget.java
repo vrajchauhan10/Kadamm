@@ -58,7 +58,7 @@ public class StepsWidget extends AppWidgetProvider {
         p.setColor(Color.rgb(54,57,62));cv.drawArc(o,0,360,false,p);
         if(move>0){p.setColor(Color.rgb(129,201,149));cv.drawArc(o,-90,Math.max(2f,move*360),false,p);}
         p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);p.setColor(Color.rgb(232,234,237));p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
-        String text=steps<0?"—":String.format(Locale.US,"%,d",steps);float ts=24*d;p.setTextSize(ts);
+        String text=steps<0?"—":String.format(Locale.US,"%,d",steps);float ts=31*d;p.setTextSize(ts);
         while(p.measureText(text)>r2*2-22*d&&ts>12*d){ts-=d;p.setTextSize(ts);}
         cv.drawText(text,cx,cy+ts*.2f,p);
         p.setTypeface(Typeface.DEFAULT);p.setColor(f>=1?Color.rgb(129,201,149):Color.rgb(154,160,166));p.setTextSize(10*d);cv.drawText(steps<0?"steps":f>=1?"goal ✓":Math.round(f*100)+"% of goal",cx,cy+ts*.2f+14*d,p);

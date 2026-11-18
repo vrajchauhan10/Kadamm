@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="9.3";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="9.4";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -2056,6 +2056,8 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         double so=0,sh=0;if(own!=null)for(double v:own)so+=v;if(hc!=null)for(double v:hc)sh+=v;
         double[] hours=own!=null&&so>=sh?own:hc!=null?hc:own;if(hours==null){return;}
         double total=0;int peak=0;for(int i=0;i<24;i++){total+=hours[i];if(hours[i]>hours[peak])peak=i;}if(total<=0)return;
+        // The headline is the same day total as the top of Home; the hours show where those steps fell.
+        long dayTotal=DaySteps.todayTotal(this);double placed=total;if(dayTotal>0)total=dayTotal;
         LinearLayout c=metricCard("STEPS THROUGH THE DAY","","Every step you've taken today, hour by hour, from "+(hours==own?"Kadamm's own counting with this phone's step sensor":"Health Connect")+". Each dot is a block of steps (shown under the chart); dots turn amber in busier hours. The ring marks the current hour. Touch and slide across the chart to read any hour.");
         LinearLayout r=row();LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(6);c.addView(r,rp);
         r.addView(valueUnit(String.format(Locale.US,"%,d",Math.round(total)),"steps",26,ink),new LinearLayout.LayoutParams(0,-2,1));
@@ -2063,6 +2065,8 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         MetricViews.DotDay dd=new MetricViews.DotDay(this,chartTheme(),hours,Calendar.getInstance().get(Calendar.HOUR_OF_DAY),lime);
         LinearLayout.LayoutParams dp1=lp(-1,170);dp1.topMargin=dp(8);c.addView(dd,dp1);
         TextView key=tx("● = "+dd.unit()+" steps",10,muted,false);LinearLayout.LayoutParams kp=lp(-1,-2);kp.topMargin=dp(4);c.addView(key,kp);
+        long gap=Math.round(total-placed);
+        if(Math.abs(gap)>Math.max(50,total*.01)){TextView n=tx(gap>0?String.format(Locale.US,"%,d steps don't have an hour yet (Health Connect sends them later)",gap):String.format(Locale.US,"The hours add up to %,d; small differences come from readings around midnight",Math.round(placed)),10,muted,false);c.addView(n);}
     }
     private void renderMovementQuality(){
         JSONObject d=DaySteps.minuteDays(this).optJSONObject(todayKey());if(d==null||!d.has("p30"))return;

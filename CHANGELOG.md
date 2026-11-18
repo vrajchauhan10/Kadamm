@@ -1,5 +1,10 @@
 # Changelog
 
+## 9.4 (versionCode 47)
+
+- Steps through the day shows the same total as the top of Home. Day totals and the hourly record now treat a reading after more than 6 hours (overnight) the same way, so they add up alike; a note explains any steps Health Connect hasn't placed in an hour yet.
+- Widgets: the step count is the big main number (larger in the steps ring, and a new large line in the daily goals widget).
+
 ## 9.3 (versionCode 46)
 
 - Automatic sessions start the moment Android detects walking, with a visible notification from the first step: "Walking detected · 42 steps · it becomes a session at 100" (updating every 2 seconds), then the normal live session; the mini bar shows too. After you stop, the notification reads "You stopped walking · finishes in 2:40 unless you move again". Recordings under 100 steps still aren't saved. Replaces 9.2's quiet check, which Android delayed until hundreds of steps had passed.
