@@ -6,8 +6,8 @@
 #   ./release.sh          publish the current version
 #   ./release.sh notes    rewrite the current version's release description (screenshots + changelog)
 #
-# Uses the GitHub CLI (gh) if installed and logged in; otherwise asks for a token (hidden typing), or reads
-# GITHUB_TOKEN from the environment: a fine-grained token with "Contents: read and write" on vrajchauhan10/Kadamm.
+# Uses the GitHub CLI (gh) if installed and logged in; otherwise a token from the Keychain (asked for once, hidden
+# typing) or GITHUB_TOKEN from the environment: a fine-grained token with "Contents: read and write" on vrajchauhan10/Kadamm.
 # The token is never stored.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -47,12 +47,16 @@ EOF
 )
 
 api(){ curl -fsS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$@"; }
+# The token lives in the macOS Keychain ("kadamm-release"): asked for once, then read from there every time.
 need_token(){
+  if [ -z "${GITHUB_TOKEN:-}" ]; then GITHUB_TOKEN=$(security find-generic-password -s kadamm-release -a github -w 2>/dev/null || true); fi
   if [ -z "${GITHUB_TOKEN:-}" ]; then
-    echo "Paste a GitHub token with Contents: read and write on $REPO (typing is hidden), then press Return:"
+    echo "Paste a GitHub token with Contents: read and write on $REPO (typing is hidden), then press Return."
+    echo "It's saved in your Mac's Keychain, so you won't be asked again:"
     read -rs GITHUB_TOKEN; echo
+    [ -n "$GITHUB_TOKEN" ] || { echo "No token given."; exit 1; }
+    security add-generic-password -U -s kadamm-release -a github -w "$GITHUB_TOKEN" && echo "Saved to Keychain."
   fi
-  [ -n "$GITHUB_TOKEN" ] || { echo "No token given."; exit 1; }
 }
 
 if [ "$MODE" = "notes" ]; then
