@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="9.4";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="9.5";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -676,16 +676,83 @@ public class MainActivity extends Activity {
     private Trainer.State trainerState(JSONArray h){return Trainer.build(this,h);}
     /** Home: today's workout from the trainer, one tap to the full plan. */
     private void renderTrainerCard(JSONArray hist){
-        if(!SessionMetrics.ready())return;Trainer.State st=trainerState(hist);Trainer.Workout w=st.today;if(w==null)return;
-        LinearLayout c=card();GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(panel,GoalCapsule.COLORS[0],darkTheme?.18f:.10f),panel});g.setCornerRadius(dp(16));g.setStroke(dp(1),blend(line,GoalCapsule.COLORS[0],.3f));c.setBackground(g);
-        LinearLayout r=row();c.addView(r,lp(-1,-2));LinearLayout l=col();r.addView(l,new LinearLayout.LayoutParams(0,-2,1));
-        TextView e=tx("KADAMM TRAINER · STAGE "+(st.stage+1)+" "+Trainer.STAGES[st.stage].toUpperCase(Locale.US),10,GoalCapsule.COLORS[0],true);e.setLetterSpacing(.06f);l.addView(e);
-        l.addView(tx((w.done?"Done today ✓ · ":"Today: ")+w.title,15,ink,true));l.addView(tx(w.detail,12,muted,false));
-        r.addView(tx("›",24,muted,false));c.setOnClickListener(v->navigate("Trainer"));
+        if(!SessionMetrics.ready())return;TrainerCoach.Day cd=TrainerCoach.today(this,hist);
+        LinearLayout c=card();c.setPadding(dp(18),dp(18),dp(18),dp(18));coachBackground(c,cd.allDone);
+        coachHeader(c,cd,false);
+        TextView m=tx(cd.message,14,ink,false);m.setLineSpacing(dp(3),1f);m.setMaxLines(4);m.setEllipsize(android.text.TextUtils.TruncateAt.END);LinearLayout.LayoutParams mp=lp(-1,-2);mp.topMargin=dp(12);c.addView(m,mp);
+        LinearLayout r=row();LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(14);c.addView(r,rp);
+        for(int i=0;i<cd.list.size();i++){TrainerCoach.Challenge ch=cd.list.get(i);LinearLayout b=col();b.setPadding(dp(10),dp(10),dp(10),dp(10));b.setBackground(shape(ch.done?blend(panel,positive,darkTheme?.22f:.14f):raised,12));
+            LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(0,-1,1);if(i>0)bp.leftMargin=dp(8);r.addView(b,bp);
+            b.addView(tx(ch.done?"✓":coachIcon(ch.id),16,ch.done?positive:coachColor(i),true));TextView t=tx(ch.title,11,ink,true);t.setMaxLines(2);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(4);b.addView(t,tp);
+            b.addView(coachBar(ch,i),coachBarLp());}
+        TextView open=tx("Open your trainer  ›",13,GoalCapsule.COLORS[0],true);LinearLayout.LayoutParams op=lp(-1,-2);op.topMargin=dp(14);c.addView(open,op);c.setOnClickListener(v->navigate("Trainer"));
+        maybeCoachCelebrate(cd);
+    }
+    private static final int[] COACH_COLORS={0xFF00BFA6,0xFFFF6B6B,0xFF7C6CF2};
+    private int coachColor(int i){return COACH_COLORS[i%3];}
+    private String coachIcon(String id){switch(id){case "steps":return "👟";case "brisk":return "⚡";case "sit":return "🪑";case "long":return "⏱";case "km":return "📍";case "beat":return "🏆";case "evening":return "🌙";case "twice":return "✌";case "hours":return "⏰";case "cadence":return "🎵";default:return "🌅";}}
+    private void coachBackground(LinearLayout c,boolean done){int a=done?positive:violet;GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(panel,a,darkTheme?.26f:.14f),blend(panel,GoalCapsule.COLORS[0],darkTheme?.10f:.06f),panel});g.setCornerRadius(dp(20));g.setStroke(dp(1),blend(line,a,.35f));c.setBackground(g);}
+    /** The coach's face and name: a gradient avatar, "Coach Kadamm", and what it does. */
+    private void coachHeader(LinearLayout c,TrainerCoach.Day cd,boolean big){
+        LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);c.addView(r,lp(-1,-2));
+        TextView av=tx("K",big?26:20,Color.WHITE,true);av.setGravity(Gravity.CENTER);GradientDrawable ag=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{GoalCapsule.COLORS[0],violet});ag.setShape(GradientDrawable.OVAL);ag.setStroke(dp(3),blend(panel,Color.WHITE,.25f));av.setBackground(ag);r.addView(av,lp(big?60:48,big?60:48));
+        LinearLayout l=col();LinearLayout.LayoutParams llp=new LinearLayout.LayoutParams(0,-2,1);llp.leftMargin=dp(12);r.addView(l,llp);
+        TextView e=tx(cd.allDone?"ALL DONE TODAY":"YOUR TRAINER · LEARNS FROM YOUR DATA",9,cd.allDone?positive:violet,true);e.setLetterSpacing(.08f);l.addView(e);
+        l.addView(tx("Coach Kadamm",big?20:17,ink,true));l.addView(tx(cd.greeting,12,muted,false));
+        TextView cnt=tx(cd.done+"/"+cd.list.size(),big?20:16,cd.allDone?positive:ink,true);cnt.setGravity(Gravity.CENTER);cnt.setPadding(dp(10),dp(4),dp(10),dp(4));cnt.setBackground(shape(cd.allDone?blend(panel,positive,.25f):raised,14));r.addView(cnt,lp(-2,-2));
+    }
+    private View coachBar(TrainerCoach.Challenge ch,int i){
+        FrameLayout f=new FrameLayout(this);f.setBackground(shape(blend(raised,line,.5f),3));View in=new View(this);in.setBackground(shape(ch.done?positive:coachColor(i),3));
+        f.addView(in,new FrameLayout.LayoutParams(0,-1));f.post(()->{FrameLayout.LayoutParams q=(FrameLayout.LayoutParams)in.getLayoutParams();q.width=(int)(f.getWidth()*Math.max(.03f,ch.fraction()));in.setLayoutParams(q);});return f;}
+    private LinearLayout.LayoutParams coachBarLp(){LinearLayout.LayoutParams p=lp(-1,6);p.topMargin=dp(8);return p;}
+    /** Once a day, when all three challenges are done: the coach's congratulation with confetti. */
+    private void maybeCoachCelebrate(TrainerCoach.Day cd){
+        if(!cd.allDone||!resumed||authLayer!=null||celebrateLayer!=null)return;SharedPreferences st=getSharedPreferences("kadamm_coach",MODE_PRIVATE);if(todayKey().equals(st.getString("celebrated","")))return;
+        st.edit().putString("celebrated",todayKey()).apply();
+        handler.postDelayed(()->{if(!resumed||celebrateLayer!=null)return;
+            celebrateLayer=new FrameLayout(this);celebrateLayer.setBackgroundColor(Color.argb(175,0,0,0));celebrateLayer.setClickable(true);root.addView(celebrateLayer,new FrameLayout.LayoutParams(-1,-1));
+            LinearLayout card=col();card.setGravity(Gravity.CENTER_HORIZONTAL);card.setPadding(dp(24),dp(28),dp(24),dp(20));
+            card.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{blend(panel,violet,darkTheme?.32f:.18f),panel}){{setCornerRadius(dp(28));setStroke(dp(1),blend(line,violet,.4f));}});
+            FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER);cp.setMargins(dp(26),0,dp(26),0);celebrateLayer.addView(card,cp);
+            TextView av=tx("K",36,Color.WHITE,true);av.setGravity(Gravity.CENTER);GradientDrawable ag=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{GoalCapsule.COLORS[0],violet});ag.setShape(GradientDrawable.OVAL);ag.setStroke(dp(5),blend(violet,Color.WHITE,.5f));av.setBackground(ag);card.addView(av,lp(96,96));
+            TextView h=tx("Coach Kadamm",13,violet,true);h.setGravity(Gravity.CENTER);LinearLayout.LayoutParams hp=lp(-1,-2);hp.topMargin=dp(12);card.addView(h,hp);
+            TextView big=tx("All 3 challenges done!",26,ink,true);big.setGravity(Gravity.CENTER);LinearLayout.LayoutParams bp=lp(-1,-2);bp.topMargin=dp(4);card.addView(big,bp);
+            TextView sub=tx(cd.message,15,ink,false);sub.setGravity(Gravity.CENTER);sub.setLineSpacing(dp(3),1f);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(10);card.addView(sub,sp);
+            TextView so=tx(cd.signoff,13,muted,false);so.setGravity(Gravity.CENTER);LinearLayout.LayoutParams sop=lp(-1,-2);sop.topMargin=dp(8);card.addView(so,sop);
+            Button ok=button("Thanks, coach",violet,Color.WHITE);ok.setTextSize(15);LinearLayout.LayoutParams okp=lp(-1,50);okp.topMargin=dp(20);card.addView(ok,okp);
+            Runnable close=()->{FrameLayout l=celebrateLayer;celebrateLayer=null;if(l!=null)l.animate().alpha(0f).setDuration(200).withEndAction(()->root.removeView(l)).start();};
+            ok.setOnClickListener(v->close.run());celebrateLayer.setOnClickListener(v->close.run());
+            ConfettiView shower=ConfettiView.shower(this);celebrateLayer.addView(shower,new FrameLayout.LayoutParams(-1,-1));},900);
+    }
+    /** Trainer page: the coach's message, today's challenges in full, and the report on your last four weeks. */
+    private void renderCoachSection(JSONArray h){
+        TrainerCoach.Day cd=TrainerCoach.today(this,h);
+        LinearLayout c=card();c.setPadding(dp(20),dp(20),dp(20),dp(20));coachBackground(c,cd.allDone);coachHeader(c,cd,true);
+        LinearLayout bub=col();bub.setPadding(dp(16),dp(14),dp(16),dp(14));GradientDrawable bg2=shape(darkTheme?blend(panel,Color.BLACK,.25f):blend(panel,Color.WHITE,.6f),18);bg2.setCornerRadii(new float[]{dp(4),dp(4),dp(18),dp(18),dp(18),dp(18),dp(18),dp(18)});bub.setBackground(bg2);
+        LinearLayout.LayoutParams bup=lp(-1,-2);bup.topMargin=dp(16);c.addView(bub,bup);
+        TextView m=tx(cd.message,15,ink,false);m.setLineSpacing(dp(4),1f);bub.addView(m);TextView so=tx(cd.signoff,13,cd.allDone?positive:violet,true);so.setLineSpacing(dp(3),1f);so.setPadding(0,dp(10),0,0);bub.addView(so);
+        TextView ht=tx("TODAY'S CHALLENGES",10,muted,true);ht.setLetterSpacing(.08f);LinearLayout.LayoutParams htp=lp(-1,-2);htp.topMargin=dp(22);c.addView(ht,htp);
+        for(int i=0;i<cd.list.size();i++){TrainerCoach.Challenge ch=cd.list.get(i);LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);r.setPadding(dp(14),dp(14),dp(14),dp(14));r.setBackground(shape(ch.done?blend(panel,positive,darkTheme?.20f:.12f):raised,16));
+            LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(10);c.addView(r,rp);
+            TextView ic=tx(ch.done?"✓":coachIcon(ch.id),18,ch.done?Color.WHITE:coachColor(i),true);ic.setGravity(Gravity.CENTER);GradientDrawable ig=new GradientDrawable();ig.setShape(GradientDrawable.OVAL);ig.setColor(ch.done?positive:blend(panel,coachColor(i),.22f));ic.setBackground(ig);r.addView(ic,lp(44,44));
+            LinearLayout l=col();LinearLayout.LayoutParams llp=new LinearLayout.LayoutParams(0,-2,1);llp.leftMargin=dp(14);r.addView(l,llp);
+            l.addView(tx(ch.title,15,ink,true));l.addView(tx(ch.progress(),12,ch.done?positive:muted,ch.done));l.addView(coachBar(ch,i),coachBarLp());}
+        TextView how=tx("A new set every day, picked from 11 kinds so none repeats from yesterday. Targets come from your own last four weeks: a good day for you, not your best. Finish all three and tomorrow's rise 5 %; miss most and they ease.",11,muted,false);how.setLineSpacing(dp(2),1f);LinearLayout.LayoutParams hwp=lp(-1,-2);hwp.topMargin=dp(14);c.addView(how,hwp);
+        maybeCoachCelebrate(cd);
+        // Report
+        java.util.List<TrainerCoach.Finding> rep=TrainerCoach.report(this,h);
+        LinearLayout rc=metricCard("COACH'S REPORT","last 4 weeks","What your last 28 days of steps, sessions, pace, cadence and challenges show, compared with the weeks before. Green is going well, amber is worth a look.");
+        if(rep.isEmpty())rc.addView(tx("A week of days is enough for the first report. Keep walking and check back.",13,muted,false));
+        for(int i=0;i<rep.size();i++){TrainerCoach.Finding f=rep.get(i);LinearLayout r=row();r.setPadding(0,dp(12),0,dp(12));if(i>0){View sep=new View(this);sep.setBackgroundColor(line);rc.addView(sep,lp(-1,1));}rc.addView(r,lp(-1,-2));
+            View dot=new View(this);GradientDrawable dg=new GradientDrawable();dg.setShape(GradientDrawable.OVAL);dg.setColor(f.tone>0?positive:f.tone<0?warning:muted);dot.setBackground(dg);LinearLayout.LayoutParams dlp=lp(10,10);dlp.topMargin=dp(5);dlp.rightMargin=dp(12);r.addView(dot,dlp);
+            LinearLayout l=col();r.addView(l,new LinearLayout.LayoutParams(0,-2,1));LinearLayout top=row();l.addView(top,lp(-1,-2));
+            top.addView(tx(f.title,13,muted,true),new LinearLayout.LayoutParams(0,-2,1));top.addView(tx(f.value,14,ink,true));
+            TextView v=tx(f.verdict,13,ink,false);v.setLineSpacing(dp(2),1f);v.setPadding(0,dp(4),0,0);l.addView(v);}
     }
     private void renderTrainer(){
         JSONArray h=history();brand("KADAMM TRAINER","Your training","A plan built from your own walks, steps and pace.");
         if(!SessionMetrics.ready()){LinearLayout w=card();w.addView(tx("Analysing your sessions…",13,muted,false));handler.postDelayed(()->{if("Trainer".equals(page))renderPageNow();},800);return;}
+        renderCoachSection(h);
         Trainer.State st=trainerState(h);KadammTheme th=chartTheme();int teal=GoalCapsule.COLORS[0];
         // Stage ladder
         LinearLayout sc=card();TextView se=tx("STAGE "+(st.stage+1)+" OF 6",10,teal,true);se.setLetterSpacing(.08f);sc.addView(se);sc.addView(tx(Trainer.STAGES[st.stage],24,ink,true));
@@ -820,9 +887,16 @@ public class MainActivity extends Activity {
         int sesAt=Reminders.get(this,"sesAt",23*60);Calendar nowC=Calendar.getInstance();boolean final_=!day.equals(todayKey())||nowC.get(Calendar.HOUR_OF_DAY)*60+nowC.get(Calendar.MINUTE)>=sesAt;
         list.removeIf(o->!DaySummary.counts(o));
         LinearLayout ov=metricCard(final_?"FINAL SUMMARY":"SO FAR TODAY","",(final_?"The day is complete: everything below is final.":"The summary is final at "+clock12(sesAt)+", when it's also sent as a notification; until then it grows with each session.")+" Totals add every session together; averages are worked out over the whole day (pace = total moving time ÷ total distance, cadence weighted by each session's moving time)."+(d.skipped>0?"\n\n"+d.skipped+(d.skipped==1?" short recording":" short recordings")+" under 100 steps (or rides) are left out.":""));
-        ov.addView(valueUnit(String.format(Locale.US,"%.2f",d.km),"km in total",34,ink));
+        // The whole day first (the same total as Home), then what the sessions added up to.
+        ov.addView(valueUnit(String.format(Locale.US,"%,d",d.daySteps),"steps today",34,ink));
+        if(d.daySteps>0){int pct=(int)Math.round(d.steps*100d/d.daySteps);
+            LinearLayout split=row();split.setClipToOutline(true);split.setBackground(shape(raised,5));LinearLayout.LayoutParams spp=lp(-1,10);spp.topMargin=dp(8);ov.addView(split,spp);
+            View a1=new View(this);a1.setBackgroundColor(GoalCapsule.COLORS[0]);split.addView(a1,new LinearLayout.LayoutParams(0,-1,Math.max(1,pct)));View a2=new View(this);split.addView(a2,new LinearLayout.LayoutParams(0,-1,Math.max(1,100-pct)));
+            ov.addView(tx(String.format(Locale.US,"%,d in %d sessions (%d%%) · %,d from everyday walking",d.steps,d.sessions,pct,d.outsideSteps),12,muted,false));}
+        TextView wl=tx("WHOLE DAY",10,muted,true);wl.setLetterSpacing(.08f);LinearLayout.LayoutParams wlp=lp(-1,-2);wlp.topMargin=dp(12);ov.addView(wl,wlp);
+        statGrid(ov,new String[][]{{"Steps",String.format(Locale.US,"%,d",d.daySteps),""},{"Distance",String.format(Locale.US,"≈%.1f",d.dayKm),"km"},{"Active",String.valueOf(Math.round(d.dayKcal)),"kcal"}},6);
         double gain=0;for(JSONObject o:list){SessionMetrics m=SessionMetrics.of(this,o);if(m.gain>0)gain+=m.gain;}
-        TextView tl=tx("TOTALS",10,muted,true);tl.setLetterSpacing(.08f);LinearLayout.LayoutParams tlp=lp(-1,-2);tlp.topMargin=dp(12);ov.addView(tl,tlp);
+        TextView tl=tx("IN SESSIONS · TOTALS",10,muted,true);tl.setLetterSpacing(.08f);LinearLayout.LayoutParams tlp=lp(-1,-2);tlp.topMargin=dp(12);ov.addView(tl,tlp);
         statGrid(ov,new String[][]{{"Total time",DaySummary.clock(d.elapsedS),""},{"Moving time",DaySummary.clock(d.movingS),""},{"Sessions",String.valueOf(d.sessions),""},
             {"Steps",d.steps>0?String.format(Locale.US,"%,d",d.steps):"—",""},{"Active",String.valueOf(Math.round(d.kcal)),"kcal"},{"Climb",gain>0?String.format(Locale.US,"%.0f",gain):"—",gain>0?"m":""},
             {"Effort",String.valueOf(Math.round(d.effort)),""},{"Intensity",String.valueOf(Math.round(d.intensity)),"min"},{"Distance",String.format(Locale.US,"%.2f",d.km),"km"}},6);
@@ -830,6 +904,23 @@ public class MainActivity extends Activity {
         statGrid(ov,new String[][]{{"Pace",paceText(d.pace()),"/km"},{"Cadence",d.cadence>0?String.valueOf(Math.round(d.cadence)):"—",d.cadence>0?"spm":""},{"Per session",DaySummary.clock(d.avgTime()),""},
             {"Distance each",String.format(Locale.US,"%.2f",d.avgKm()),"km"},{"Steps each",d.steps>0?String.format(Locale.US,"%,d",d.avgSteps()):"—",""},{"Effort each",d.sessions>0?String.valueOf(Math.round(d.effort/d.sessions)):"—",""}},6);
         if(d.skipped>0){TextView sk=tx(d.skipped+(d.skipped==1?" short recording":" short recordings")+" under 100 steps left out",11,muted,false);LinearLayout.LayoutParams skp=lp(-1,-2);skp.topMargin=dp(10);ov.addView(sk,skp);}
+        // Session by session: every session side by side, the top one in each column highlighted.
+        if(list.size()>=2){
+            LinearLayout sb=metricCard("SESSION BY SESSION","","Each of the day's sessions side by side. The highest steps, distance and effort, and the fastest pace, are highlighted, so you can see which session did the most. The bottom line adds them up.");
+            long maxSteps=0;double maxKm=0,maxEff=0,bestPace=Double.MAX_VALUE;
+            for(JSONObject o:list){SessionMetrics x=SessionMetrics.of(this,o);maxSteps=Math.max(maxSteps,o.optLong("steps",0));maxKm=Math.max(maxKm,o.optDouble("distanceKm",0));maxEff=Math.max(maxEff,x.effort);if(x.paceMoving>0&&x.paceMoving<1800)bestPace=Math.min(bestPace,x.paceMoving);}
+            LinearLayout hd=row();LinearLayout.LayoutParams hdp=lp(-1,-2);hdp.topMargin=dp(10);sb.addView(hd,hdp);float[] wts={1.25f,1f,.85f,.8f,1f};String[] hs={"Session","Steps","km","Effort","Pace"};
+            for(int k=0;k<5;k++){TextView t=tx(hs[k],10,muted,false);if(k>0)t.setGravity(Gravity.END);hd.addView(t,new LinearLayout.LayoutParams(0,-2,wts[k]));}
+            for(JSONObject o:list){SessionMetrics x=SessionMetrics.of(this,o);LinearLayout r=row();r.setPadding(0,dp(9),0,dp(9));r.setBackground(rippleOn(Color.TRANSPARENT,8));sb.addView(r,lp(-1,-2));
+                r.addView(tx(o.optString("time",""),13,ink,true),new LinearLayout.LayoutParams(0,-2,wts[0]));
+                long st=o.optLong("steps",0);double kmv=o.optDouble("distanceKm",0);boolean bp=x.paceMoving>0&&Math.abs(x.paceMoving-bestPace)<.5;
+                cellMax(r,String.format(Locale.US,"%,d",st),st==maxSteps,wts[1]);cellMax(r,String.format(Locale.US,"%.2f",kmv),kmv==maxKm,wts[2]);cellMax(r,String.valueOf(Math.round(x.effort)),x.effort==maxEff,wts[3]);cellMax(r,paceText(x.paceMoving),bp,wts[4]);
+                r.setOnClickListener(v->{lastSession=o;page="Detail";renderPage();});}
+            View dv=new View(this);dv.setBackgroundColor(line);sb.addView(dv,lp(-1,1));
+            LinearLayout tot=row();tot.setPadding(0,dp(9),0,0);sb.addView(tot,lp(-1,-2));tot.addView(tx("Total",13,ink,true),new LinearLayout.LayoutParams(0,-2,wts[0]));
+            String[] tv={String.format(Locale.US,"%,d",d.steps),String.format(Locale.US,"%.2f",d.km),String.valueOf(Math.round(d.effort)),paceText(d.pace())};for(int k=0;k<4;k++){TextView t=tx(tv[k],13,ink,true);t.setGravity(Gravity.END);tot.addView(t,new LinearLayout.LayoutParams(0,-2,wts[k+1]));}
+            sb.addView(tx("Highlighted = the day's top session for that measure. Tap a row to open it.",10,muted,false));
+        }
         // Relative effort: this day against your recent active days
         java.util.Map<String,Double> byDay=new java.util.HashMap<>();String from=DaySteps.key(dayMillis(day)-21L*86400000L);
         for(int i=0;i<h.length();i++){JSONObject o=h.optJSONObject(i);if(o==null)continue;String k=o.optString("day","");if(k.compareTo(from)>=0&&k.compareTo(day)<0&&!Insights.vehicle(o)){Double v=byDay.get(k);byDay.put(k,(v==null?0:v)+SessionMetrics.of(this,o).effort);}}
@@ -867,6 +958,7 @@ public class MainActivity extends Activity {
         Button share=button("Share this day",lime,accentOn);share.setTextSize(15);LinearLayout.LayoutParams shp=lp(-1,50);shp.topMargin=dp(14);content.addView(share,shp);share.setOnClickListener(v->shareDay(day));
         TextView when=tx("The day's summary also arrives as a notification at "+clock12(Reminders.get(this,"sesAt",23*60))+" · change in Notifications  ›",12,lime,true);when.setPadding(0,dp(12),0,0);when.setOnClickListener(v->navigate("Notifications"));content.addView(when);
     }
+    private void cellMax(LinearLayout r,String text,boolean top,float w){TextView t=tx(text,13,top?GoalCapsule.COLORS[0]:ink,top);t.setGravity(Gravity.END);if(top){t.setBackground(shape(blend(panel,GoalCapsule.COLORS[0],darkTheme?.20f:.12f),6));t.setPadding(dp(4),dp(1),dp(4),dp(1));}LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-2,w);p.leftMargin=dp(3);r.addView(t,p);}
     private long dayMillis(String day){try{return new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US).parse(day).getTime();}catch(Exception e){return System.currentTimeMillis();}}
     private void zoneBars(LinearLayout parent,long[] z,long total,int[] colors,String[] names){
         for(int i=z.length-1;i>=0;i--){

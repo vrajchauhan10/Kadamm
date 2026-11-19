@@ -14,6 +14,9 @@ import java.util.Locale;
  */
 final class DaySummary {
     int sessions,auto,skipped;double km,kcal,effort,intensity,cadence=-1;long movingS,elapsedS,steps;String longest="";
+    /** The whole day, not only sessions: all-day steps (the day's total), steps outside sessions, and the day's
+     *  distance and active calories with everyday walking added at your stride (marked as estimated on screen). */
+    long daySteps,outsideSteps;double dayKm,dayKcal;
     /** Whether a session counts: short recordings under 100 steps (saved before 9.0) and rides are left out. */
     static boolean counts(JSONObject o){return !(o.optBoolean("stepsAvailable",false)&&o.optLong("steps",0)<SessionRules.MIN_STEPS)&&!Insights.vehicle(o);}
     private DaySummary() {}
@@ -31,6 +34,8 @@ final class DaySummary {
             if(el>longestS){longestS=el;d.longest=o.optString("time","");}
         }
         if(cadS>0)d.cadence=cadSum/cadS;
+        Long all=DaySteps.allDayTotals(c).get(day);d.daySteps=Math.max(all==null?0:all,d.steps);d.outsideSteps=Math.max(0,d.daySteps-d.steps);
+        double outKm=DaySteps.stepKm(c,d.outsideSteps);d.dayKm=d.km+outKm;d.dayKcal=d.kcal+outKm*Calories.weightKg(c)*.5;
         return d;
     }
     /** Average pace over the day's whole distance and moving time, seconds per km; -1 when there's too little distance. */
@@ -46,10 +51,12 @@ final class DaySummary {
     String headline(){return sessions+(sessions==1?" session":" sessions")+String.format(Locale.US," · %.2f km · ",km)+clock(elapsedS);}
     /** The full summary as plain text, for the notification and for sharing. */
     String text(String title){
-        StringBuilder b=new StringBuilder(title).append('\n').append(headline());
+        StringBuilder b=new StringBuilder(title).append('\n');
+        if(daySteps>0)b.append(String.format(Locale.US,"Whole day: %,d steps · ≈%.1f km · %d kcal\n",daySteps,dayKm,Math.round(dayKcal)));
+        b.append(headline());
         if(auto>0)b.append(String.format(Locale.US," (%d auto, %d started by you)",auto,sessions-auto));
         b.append('\n');
-        b.append("Total: ");if(steps>0)b.append(String.format(Locale.US,"%,d steps · ",steps));
+        b.append("In sessions: ");if(steps>0)b.append(String.format(Locale.US,"%,d steps · ",steps));
         b.append(String.format(Locale.US,"%.2f km · %d kcal · %s moving",km,Math.round(kcal),clock(movingS)));
         b.append("\nAverage: pace ").append(pace(pace()));
         if(cadence>0)b.append(String.format(Locale.US," · cadence %d spm",Math.round(cadence)));

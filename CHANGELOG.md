@@ -1,5 +1,14 @@
 # Changelog
 
+## 9.5 (versionCode 48)
+
+- Day summary matches the day: it opens with the whole day's steps (the same total as Home), split into steps in sessions and steps from everyday walking, plus whole-day distance and active calories. Session totals are labelled as such.
+- New "Session by session" table in the day summary: steps, km, effort and pace for each session, with the day's top session highlighted in every column. Tap a row to open that session.
+- Coach Kadamm: the Trainer now has a coach with a face, a greeting and a message written from your own numbers. There are three new challenges every day, drawn from 11 kinds (steps, distance, beat yesterday, brisk minutes, no long sits, a long walk, an early walk, an evening walk, two walks, active hours, cadence), and none repeats from the day before. Targets come from your last four weeks and rise 5 % after a perfect day, or ease after a weak one.
+- Finish all three challenges and the coach congratulates you with confetti. There's a morning notification with the day's challenges and a thank-you notification when all are done.
+- Coach's report: step trend, consistency, day-to-day swing, weekly rhythm, when you move, walking speed and cadence trends, effort mix and challenge success, over the last 4 weeks.
+- Home's trainer card is now a larger coach card showing today's three challenges.
+
 ## 9.4 (versionCode 47)
 
 - Steps through the day shows the same total as the top of Home. Day totals and the hourly record now treat a reading after more than 6 hours (overnight) the same way, so they add up alike; a note explains any steps Health Connect hasn't placed in an hour yet.
