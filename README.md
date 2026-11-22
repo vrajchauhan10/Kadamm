@@ -39,9 +39,15 @@
 </p>
 
 ### Training and progress
+- **Coach Kadamm:** three new daily challenges, weekly challenges with trophies, a Sunday review, recovery days, streak protection, friend challenge codes, fitness age and a 4-week report.
 - **Kadamm Trainer:** six stages from Starter to 10K runner, today's workout with pace targets, a weekly plan that adapts to your form, and a 4-week fitness forecast.
 - **Reports:** weekly, monthly and custom ranges, with fitness and form, training load, a pace curve and a when-you-move heatmap.
 - **45 badges** in four tiers, from easy to extreme, plus streaks and personal records.
+
+### On your wrist (Wear OS)
+- **Kadamm for Wear OS** works with any Wear OS 3+ watch (Galaxy Watch 4 and later, Pixel Watch, TicWatch, Fossil and others). It shows your steps ring, streak and today's challenges, and starts, pauses and finishes sessions from your wrist. Your watch's heart rate is saved with the session.
+- **Every watch brand through Health Connect:** sleep, resting heart rate and VO2max from Samsung Health, Fitbit, Zepp, Garmin and others feed the coach, fitness age and sleep insights.
+- **Install on the watch:** turn on *Developer options › ADB debugging* and *Wireless debugging* on the watch, then on a computer run `adb connect <watch-ip>:<port>` and `adb install Kadamm-Wear-<version>.apk`. Keep Kadamm installed on the phone; the two pair automatically.
 
 ### Your data, your phone
 - **Stays on your phone:** everything is stored on your phone, and accounts are local.

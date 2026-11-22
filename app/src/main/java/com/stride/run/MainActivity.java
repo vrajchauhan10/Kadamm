@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="9.5";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="9.6";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -166,7 +166,9 @@ public class MainActivity extends Activity {
     }
     /** True when a scrolling view inside {@code v} is not at its top, so a downward drag should scroll it instead. */
     private boolean scrolledDown(View v){if(v.canScrollVertically(-1))return true;if(v instanceof android.view.ViewGroup){android.view.ViewGroup g=(android.view.ViewGroup)v;for(int i=0;i<g.getChildCount();i++)if(g.getChildAt(i).getVisibility()==View.VISIBLE&&scrolledDown(g.getChildAt(i)))return true;}return false;}
-    private LinearLayout navItem(String title,String icon){LinearLayout item=col();item.setGravity(Gravity.CENTER);item.setFocusable(true);String shown="Today".equals(title)?"Home":title;item.setContentDescription(shown);item.setOnClickListener(v->navigate(title));android.widget.ImageView symbol=icon(iconRes(title),muted,2);item.addView(symbol,lp(-1,28));TextView label=tx(shown,11,muted,true);label.setGravity(Gravity.CENTER);item.addView(label,lp(-1,20));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1);p.setMargins(dp(3),0,dp(3),0);nav.addView(item,p);return item;}
+    private String lastNavTap="";private long lastNavAt;
+    /** Tapping the tab you are on (or double-tapping any tab) scrolls back to the top. */
+    private LinearLayout navItem(String title,String icon){LinearLayout item=col();item.setGravity(Gravity.CENTER);item.setFocusable(true);String shown="Today".equals(title)?"Home":title;item.setContentDescription(shown);item.setOnClickListener(v->{if(title.equals(page)&&scroller!=null){scroller.smoothScrollTo(0,0);return;}long now=android.os.SystemClock.uptimeMillis();boolean dbl=title.equals(lastNavTap)&&now-lastNavAt<400;lastNavTap=title;lastNavAt=now;navigate(title);if(dbl&&scroller!=null)scroller.post(()->scroller.smoothScrollTo(0,0));});android.widget.ImageView symbol=icon(iconRes(title),muted,2);item.addView(symbol,lp(-1,28));TextView label=tx(shown,11,muted,true);label.setGravity(Gravity.CENTER);item.addView(label,lp(-1,20));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1);p.setMargins(dp(3),0,dp(3),0);nav.addView(item,p);return item;}
     private void navigate(String destination){page=destination;closeDrawer();renderPage();}
     private void openDrawer(){buildDrawerContents();drawer.setBackgroundColor(panel);drawerLayer.setVisibility(View.VISIBLE);drawerLayer.setAlpha(0f);drawerLayer.animate().alpha(1f).setDuration(reducedMotion()?0:160).start();drawer.setTranslationX(-drawer.getLayoutParams().width);drawer.animate().translationX(0).setInterpolator(new android.view.animation.DecelerateInterpolator()).setDuration(reducedMotion()?0:240).start();}
     private void closeDrawer(){if(drawerLayer==null||drawerLayer.getVisibility()!=View.VISIBLE)return;drawer.animate().translationX(-drawer.getLayoutParams().width).setDuration(reducedMotion()?0:160).start();drawerLayer.animate().alpha(0f).setDuration(reducedMotion()?0:120).withEndAction(()->drawerLayer.setVisibility(View.GONE)).start();}
@@ -697,7 +699,7 @@ public class MainActivity extends Activity {
         LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);c.addView(r,lp(-1,-2));
         TextView av=tx("K",big?26:20,Color.WHITE,true);av.setGravity(Gravity.CENTER);GradientDrawable ag=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{GoalCapsule.COLORS[0],violet});ag.setShape(GradientDrawable.OVAL);ag.setStroke(dp(3),blend(panel,Color.WHITE,.25f));av.setBackground(ag);r.addView(av,lp(big?60:48,big?60:48));
         LinearLayout l=col();LinearLayout.LayoutParams llp=new LinearLayout.LayoutParams(0,-2,1);llp.leftMargin=dp(12);r.addView(l,llp);
-        TextView e=tx(cd.allDone?"ALL DONE TODAY":"YOUR TRAINER · LEARNS FROM YOUR DATA",9,cd.allDone?positive:violet,true);e.setLetterSpacing(.08f);l.addView(e);
+        TextView e=tx(cd.allDone?"ALL DONE TODAY":"YOUR TRAINER",9,cd.allDone?positive:violet,true);e.setLetterSpacing(.08f);l.addView(e);
         l.addView(tx("Coach Kadamm",big?20:17,ink,true));l.addView(tx(cd.greeting,12,muted,false));
         TextView cnt=tx(cd.done+"/"+cd.list.size(),big?20:16,cd.allDone?positive:ink,true);cnt.setGravity(Gravity.CENTER);cnt.setPadding(dp(10),dp(4),dp(10),dp(4));cnt.setBackground(shape(cd.allDone?blend(panel,positive,.25f):raised,14));r.addView(cnt,lp(-2,-2));
     }
@@ -723,6 +725,90 @@ public class MainActivity extends Activity {
             Runnable close=()->{FrameLayout l=celebrateLayer;celebrateLayer=null;if(l!=null)l.animate().alpha(0f).setDuration(200).withEndAction(()->root.removeView(l)).start();};
             ok.setOnClickListener(v->close.run());celebrateLayer.setOnClickListener(v->close.run());
             ConfettiView shower=ConfettiView.shower(this);celebrateLayer.addView(shower,new FrameLayout.LayoutParams(-1,-1));},900);
+    }
+    // ---- Trainer: weekly challenges, the weekly review, friends, watch and fitness, records ----
+    private void challengeRow(LinearLayout parent,TrainerCoach.Challenge ch,int i){
+        LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);r.setPadding(dp(12),dp(12),dp(12),dp(12));r.setBackground(shape(ch.done?blend(panel,positive,darkTheme?.20f:.12f):raised,14));LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(8);parent.addView(r,rp);
+        TextView ic=tx(ch.done?"✓":String.valueOf(i+1),15,ch.done?Color.WHITE:coachColor(i),true);ic.setGravity(Gravity.CENTER);GradientDrawable ig=new GradientDrawable();ig.setShape(GradientDrawable.OVAL);ig.setColor(ch.done?positive:blend(panel,coachColor(i),.22f));ic.setBackground(ig);r.addView(ic,lp(36,36));
+        LinearLayout l=col();LinearLayout.LayoutParams llp=new LinearLayout.LayoutParams(0,-2,1);llp.leftMargin=dp(12);r.addView(l,llp);l.addView(tx(ch.title,14,ink,true));l.addView(tx(ch.progress(),12,ch.done?positive:muted,ch.done));l.addView(coachBar(ch,i),coachBarLp());
+    }
+    private void renderWeekly(JSONArray h){
+        TrainerCoach.Week w=TrainerCoach.week(this,h);
+        LinearLayout c=metricCard("THIS WEEK'S CHALLENGES",w.done+"/"+w.list.size(),"Three challenges for Monday to Sunday, picked fresh each week and fitted to your usual week (the four before). Win all three for a weekly trophy.");
+        c.addView(tx(w.allDone?"🏆 Weekly challenge won. Brilliant week.":w.daysLeft==1?"Last day of the week: finish strong.":w.daysLeft+" days left this week",13,w.allDone?positive:ink,true));
+        for(int i=0;i<w.list.size();i++)challengeRow(c,w.list.get(i),i);
+        if(w.wins>0){TextView t=tx("🏆 × "+w.wins+(w.wins==1?" weekly trophy":" weekly trophies"),12,muted,true);t.setPadding(0,dp(10),0,0);c.addView(t);}
+        // The weekly review: this week from Sunday 6 pm, last week on Monday and Tuesday.
+        Calendar now=Calendar.getInstance();int dow=now.get(Calendar.DAY_OF_WEEK);int back=dow==Calendar.SUNDAY&&now.get(Calendar.HOUR_OF_DAY)>=18?0:(dow==Calendar.MONDAY||dow==Calendar.TUESDAY)?1:-1;
+        if(back>=0){TrainerCoach.Review r=TrainerCoach.review(this,h,back);LinearLayout rc=card();coachBackground(rc,false);
+            TextView e=tx("WEEKLY REVIEW · COACH KADAMM",10,violet,true);e.setLetterSpacing(.08f);rc.addView(e);rc.addView(tx(r.title,20,ink,true));
+            for(String line:r.lines){TextView t=tx("•  "+line,14,ink,false);t.setPadding(0,dp(6),0,0);rc.addView(t);}
+            TextView f=tx(r.focus,13,violet,true);f.setPadding(0,dp(12),0,0);f.setLineSpacing(dp(2),1f);rc.addView(f);
+            Button sh=button("Share my week",raised,ink);LinearLayout.LayoutParams sp=lp(-1,44);sp.topMargin=dp(12);rc.addView(sh,sp);
+            sh.setOnClickListener(v->{StringBuilder b=new StringBuilder("Kadamm · "+r.title+"\n");for(String line:r.lines)b.append("• ").append(line).append('\n');shareSheet("Share your week",b.toString().trim(),null,null);});}
+    }
+    private void renderFriends(JSONArray h){
+        LinearLayout c=metricCard("CHALLENGE A FRIEND","","Make a challenge code and send it any way you like. Your friend enters it in their Kadamm and the clock starts for them that day. Codes hold only the challenge and your first name; nothing goes to a server.");
+        java.util.List<TrainerCoach.Friend> fs=TrainerCoach.friends(this,h);
+        if(fs.isEmpty())c.addView(tx("Walk together, apart: send a code like KDM-S70000-7 (70,000 steps in 7 days) or enter one from a friend.",13,muted,false));
+        for(TrainerCoach.Friend f:fs){LinearLayout r=col();r.setPadding(dp(12),dp(12),dp(12),dp(12));r.setBackground(shape(f.done?blend(panel,positive,darkTheme?.20f:.12f):raised,14));LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(8);c.addView(r,rp);
+            String unit=TrainerCoach.kindUnit(f.kind);String tgt="D".equals(f.kind)?String.format(Locale.US,"%d km",f.target):String.format(Locale.US,"%,d %s",f.target,unit);
+            r.addView(tx(f.name+"'s challenge: "+tgt,14,ink,true));
+            String val="D".equals(f.kind)?String.format(Locale.US,"≈%.1f km",f.value):String.format(Locale.US,"%,d %s",Math.round(f.value),unit);
+            r.addView(tx(f.done?"Done ✓ "+val:f.over?"Ended · "+val:val+" · until "+prettyDay(f.to),12,f.done?positive:muted,f.done));
+            TrainerCoach.Challenge pr=new TrainerCoach.Challenge("f","",f.target,f.value,"",f.done);r.addView(coachBar(pr,0),coachBarLp());
+            LinearLayout acts=row();LinearLayout.LayoutParams ap=lp(-1,-2);ap.topMargin=dp(8);r.addView(acts,ap);
+            TextView share=tx("Send my result  ›",12,lime,true);acts.addView(share,new LinearLayout.LayoutParams(0,-2,1));TextView rm=tx("Remove",12,muted,true);acts.addView(rm);
+            share.setOnClickListener(v->shareSheet("Send your result","Kadamm challenge "+f.code+": I "+(f.done?"finished it with ":"have ")+val+" of "+tgt+".",null,null));
+            rm.setOnClickListener(v->{TrainerCoach.removeFriend(this,f.code);renderPageNow();});}
+        LinearLayout btns=row();LinearLayout.LayoutParams bp=lp(-1,46);bp.topMargin=dp(12);c.addView(btns,bp);
+        Button make=button("Create a code",lime,darkTheme?Color.rgb(11,11,13):Color.WHITE),enter=button("Enter a code",raised,ink);
+        btns.addView(make,new LinearLayout.LayoutParams(0,-1,1));LinearLayout.LayoutParams ep=new LinearLayout.LayoutParams(0,-1,1);ep.leftMargin=dp(8);btns.addView(enter,ep);
+        make.setOnClickListener(v->{String[] opts={"70,000 steps in 7 days","15,000 steps in 1 day","150 brisk minutes in 7 days","40 km in 7 days","300,000 steps in 30 days"};String[] codes={"S70000-7","S15000-1","B150-7","D40-7","S300000-30"};
+            dialog().setTitle("Challenge a friend").setItems(opts,(d,which)->{String[] q=codes[which].split("-");String code=TrainerCoach.makeCode(q[0].substring(0,1),Long.parseLong(q[0].substring(1)),Integer.parseInt(q[1]),LocalAccount.name(this));
+                TrainerCoach.join(this,code);renderPageNow();shareSheet("Send your challenge","I challenge you on Kadamm: "+opts[which]+". Enter this code in Kadamm › Trainer › Challenge a friend: "+code,null,null);}).show();});
+        enter.setOnClickListener(v->{android.widget.EditText in=new android.widget.EditText(this);in.setHint("KDM-S70000-7-Name");in.setSingleLine(true);FrameLayout box=new FrameLayout(this);box.setPadding(dp(20),dp(8),dp(20),0);box.addView(in);
+            dialog().setTitle("Enter a challenge code").setView(box).setPositiveButton("Join",(d,w)->{String err=TrainerCoach.join(this,in.getText().toString());if(err!=null)toast(err);else{toast("Challenge joined: it starts today");renderPageNow();}}).setNegativeButton("Cancel",null).show();});
+    }
+    private String prettyDay(String key){try{return new java.text.SimpleDateFormat("EEE d MMM",Locale.getDefault()).format(new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US).parse(key));}catch(Exception e){return key;}}
+    private void renderWatchFitness(JSONArray h){
+        JSONObject v=Vitals.all(this);
+        LinearLayout c=metricCard("YOUR WATCH","","Kadamm works with any Wear OS watch (Galaxy Watch, Pixel Watch and others): install Kadamm on the watch to start and finish walks from your wrist, see today's challenges, and add your watch's heart rate to sessions. Sleep, resting heart rate and VO2max come from any watch that shares into Health Connect, including Samsung Health, Fitbit, Zepp and Garmin.");
+        TextView status=tx("Looking for your watch…",13,muted,true);c.addView(status);
+        try{com.google.android.gms.wearable.Wearable.getNodeClient(this).getConnectedNodes().addOnSuccessListener(nodes->{if(nodes.isEmpty()){status.setText("No Wear OS watch connected");status.setTextColor(muted);}else{status.setText("⌚  Connected: "+nodes.get(0).getDisplayName());status.setTextColor(positive);}})
+            .addOnFailureListener(e->status.setText("No Wear OS watch paired with this phone"));}catch(Throwable t){status.setText("Wear OS isn't available on this phone");}
+        java.util.TreeMap<String,Double> sleep=Vitals.series(v,"sleep"),rhr=Vitals.series(v,"rhr"),vo2=Vitals.series(v,"vo2");
+        if(sleep.isEmpty()&&rhr.isEmpty()&&vo2.isEmpty()){TextView t=tx(DaySteps.hcSteps(this)?"No sleep, resting heart rate or VO2max shared yet. Wear your watch to sleep and allow these in Health Connect.":"Connect Health Connect to bring in your watch's sleep, resting heart rate and VO2max.",13,ink,false);t.setPadding(0,dp(8),0,0);c.addView(t);
+            TextView go=tx("Health Connect permissions  ›",13,lime,true);go.setPadding(0,dp(10),0,0);go.setOnClickListener(x->startActivity(new Intent(this,HealthConnectActivity.class)));c.addView(go);}
+        else{java.util.List<String[]> cells=new java.util.ArrayList<>();
+            if(!sleep.isEmpty()){double last=sleep.lastEntry().getValue();double avg=0;for(double x:sleep.values())avg+=x;avg/=sleep.size();cells.add(new String[]{"Last night",String.format(Locale.US,"%dh %02dm",Math.round(last)/60,Math.round(last)%60),String.format(Locale.US,"avg %dh %02dm",Math.round(avg)/60,Math.round(avg)%60)});}
+            if(!rhr.isEmpty()){double now=rhr.lastEntry().getValue();java.util.List<Double> vals=new java.util.ArrayList<>(rhr.values());double first=Vitals.median(vals.subList(0,Math.max(1,vals.size()/2)));cells.add(new String[]{"Resting HR",Math.round(now)+"",vals.size()>=6?String.format(Locale.US,"bpm (%+.0f)",now-first):"bpm"});}
+            if(!vo2.isEmpty())cells.add(new String[]{"VO₂max",String.format(Locale.US,"%.1f",vo2.lastEntry().getValue()),"ml/kg/min"});
+            statGrid(c,cells.toArray(new String[0][]),10);
+            String src=Vitals.sources(v);if(!src.isEmpty()){TextView t=tx("From "+src+" via Health Connect",11,muted,false);t.setPadding(0,dp(8),0,0);c.addView(t);}
+            double[] sv=Vitals.sleepVsSteps(this);if(sv!=null){double diff=sv[0]-sv[1];TextView t=tx(String.format(Locale.US,Math.abs(diff)<5?"Your sleep is about the same after active and quiet days (%,d+ steps or fewer).":diff>0?"After days of %,d+ steps you sleep %d minutes longer than after quieter days.":"After days of %,d+ steps you sleep %d minutes less than after quieter days.",Math.round(sv[2]),Math.round(Math.abs(diff))),13,ink,true);t.setPadding(0,dp(10),0,0);c.addView(t);
+                TextView n=tx("Based on "+Math.round(sv[3])+" nights.",11,muted,false);c.addView(n);}}
+        // Fitness age
+        Vitals.FitnessAge fa=Vitals.fitnessAge(this,h);
+        LinearLayout fc=metricCard("FITNESS AGE","","The age whose average VO2max matches yours (from the HUNT fitness study). VO2max comes from your watch when it measures it; otherwise Kadamm estimates it from walks with heart rate: the oxygen cost of your walking speed, scaled by how hard your heart worked against your measured resting heart rate. Estimates are labelled.");
+        if(fa.need!=null){String msg="age".equals(fa.need)?"Add your age in Profile to see your fitness age.":"rest".equals(fa.need)?"Needs a resting heart rate from your watch (through Health Connect), or VO2max from your watch.":"Needs 2 or more walks of 10+ minutes with heart rate from a watch in the last 60 days ("+fa.sessions+" so far).";fc.addView(tx(msg,13,ink,false));}
+        else{LinearLayout r=row();r.setGravity(Gravity.BOTTOM);fc.addView(r);r.addView(tx(String.valueOf(fa.fitAge),40,fa.fitAge<=fa.age?positive:warning,true));TextView yr=tx(" years",14,muted,false);yr.setPadding(0,0,0,dp(8));r.addView(yr);
+            fc.addView(tx(fa.fitAge<fa.age?(fa.age-fa.fitAge)+" years younger than your age ("+fa.age+")":fa.fitAge==fa.age?"The same as your age":(fa.fitAge-fa.age)+" years older than your age ("+fa.age+"): brisk walks bring it down",13,ink,true));
+            fc.addView(tx(String.format(Locale.US,"VO₂max %.1f ml/kg/min · %s",fa.vo2,fa.fromWatch?"measured by your watch":"estimate from "+fa.sessions+" walks"),12,muted,false));}
+        String sex=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("sex","");
+        TextView sx=tx(("m".equals(sex)?"Compared with men":"f".equals(sex)?"Compared with women":"Compared with everyone")+" · change  ›",12,lime,true);sx.setPadding(0,dp(10),0,0);fc.addView(sx);
+        sx.setOnClickListener(x->dialog().setTitle("Compare with").setItems(new String[]{"Men","Women","Everyone"},(d,w)->{getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("sex",w==0?"m":w==1?"f":"").apply();renderPageNow();}).show());
+    }
+    private void renderRecordsTrend(JSONArray h){
+        java.util.List<Vitals.Month> ms=Vitals.records(this,h);boolean any=false;for(Vitals.Month m:ms)if(m.bestDay>0||m.sessions>0)any=true;if(!any)return;
+        LinearLayout c=metricCard("RECORDS OVER TIME","6 months","Each month's biggest day, longest walk and fastest pace (walks of 1 km or more with GPS distance). Green marks an all-time best in these six months.");
+        long topDay=0;double topKm=0,topPace=-1;for(Vitals.Month m:ms){topDay=Math.max(topDay,m.bestDay);topKm=Math.max(topKm,m.longestKm);if(m.bestPaceS>0&&(topPace<0||m.bestPaceS<topPace))topPace=m.bestPaceS;}
+        LinearLayout hd=row();c.addView(hd,lp(-1,-2));String[] heads={"","Best day","Longest","Fastest"};float[] ws={.8f,1.3f,1f,1f};
+        for(int i=0;i<4;i++){TextView t=tx(heads[i],11,muted,true);t.setGravity(i==0?Gravity.START:Gravity.END);hd.addView(t,new LinearLayout.LayoutParams(0,-2,ws[i]));}
+        for(int k=ms.size()-1;k>=0;k--){Vitals.Month m=ms.get(k);LinearLayout r=row();r.setPadding(0,dp(9),0,dp(9));c.addView(r,lp(-1,-2));
+            String[] vals={m.label,m.bestDay>0?String.format(Locale.US,"%,d",m.bestDay):"—",m.longestKm>0?String.format(Locale.US,"%.2f km",m.longestKm):"—",m.bestPaceS>0?paceText(m.bestPaceS):"—"};
+            boolean[] top={false,m.bestDay>0&&m.bestDay==topDay,m.longestKm>0&&m.longestKm==topKm,m.bestPaceS>0&&m.bestPaceS==topPace};
+            for(int i=0;i<4;i++){TextView t=tx(vals[i],13,top[i]?positive:ink,i==0||top[i]);t.setGravity(i==0?Gravity.START:Gravity.END);r.addView(t,new LinearLayout.LayoutParams(0,-2,ws[i]));}}
     }
     /** Trainer page: the coach's message, today's challenges in full, and the report on your last four weeks. */
     private void renderCoachSection(JSONArray h){
@@ -752,7 +838,7 @@ public class MainActivity extends Activity {
     private void renderTrainer(){
         JSONArray h=history();brand("KADAMM TRAINER","Your training","A plan built from your own walks, steps and pace.");
         if(!SessionMetrics.ready()){LinearLayout w=card();w.addView(tx("Analysing your sessions…",13,muted,false));handler.postDelayed(()->{if("Trainer".equals(page))renderPageNow();},800);return;}
-        renderCoachSection(h);
+        renderCoachSection(h);renderWeekly(h);renderFriends(h);renderWatchFitness(h);renderRecordsTrend(h);
         Trainer.State st=trainerState(h);KadammTheme th=chartTheme();int teal=GoalCapsule.COLORS[0];
         // Stage ladder
         LinearLayout sc=card();TextView se=tx("STAGE "+(st.stage+1)+" OF 6",10,teal,true);se.setLetterSpacing(.08f);sc.addView(se);sc.addView(tx(Trainer.STAGES[st.stage],24,ink,true));
@@ -1328,7 +1414,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         try{HealthSync.refresh(this,()->{StepsWidget.refresh(this);if(resumed&&!dragging&&("Health".equals(page)||"Today".equals(page))){int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));}syncing=false;});}catch(Throwable ignored){}
     }
     @Override protected void onResume(){
-        super.onResume();resumed=true;checkForUpdateOnce();WidgetTick.schedule(this);handler.removeCallbacks(refresh);handler.post(refresh);startStepCounting();refreshHealth(true);handler.postDelayed(()->SessionMetrics.warm(this,history()),1500);
+        super.onResume();resumed=true;checkForUpdateOnce();WidgetTick.schedule(this);handler.removeCallbacks(refresh);handler.post(refresh);startStepCounting();refreshHealth(true);handler.postDelayed(()->SessionMetrics.warm(this,history()),1500);handler.postDelayed(()->{WearBridge.pushToday(this);WearBridge.pushLive(this);},4000);
         if(content!=null&&(("Today".equals(page)&&stepSetupShown&&DaySteps.permitted(this))||"Health".equals(page)||"Notifications".equals(page)||"Permissions".equals(page)||"Auto".equals(page)||"Storage".equals(page)))renderPageNow();
     }
     @Override protected void onPause(){

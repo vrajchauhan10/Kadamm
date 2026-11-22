@@ -1,0 +1,26 @@
+plugins { id 'com.android.application' }
+
+def appVersion = new Properties()
+file('../version.properties').withInputStream { appVersion.load(it) }
+
+// Kadamm for Wear OS. Same application id and signing key as the phone app, which the Wearable Data Layer needs
+// to pair the two.
+android {
+    namespace 'com.stride.run.wear'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.stride.run'
+        minSdk 30
+        targetSdk 34
+        versionCode appVersion.getProperty('versionCode').toInteger()
+        versionName appVersion.getProperty('versionName')
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.android.gms:play-services-wearable:18.2.0'
+}

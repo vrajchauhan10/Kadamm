@@ -1,5 +1,20 @@
 # Changelog
 
+## 9.6 (versionCode 49)
+
+- Kadamm for Wear OS: a watch app for any Wear OS 3+ watch (Galaxy Watch, Pixel Watch and others), released as Kadamm-Wear-9.6.apk. It shows today's steps ring, streak and the coach's three challenges, and lets you start a walk or run, pause and finish from your wrist; the session records on the phone with GPS. While a session runs, the watch shows time, distance, steps, pace and heart rate, and its heart rate is saved with the session.
+- Watch data from any brand through Health Connect: sleep, resting heart rate and VO2max (Samsung Health, Fitbit, Zepp, Garmin and others), shown in a new "Your watch" card on the Trainer page.
+- Weekly challenges: three every Monday, from steps, goal days, WHO's 150 brisk minutes, walks and perfect days, fitted to your usual week. Win all three for a weekly trophy.
+- Weekly review from the coach on Sunday evening (notification and card): steps against the week before, goal days, brisk minutes, best day, challenges, and next week's focus. It's shareable, and last week's review shows on Monday and Tuesday.
+- Smart nudges: a reminder when your usual walking hour passes quietly, and "so close" when a challenge is 85 % done.
+- Recovery days: after more than twice your usual effort, the next day's targets ease and the hard challenges are left out.
+- Streak protection: between 8 and 10:30 pm, a warning when your streak is at risk, with the steps and minutes needed.
+- Challenge a friend: create a code (for example KDM-S70000-7: 70,000 steps in 7 days) and share it. A friend enters it and sees their progress, then sends back their result. Nothing goes to a server.
+- Fitness age: from your watch's VO2max, or estimated from walks with heart rate (labelled as an estimate).
+- Sleep and steps: how your sleep differs after active days and quiet days (needs 8+ nights from a watch).
+- Records over time: each of the last six months' biggest day, longest walk and fastest pace, with all-time bests highlighted.
+- Tapping the tab you're on (or double-tapping any tab) scrolls back to the top.
+
 ## 9.5 (versionCode 48)
 
 - Day summary matches the day: it opens with the whole day's steps (the same total as Home), split into steps in sessions and steps from everyday walking, plus whole-day distance and active calories. Session totals are labelled as such.

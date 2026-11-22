@@ -42,7 +42,7 @@ $CHANGES
 </p>
 
 ### Install
-Download **Kadamm-$VERSION.apk** below and open it. Already on 9.2 or later? Kadamm offers this update by itself; your sessions and settings stay.
+Download **Kadamm-$VERSION.apk** below and open it. For a Wear OS watch, install **Kadamm-Wear-$VERSION.apk** on the watch (see the README). Already on 9.2 or later? Kadamm offers this update by itself; your sessions and settings stay.
 EOF
 )
 
@@ -73,13 +73,16 @@ fi
 SRC="releases/kadamm-v$VERSION.apk"
 [ -f "$SRC" ] || { echo "No $SRC: run ./build.sh first."; exit 1; }
 OUT="$(mktemp -d)/Kadamm-$VERSION.apk"; cp "$SRC" "$OUT"
+WEAR=""; if [ -f "releases/kadamm-wear-v$VERSION.apk" ]; then WEAR="$(dirname "$OUT")/Kadamm-Wear-$VERSION.apk"; cp "releases/kadamm-wear-v$VERSION.apk" "$WEAR"; fi
 if command -v gh >/dev/null 2>&1; then
-  gh release create "v$VERSION" "$OUT" --repo "$REPO" --title "Kadamm $VERSION" --notes "$NOTES"
+  gh release create "v$VERSION" "$OUT" ${WEAR:+"$WEAR"} --repo "$REPO" --title "Kadamm $VERSION" --notes "$NOTES"
 else
   need_token
   BODY=$(python3 -c 'import json,sys; print(json.dumps({"tag_name":"v"+sys.argv[1],"name":"Kadamm "+sys.argv[1],"body":sys.argv[2],"target_commitish":"main"}))' "$VERSION" "$NOTES")
   ID=$(api -X POST "https://api.github.com/repos/$REPO/releases" -d "$BODY" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
   curl -fsS -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/vnd.android.package-archive" \
     --data-binary @"$OUT" "https://uploads.github.com/repos/$REPO/releases/$ID/assets?name=Kadamm-$VERSION.apk" >/dev/null
+  if [ -n "$WEAR" ]; then curl -fsS -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/vnd.android.package-archive" \
+    --data-binary @"$WEAR" "https://uploads.github.com/repos/$REPO/releases/$ID/assets?name=Kadamm-Wear-$VERSION.apk" >/dev/null; fi
 fi
 echo "Published Kadamm $VERSION: https://github.com/$REPO/releases/tag/v$VERSION"

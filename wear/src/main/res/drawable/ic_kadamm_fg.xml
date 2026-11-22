@@ -1,0 +1,7 @@
+<!-- Kadamm mark: a running track with a dot where you are on it. White on the brand blue. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="6" android:fillColor="#00000000" android:pathData="M42,36 H66 A18,18 0 0 1 84,54 A18,18 0 0 1 66,72 H42 A18,18 0 0 1 24,54 A18,18 0 0 1 42,36 Z" />
+    <path android:strokeColor="#668AB4F8" android:strokeWidth="3.5" android:fillColor="#00000000" android:pathData="M42,46 H66 A8,8 0 0 1 74,54 A8,8 0 0 1 66,62 H42 A8,8 0 0 1 34,54 A8,8 0 0 1 42,46 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M67.5,38.4 a7.5,7.5 0 1 0 15,0 a7.5,7.5 0 1 0 -15,0 z" />
+    <path android:fillColor="#FF0B0B0D" android:pathData="M70,38.4 a5,5 0 1 0 10,0 a5,5 0 1 0 -10,0 z" />
+</vector>

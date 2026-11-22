@@ -37,7 +37,7 @@ final class TrainerCoach {
             return unit;
         }
     }
-    static final class Day { final List<Challenge> list=new ArrayList<>();int done;String greeting,message,signoff;boolean allDone;double level; }
+    static final class Day { final List<Challenge> list=new ArrayList<>();int done;String greeting,message,signoff;boolean allDone,recovery;double level,yEffort,usualEffort; }
 
     private static SharedPreferences prefs(Context c){return c.getSharedPreferences("kadamm_coach",Context.MODE_PRIVATE);}
     private static String name(Context c){LocalAccount.Account a=LocalAccount.current(c);if(a==null||a.name==null)return "";String n=a.name.trim();int sp=n.indexOf(' ');return sp>0?n.substring(0,sp):n;}
@@ -72,11 +72,14 @@ final class TrainerCoach {
             Calendar st=Calendar.getInstance();st.setTimeInMillis(o.optLong("startTimeMs",o.optLong("id")));int hr=st.get(Calendar.HOUR_OF_DAY);if(hr<9)early=true;if(hr>=18)evening=true;
             if(SessionMetrics.ready()&&o.optLong("durationMs")>=10*60000){SessionMetrics m=SessionMetrics.of(c,o);bestCad=Math.max(bestCad,m.cadenceAvg);}}
         SharedPreferences cp=prefs(c);Calendar y=Calendar.getInstance();y.add(Calendar.DAY_OF_YEAR,-1);String yKey=DaySteps.key(y.getTimeInMillis());
+        // Recovery: after a day with more than twice your usual effort, today is eased and kept gentle.
+        double[] eff=efforts(c,hist);day.yEffort=eff[0];day.usualEffort=eff[1];day.recovery=eff[0]>=60&&eff[1]>0&&eff[0]>2*eff[1];
+        if(day.recovery){day.level=Math.min(day.level,.9);stepTarget=Math.max(goal,Math.round(base*day.level/500.0)*500.0);briskTarget=Math.max(20,Math.round((brMed)*.8/5.0)*5.0);}
         String picked=cp.getString("set_"+today,"");
         if(picked.isEmpty()){
             List<String> yest=Arrays.asList(cp.getString("set_"+yKey,"").split(","));java.util.Random rnd=new java.util.Random(today.hashCode()*31L+7);
             List<String> vol=new ArrayList<>(Arrays.asList("steps","km","beat"));Long yv0=totals.get(yKey);if(yv0==null||yv0<1000)vol.remove("beat");
-            List<String> rest=new ArrayList<>(Arrays.asList("brisk","sit","long","early","evening","twice","hours","cadence"));if(minute>=8*60+30)rest.remove("early");if(minute>=19*60)rest.remove("evening");
+            List<String> rest=new ArrayList<>(Arrays.asList("brisk","sit","long","early","evening","twice","hours","cadence"));if(day.recovery){rest.remove("cadence");rest.remove("long");}if(minute>=8*60+30)rest.remove("early");if(minute>=19*60)rest.remove("evening");
             vol.removeAll(yest);if(vol.isEmpty())vol.add("steps");List<String> fresh=new ArrayList<>(rest);fresh.removeAll(yest);if(fresh.size()<2)fresh=rest;
             java.util.Collections.shuffle(vol,rnd);java.util.Collections.shuffle(fresh,rnd);picked=vol.get(0)+","+fresh.get(0)+","+fresh.get(1);
             cp.edit().putString("set_"+today,picked).apply();
@@ -118,7 +121,8 @@ final class TrainerCoach {
             m.append(String.format(Locale.US,", with %,d steps on the day. That's exactly how fitness is built, one good day at a time.",Math.round(steps)));
             day.signoff="Rest well. Tomorrow I'll raise the bar a little, because you've earned it.";
         }else{
-            if(yv!=null&&yv>0&&minute<12*60)m.append(String.format(Locale.US,"Yesterday you walked %,d steps%s. ",yv,yDone>=3?" and finished every challenge, brilliant":yDone==2?" and finished two of three challenges":""));
+            if(day.recovery)m.append(String.format(Locale.US,"Yesterday was a big day: effort %d, about %.1f× your usual. Today is a recovery day, so I've eased your targets. Keep the pace comfortable. ",Math.round(day.yEffort),day.yEffort/day.usualEffort));
+            else if(yv!=null&&yv>0&&minute<12*60)m.append(String.format(Locale.US,"Yesterday you walked %,d steps%s. ",yv,yDone>=3?" and finished every challenge, brilliant":yDone==2?" and finished two of three challenges":""));
             Challenge next=null;for(Challenge ch:day.list)if(!ch.done&&(next==null||ch.fraction()>next.fraction()))next=ch;
             if(day.done==0)m.append("Here are today's three challenges, set from your last four weeks. ");
             else m.append(day.done==1?"One challenge down, two to go. ":"Two done, one to go. ");
@@ -135,7 +139,9 @@ final class TrainerCoach {
                 else if("cadence".equals(next.id))m.append("Walk 10 minutes with quick, light steps, about 110 a minute.");
                 else m.append("Stand up and walk for two minutes every time you've been still for close to an hour.");
             }
-            day.signoff=day.level>1.02?String.format(Locale.US,"Your targets are %d%% above your usual, because you've been on a roll.",Math.round((day.level-1)*100)):day.level<.98?"I've eased today's targets a little; a steady day gets you back on track.":"You've got this.";
+            int[] stk=DaySteps.streaks(totals,c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getInt("stepGoal",10000));int g0=c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getInt("stepGoal",10000);
+            if(minute>=19*60&&stk[0]>=2&&steps<g0)m.append(String.format(Locale.US," Your %d-day streak needs %,d more steps tonight, about %d minutes of walking.",stk[0],Math.round(g0-steps),Math.max(5,Math.round((g0-steps)/100.0))));
+            day.signoff=day.recovery?"Easy movement today helps your body absorb yesterday's work.":day.level>1.02?String.format(Locale.US,"Your targets are %d%% above your usual, because you've been on a roll.",Math.round((day.level-1)*100)):day.level<.98?"I've eased today's targets a little; a steady day gets you back on track.":"You've got this.";
         }
         day.message=m.toString().trim();
     }
@@ -177,6 +183,101 @@ final class TrainerCoach {
         if(daysTracked>0)out.add(new Finding("Challenges",full+" perfect days of "+daysTracked,done*100/Math.max(1,daysTracked*3)+"% of challenges completed over the last two weeks.",full*2>=daysTracked?1:0));
         return out;
     }
+    /** [yesterday's effort, your usual daily effort over the 28 days before]. */
+    static double[] efforts(Context c,JSONArray hist){
+        if(!SessionMetrics.ready())return new double[]{0,0};
+        Calendar y=Calendar.getInstance();y.add(Calendar.DAY_OF_YEAR,-1);String yk=DaySteps.key(y.getTimeInMillis());y.add(Calendar.DAY_OF_YEAR,-28);String from=DaySteps.key(y.getTimeInMillis());
+        double ye=0,sum=0;for(int i=0;i<hist.length();i++){JSONObject o=hist.optJSONObject(i);if(o==null||!DaySummary.counts(o))continue;String k=o.optString("day","");if(k.compareTo(from)<0||k.compareTo(yk)>0)continue;
+            double e=SessionMetrics.of(c,o).effort;if(k.equals(yk))ye+=e;else sum+=e;}
+        return new double[]{ye,sum/28};
+    }
+
+    // ---- Weekly challenges (Monday to Sunday) ----
+    static final class Week { final List<Challenge> list=new ArrayList<>();int done,daysLeft,wins;boolean allDone;String key; }
+    static Calendar monday(int weeksBack){Calendar m=Calendar.getInstance();int dow=(m.get(Calendar.DAY_OF_WEEK)+5)%7;m.add(Calendar.DAY_OF_YEAR,-dow-7*weeksBack);m.set(Calendar.HOUR_OF_DAY,12);return m;}
+    /** Brisk minutes on a day: Health Connect's minute steps or that day's sessions, the larger. */
+    static double briskOn(Context c,JSONArray hist,JSONObject md,String day){
+        if(day.equals(DaySteps.todayKey()))return GoalCapsule.briskToday(c);
+        JSONObject x=md.optJSONObject(day);double hc=x!=null?x.optDouble("brisk",0):0,ses=0;
+        if(SessionMetrics.ready())for(int i=0;i<hist.length();i++){JSONObject o=hist.optJSONObject(i);if(o!=null&&day.equals(o.optString("day",""))&&DaySummary.counts(o)){SessionMetrics m=SessionMetrics.of(c,o);ses+=(m.zoneS[2]+m.zoneS[3]+m.zoneS[4])/60d;}}
+        return Math.max(hc,ses);
+    }
+    static Week week(Context c,JSONArray hist){
+        Week w=new Week();Calendar mon=monday(0);w.key=DaySteps.key(mon.getTimeInMillis());Map<String,Long> totals=DaySteps.allDayTotals(c);JSONObject md=DaySteps.minuteDays(c);SharedPreferences p=prefs(c);
+        int goal=c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getInt("stepGoal",10000);String today=DaySteps.todayKey();
+        long steps=0;int goalDays=0,perfect=0,walks=0;double brisk=0;Calendar d=(Calendar)mon.clone();
+        for(int i=0;i<7;i++){String k=DaySteps.key(d.getTimeInMillis());if(k.compareTo(today)>0){w.daysLeft++;d.add(Calendar.DAY_OF_YEAR,1);continue;}
+            Long v=totals.get(k);long n=v==null?0:v;steps+=n;if(n>=goal)goalDays++;if(p.getInt("done_"+k,0)>=3)perfect++;brisk+=briskOn(c,hist,md,k);d.add(Calendar.DAY_OF_YEAR,1);}
+        w.daysLeft++; // today still counts
+        for(int i=0;i<hist.length();i++){JSONObject o=hist.optJSONObject(i);if(o!=null&&DaySummary.counts(o)&&o.optString("day","").compareTo(w.key)>=0)walks++;}
+        // Your usual week: the 4 weeks before this one.
+        long prior=0;Calendar q=(Calendar)mon.clone();for(int i=0;i<28;i++){q.add(Calendar.DAY_OF_YEAR,-1);Long v=totals.get(DaySteps.key(q.getTimeInMillis()));if(v!=null)prior+=v;}
+        double lv=level(c);double stepT=Math.max(goal*5L,Math.round(prior/4.0*1.05*lv/5000.0)*5000.0);
+        String picked=p.getString("wk_"+w.key,"");
+        if(picked.isEmpty()){List<String> pool=new ArrayList<>(Arrays.asList("wsteps","wgoal","wbrisk","wwalks","wperfect"));java.util.Collections.shuffle(pool,new java.util.Random(w.key.hashCode()*17L+3));
+            List<String> last=Arrays.asList(p.getString("wk_"+DaySteps.key(monday(1).getTimeInMillis()),"").split(","));pool.sort((a,b)->Boolean.compare(last.contains(a),last.contains(b)));
+            picked=pool.get(0)+","+pool.get(1)+","+pool.get(2);p.edit().putString("wk_"+w.key,picked).apply();}
+        for(String id:picked.split(",")){
+            switch(id){
+                case "wsteps":w.list.add(new Challenge(id,String.format(Locale.US,"%,d steps this week",Math.round(stepT)),stepT,steps,"steps",steps>=stepT));break;
+                case "wgoal":w.list.add(new Challenge(id,"Reach your goal on 5 days",5,goalDays,goalDays+" of 5 days",goalDays>=5));break;
+                case "wbrisk":w.list.add(new Challenge(id,"150 brisk minutes (WHO)",150,brisk,"min",brisk>=150));break;
+                case "wwalks":w.list.add(new Challenge(id,"5 walks this week",5,walks,walks+" of 5 walks",walks>=5));break;
+                default:w.list.add(new Challenge(id,"2 perfect challenge days",2,perfect,perfect+" of 2 days",perfect>=2));
+            }
+        }
+        for(Challenge ch:w.list)if(ch.done)w.done++;w.allDone=w.done==w.list.size();
+        if(w.allDone&&!p.getBoolean("wkWon_"+w.key,false))p.edit().putBoolean("wkWon_"+w.key,true).apply();
+        for(String k:p.getAll().keySet())if(k.startsWith("wkWon_"))w.wins++;
+        return w;
+    }
+
+    // ---- The weekly review ----
+    static final class Review { String title;final List<String> lines=new ArrayList<>();String focus; }
+    /** weeksBack 0: this week so far (shown Sunday evening); 1: last week (shown Monday and Tuesday). */
+    static Review review(Context c,JSONArray hist,int weeksBack){
+        Review r=new Review();Map<String,Long> totals=DaySteps.allDayTotals(c);JSONObject md=DaySteps.minuteDays(c);SharedPreferences p=prefs(c);int goal=c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getInt("stepGoal",10000);
+        Calendar mon=monday(weeksBack),prev=monday(weeksBack+1);String today=DaySteps.todayKey();
+        long steps=0,prevSteps=0,best=0;String bestDay="";int goalDays=0,chDone=0,chDays=0,perfect=0;double brisk=0;String[] names={"Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"};
+        Calendar d=(Calendar)mon.clone(),e=(Calendar)prev.clone();
+        for(int i=0;i<7;i++){String k=DaySteps.key(d.getTimeInMillis()),pk=DaySteps.key(e.getTimeInMillis());d.add(Calendar.DAY_OF_YEAR,1);e.add(Calendar.DAY_OF_YEAR,1);Long pv=totals.get(pk);if(pv!=null)prevSteps+=pv;
+            if(k.compareTo(today)>0)continue;Long v=totals.get(k);long n=v==null?0:v;steps+=n;if(n>=goal)goalDays++;if(n>best){best=n;bestDay=names[i];}brisk+=briskOn(c,hist,md,k);
+            int dn=p.getInt("done_"+k,-1);if(dn>=0){chDays++;chDone+=dn;if(dn>=3)perfect++;}}
+        r.title=weeksBack==0?"Your week so far":"Last week in review";
+        r.lines.add(String.format(Locale.US,"%,d steps%s",steps,prevSteps>0?String.format(Locale.US," (%+.0f%% on the week before)",(steps-prevSteps)*100.0/prevSteps):""));
+        r.lines.add(goalDays+" of 7 days at your step goal");
+        r.lines.add(Math.round(brisk)+" brisk minutes"+(brisk>=150?" ✓ WHO's weekly 150 met":" of WHO's weekly 150"));
+        if(best>0)r.lines.add(String.format(Locale.US,"Best day: %s, %,d steps",bestDay,best));
+        if(chDays>0)r.lines.add(chDone+" of "+chDays*3+" daily challenges done, "+perfect+" perfect "+(perfect==1?"day":"days"));
+        if(p.getBoolean("wkWon_"+DaySteps.key(mon.getTimeInMillis()),false))r.lines.add("🏆 Weekly challenge won");
+        r.focus=goalDays<4?"Next week's focus: reach your goal on at least 5 days. Steady days beat one big day.":brisk<150?"Next week's focus: add two brisk 20-minute walks to reach 150 brisk minutes.":prevSteps>0&&steps<prevSteps*.9?"Next week's focus: get back to your usual volume with one longer weekend walk.":"Next week's focus: keep this rhythm, and try one walk at a quicker cadence (110+ spm).";
+        return r;
+    }
+
+    // ---- Friend challenges: a short code, shared any way you like; nothing goes to a server ----
+    static final class Friend { String code,kind,name,from,to;long target;double value;boolean done,over; }
+    /** A code like KDM-S70000-7-Vraj: S steps, B brisk minutes or D km, the target, the days, and who sent it. */
+    static String makeCode(String kind,long target,int days,String name){String n=(name==null?"":name.trim().split(" ")[0]).replaceAll("[^A-Za-z0-9]","");return "KDM-"+kind+target+"-"+days+(n.isEmpty()?"":"-"+n);}
+    static String join(Context c,String code){
+        String t=code==null?"":code.trim().toUpperCase(Locale.US).replace(" ","");String[] parts=code==null?new String[0]:code.trim().split("-");
+        if(!t.startsWith("KDM-")||parts.length<3)return "That doesn't look like a Kadamm code (KDM-…).";
+        try{String kind=parts[1].substring(0,1).toUpperCase(Locale.US);long target=Long.parseLong(parts[1].substring(1));int days=Integer.parseInt(parts[2]);if(!"SBD".contains(kind)||target<=0||days<1||days>31)return "That code isn't valid.";
+            JSONArray a=new JSONArray(prefs(c).getString("friends","[]"));Calendar e=Calendar.getInstance();e.add(Calendar.DAY_OF_YEAR,days-1);
+            a.put(new JSONObject().put("code",code.trim()).put("kind",kind).put("target",target).put("name",parts.length>3?parts[3]:"A friend").put("from",DaySteps.todayKey()).put("to",DaySteps.key(e.getTimeInMillis())));
+            prefs(c).edit().putString("friends",a.toString()).apply();return null;}catch(Exception ex){return "That code isn't valid.";}
+    }
+    static List<Friend> friends(Context c,JSONArray hist){
+        List<Friend> out=new ArrayList<>();Map<String,Long> totals=DaySteps.allDayTotals(c);JSONObject md=DaySteps.minuteDays(c);String today=DaySteps.todayKey();
+        try{JSONArray a=new JSONArray(prefs(c).getString("friends","[]"));for(int i=a.length()-1;i>=0;i--){JSONObject o=a.getJSONObject(i);Friend f=new Friend();f.code=o.optString("code");f.kind=o.optString("kind");f.name=o.optString("name");f.from=o.optString("from");f.to=o.optString("to");f.target=o.optLong("target");
+            Calendar d=Calendar.getInstance();d.setTime(new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US).parse(f.from));
+            for(int k=0;k<40;k++){String key=DaySteps.key(d.getTimeInMillis());if(key.compareTo(f.to)>0||key.compareTo(today)>0)break;Long v=totals.get(key);long n=v==null?0:v;
+                f.value+="S".equals(f.kind)?n:"D".equals(f.kind)?DaySteps.stepKm(c,n):briskOn(c,hist,md,key);d.add(Calendar.DAY_OF_YEAR,1);}
+            f.done=f.value>=f.target;f.over=today.compareTo(f.to)>0;out.add(f);}}catch(Exception ignored){}
+        return out;
+    }
+    static void removeFriend(Context c,String code){try{JSONArray a=new JSONArray(prefs(c).getString("friends","[]")),b=new JSONArray();for(int i=0;i<a.length();i++)if(!code.equals(a.getJSONObject(i).optString("code")))b.put(a.get(i));prefs(c).edit().putString("friends",b.toString()).apply();}catch(Exception ignored){}}
+    static String kindUnit(String k){return "S".equals(k)?"steps":"D".equals(k)?"km":"brisk min";}
+
     // ---- Notifications: today's challenges in the morning, and a thank-you when all three are done ----
     static void notifyIfDue(Context c){
         try{
@@ -184,15 +285,33 @@ final class TrainerCoach {
             if(!c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getBoolean("notifyCoach",true))return;
             Day d=today(c,DaySteps.sessions(c));
             if(d.allDone&&!today.equals(p.getString("doneNotified",""))){p.edit().putString("doneNotified",today).putString("morningNotified",today).apply();
-                post(c,"Coach Kadamm: all 3 challenges done 🎉","I'm really happy with all your efforts today. "+d.signoff);return;}
+                post(c,"Coach Kadamm: all 3 challenges done 🎉","I'm really happy with all your efforts today. "+d.signoff,7420);return;}
+            Calendar now=Calendar.getInstance();int dow=now.get(Calendar.DAY_OF_WEEK);
+            // Streak protection, 8 to 10:30 pm.
+            int goal=c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getInt("stepGoal",10000);long steps=DaySteps.todayTotal(c);int[] stk=DaySteps.streaks(DaySteps.allDayTotals(c),goal);
+            if(h>=20&&(h<22||h==22&&now.get(Calendar.MINUTE)<30)&&stk[0]>=2&&steps<goal&&!today.equals(p.getString("streakNotified",""))){p.edit().putString("streakNotified",today).apply();
+                post(c,"Your "+stk[0]+"-day streak is at risk",String.format(Locale.US,"%,d steps to go: about %d minutes of walking keeps it alive.",goal-steps,Math.max(5,Math.round((goal-steps)/100.0))),7421);return;}
+            // The weekly review, Sunday 7 to 10 pm.
+            if(dow==Calendar.SUNDAY&&h>=19&&h<22&&!today.equals(p.getString("reviewNotified",""))){p.edit().putString("reviewNotified",today).apply();Review r=review(c,DaySteps.sessions(c),0);
+                post(c,"Coach Kadamm: your week in review",r.lines.get(0)+" · "+r.lines.get(1)+". "+r.focus,7422);return;}
+            // Almost there: a challenge 85 %+ done, once a day.
+            if(h>=10&&h<22&&!d.allDone&&!today.equals(p.getString("almostNotified",""))){for(Challenge ch:d.list)if(!ch.done&&ch.target>0&&ch.fraction()>=.85f){p.edit().putString("almostNotified",today).apply();
+                post(c,"So close: "+ch.title,ch.progress()+". One short walk finishes it.",7423);return;}}
+            // Your usual walking hour went by quietly.
+            int usual=usualHour(c);if(usual>=0&&h==usual+1&&!d.allDone&&!today.equals(p.getString("usualNotified",""))){double[] hh=DaySteps.hoursOn(c,today);double inHour=hh==null?0:hh[usual];
+                if(inHour<usualAvg*.3){p.edit().putString("usualNotified",today).apply();post(c,"Time for your walk?","You usually walk around "+MetricViews.DotDay.hourName(usual)+". A short one now keeps today's challenges on track.",7424);return;}}
             if(h>=7&&h<11&&d.done<d.list.size()&&!today.equals(p.getString("morningNotified",""))){p.edit().putString("morningNotified",today).apply();
                 StringBuilder b=new StringBuilder();for(Challenge ch:d.list)b.append(b.length()>0?" · ":"").append(ch.title);
-                post(c,d.greeting+" Today's challenges",b.toString());}
+                post(c,d.greeting+" Today's challenges",b.toString(),7420);}
         }catch(Exception ignored){}
     }
-    private static void post(Context c,String title,String text){
+    private static double usualAvg;
+    /** The hour (6 am to 9 pm) you walk most, from the last 14 days; -1 when no hour averages 800+ steps. */
+    static int usualHour(Context c){double[] sum=new double[24];Calendar d=Calendar.getInstance();int n=0;for(int i=0;i<14;i++){d.add(Calendar.DAY_OF_YEAR,-1);double[] h=DaySteps.hoursOn(c,DaySteps.key(d.getTimeInMillis()));if(h==null)continue;n++;for(int j=0;j<24;j++)sum[j]+=h[j];}
+        if(n<5)return -1;int best=-1;for(int j=6;j<=21;j++)if(best<0||sum[j]>sum[best])best=j;usualAvg=sum[best]/n;return usualAvg>=800?best:-1;}
+    private static void post(Context c,String title,String text,int id){
         android.app.NotificationManager nm=c.getSystemService(android.app.NotificationManager.class);if(nm==null)return;
         if(android.os.Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new android.app.NotificationChannel("kadamm_coach","Coach",android.app.NotificationManager.IMPORTANCE_DEFAULT));
-        nm.notify(7420,Reminders.rich(c,"kadamm_coach",7420,title,text,"Trainer",true).build());
+        nm.notify(id,Reminders.rich(c,"kadamm_coach",id,title,text,"Trainer",true).build());
     }
 }

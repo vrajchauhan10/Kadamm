@@ -1,6 +1,7 @@
 #!/bin/bash
 # Builds the debug APK with the bundled toolchain and copies it to releases/kadamm-v<version>.apk.
-# Pass "install" to also install it on a USB-connected phone.
+# Pass "install" to also install it on a USB-connected phone. Also builds the Wear OS app (releases/kadamm-wear-v<version>.apk);
+# install that on a watch with: adb -s <watch> install -r releases/kadamm-wear-v<version>.apk
 set -e
 cd "$(dirname "$0")"
 T="$PWD/tools/android-build"
@@ -9,4 +10,5 @@ export JAVA_HOME="$T/jdk/jdk-17.0.20.1+1/Contents/Home" ANDROID_HOME="$T/sdk" AN
 VERSION=$(grep versionName version.properties | cut -d= -f2)
 cp app/build/outputs/apk/debug/app-debug.apk "releases/kadamm-v$VERSION.apk"
 echo "Built releases/kadamm-v$VERSION.apk"
+if [ -f wear/build/outputs/apk/debug/wear-debug.apk ]; then cp wear/build/outputs/apk/debug/wear-debug.apk "releases/kadamm-wear-v$VERSION.apk"; echo "Built releases/kadamm-wear-v$VERSION.apk (Wear OS)"; fi
 if [ "$1" = "install" ]; then "$T/sdk/platform-tools/adb" install -r "releases/kadamm-v$VERSION.apk"; fi

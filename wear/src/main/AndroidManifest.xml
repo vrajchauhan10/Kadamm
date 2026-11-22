@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-feature android:name="android.hardware.type.watch" />
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <application android:label="Kadamm" android:icon="@mipmap/ic_launcher" android:theme="@android:style/Theme.DeviceDefault" android:allowBackup="false">
+        <uses-library android:name="com.google.android.wearable" android:required="false" />
+        <!-- Works with the Kadamm phone app; it isn't a standalone watch app. -->
+        <meta-data android:name="com.google.android.wearable.standalone" android:value="false" />
+        <activity android:name="com.stride.run.WatchActivity" android:exported="true" android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

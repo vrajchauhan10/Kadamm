@@ -9,6 +9,9 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.RestingHeartRateRecord
+import androidx.health.connect.client.records.SleepSessionRecord
+import androidx.health.connect.client.records.Vo2MaxRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
@@ -38,7 +41,10 @@ object HealthSync {
         HealthPermission.getReadPermission(DistanceRecord::class),
         HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
         HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
-        HealthPermission.getReadPermission(HeartRateRecord::class)
+        HealthPermission.getReadPermission(HeartRateRecord::class),
+        HealthPermission.getReadPermission(SleepSessionRecord::class),
+        HealthPermission.getReadPermission(RestingHeartRateRecord::class),
+        HealthPermission.getReadPermission(Vo2MaxRecord::class)
     ) + HealthImport.wanted()
     @JvmStatic fun isRunning() = running
     /** Lets Kadamm read while closed, so the widget and reminders stay current. Only offered where Health Connect supports it. */
@@ -234,6 +240,7 @@ object HealthSync {
         } catch (_: Exception) {
         }
         try { dailyMinutes(hc, prefs, today, zone, filter) } catch (_: Exception) { }
+        try { vitals(hc, prefs, granted, today, zone) } catch (_: Exception) { }
         edit.putBoolean("hcBackground", granted.contains(BACKGROUND))
         edit.putLong("healthDayTotal", dayTotal)
             .putString("healthOrigin", preferred ?: "")
@@ -324,6 +331,39 @@ object HealthSync {
      * peak-30 cadence (the mean of the day's 30 highest minutes, Tudor-Locke), brisk minutes (100+ steps a
      * minute), the longest sitting stretch between 7 am and 11 pm (minutes under 10 steps), and steps per hour.
      */
+    /**
+     * What a watch measures, from any brand that shares into Health Connect (Galaxy Watch through Samsung Health,
+     * Pixel Watch through Fitbit, Zepp, Garmin, Wear OS apps): sleep per night, resting heart rate and VO2max for the
+     * last 30 days. Saved as "vitals" {sleep:{day:min}, rhr:{day:bpm}, vo2:{day:value}, sources:[apps]}; a day only
+     * appears when a watch actually recorded it.
+     */
+    private suspend fun vitals(hc: HealthConnectClient, prefs: android.content.SharedPreferences, granted: Set<String>, today: LocalDate, zone: ZoneId) {
+        val range = TimeRangeFilter.between(today.minusDays(30).atStartOfDay(zone).toInstant(), Instant.now())
+        val out = JSONObject(); val sleep = JSONObject(); val rhr = JSONObject(); val vo2 = JSONObject(); val sources = java.util.TreeSet<String>()
+        if (granted.contains(HealthPermission.getReadPermission(SleepSessionRecord::class))) {
+            var token: String? = null
+            do {
+                val page = hc.readRecords(ReadRecordsRequest(SleepSessionRecord::class, range, pageToken = token))
+                for (r in page.records) {
+                    val min = Duration.between(r.startTime, r.endTime).toMinutes(); if (min < 60 || min > 16 * 60) continue
+                    val key = r.endTime.atZone(zone).toLocalDate().toString()
+                    sleep.put(key, sleep.optLong(key, 0) + min); sources.add(r.metadata.dataOrigin.packageName)
+                }
+                token = page.pageToken
+            } while (token != null)
+        }
+        if (granted.contains(HealthPermission.getReadPermission(RestingHeartRateRecord::class))) {
+            val page = hc.readRecords(ReadRecordsRequest(RestingHeartRateRecord::class, range))
+            for (r in page.records) { if (r.beatsPerMinute in 30..120) { rhr.put(r.time.atZone(zone).toLocalDate().toString(), r.beatsPerMinute); sources.add(r.metadata.dataOrigin.packageName) } }
+        }
+        if (granted.contains(HealthPermission.getReadPermission(Vo2MaxRecord::class))) {
+            val page = hc.readRecords(ReadRecordsRequest(Vo2MaxRecord::class, range))
+            for (r in page.records) { if (r.vo2MillilitersPerMinuteKilogram in 10.0..90.0) { vo2.put(r.time.atZone(zone).toLocalDate().toString(), r.vo2MillilitersPerMinuteKilogram); sources.add(r.metadata.dataOrigin.packageName) } }
+        }
+        out.put("sleep", sleep).put("rhr", rhr).put("vo2", vo2).put("sources", JSONArray(sources.toList())).put("at", System.currentTimeMillis())
+        prefs.edit().putString("vitals", out.toString()).apply()
+    }
+
     private suspend fun dailyMinutes(hc: HealthConnectClient, prefs: android.content.SharedPreferences, today: LocalDate, zone: ZoneId, filter: Set<DataOrigin>) {
         val days = try { JSONObject(prefs.getString("minuteDays", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
         for (back in 0..29) {
