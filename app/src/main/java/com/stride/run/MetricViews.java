@@ -355,6 +355,54 @@ final class MetricViews {
         }
     }
 
+    /**
+     * Pace consistency: one bar per 250 m, its height the speed of that stretch against your median (the line).
+     * Blue bars are surges (12 %+ faster), amber ones slow stretches (12 %+ slower, often a stop), green the rest.
+     */
+    static final class PaceBars extends Base {
+        private final double[] v;private final double med;
+        PaceBars(Context c,KadammTheme t,java.util.List<Double> pace){super(c,t);v=new double[pace.size()];for(int i=0;i<v.length;i++)v[i]=pace.get(i);double[] s=v.clone();java.util.Arrays.sort(s);med=s.length==0?1:s[s.length/2];setContentDescription("Pace of each 250 metres against your median");}
+        @Override protected void onDraw(Canvas c){
+            if(v.length==0)return;float w=getWidth(),h=getHeight(),bottom=h-dp(14),top=dp(4),slot=w/v.length,bw=Math.max(dp(2),Math.min(dp(14),slot*.7f));
+            double hi=0;for(double x:v)hi=Math.max(hi,med/x);hi=Math.max(hi,1.3);double lo=.5;
+            float midY=(float)(bottom-(bottom-top)*(1-lo)/(hi-lo));
+            for(int i=0;i<v.length;i++){double sp=med/v[i];float y=(float)(bottom-(bottom-top)*Math.max(0,(sp-lo))/(hi-lo));float cx=slot*i+slot/2;
+                p.setColor(sp>=1/.88?ZONE_COLORS[1]:sp<=.88?ZONE_COLORS[3]:ZONE_COLORS[2]);c.drawRoundRect(new RectF(cx-bw/2,Math.min(y,bottom-dp(2)),cx+bw/2,bottom),dp(2),dp(2),p);}
+            p.setColor(t.text);p.setStrokeWidth(dp(1));p.setPathEffect(new DashPathEffect(new float[]{dp(4),dp(3)},0));c.drawLine(0,midY,w,midY,p);p.setPathEffect(null);
+            p.setTextSize(dp(9.5f));p.setColor(t.textMuted);p.setTextAlign(Paint.Align.LEFT);c.drawText("start",0,h-dp(2),p);p.setTextAlign(Paint.Align.RIGHT);c.drawText(String.format(Locale.US,"%.2f km",v.length*.25),w,h-dp(2),p);p.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+    /**
+     * The month so far and where it's heading: cumulative steps (solid), the forecast (dashed) with its likely range
+     * (shaded), and the month's goal (a dotted line).
+     */
+    static final class MonthPath extends Base {
+        private final double[][] d;private final double target;private final int color;
+        MonthPath(Context c,KadammTheme t,double[][] path,double target,int color){super(c,t);d=path;this.target=target;this.color=color;setContentDescription("Steps this month and the forecast to the end of the month");}
+        @Override protected void onDraw(Canvas c){
+            int n=d.length;if(n<2)return;float w=getWidth(),h=getHeight(),left=dp(34),top=dp(8),bottom=h-dp(16),cw=w-left-dp(6);
+            double hi=target;for(double[] q:d)hi=Math.max(hi,q[3]);hi*=1.05;final double fhi=hi;
+            java.util.function.IntToDoubleFunction xs=i->left+cw*i/(double)(n-1);java.util.function.DoubleUnaryOperator ys=v->top+(bottom-top)*(1-v/fhi);
+            p.setTextSize(dp(9.5f));p.setColor(t.textMuted);p.setTextAlign(Paint.Align.RIGHT);
+            for(int g=0;g<=2;g++){double v=hi*g/2;float y=(float)ys.applyAsDouble(v);p.setColor(alpha(t.border,200));p.setStrokeWidth(dp(1));c.drawLine(left,y,left+cw,y,p);p.setColor(t.textMuted);c.drawText(v>=1000?Math.round(v/1000)+"k":String.valueOf(Math.round(v)),left-dp(4),y+dp(3.5f),p);}
+            p.setTextAlign(Paint.Align.LEFT);c.drawText("1",left,h-dp(3),p);p.setTextAlign(Paint.Align.RIGHT);c.drawText(String.valueOf(n),left+cw,h-dp(3),p);p.setTextAlign(Paint.Align.LEFT);
+            int last=-1;for(int i=0;i<n;i++)if(d[i][0]>=0)last=i;
+            // Range
+            Path band=new Path();boolean st=false;for(int i=Math.max(0,last);i<n;i++){float x=(float)xs.applyAsDouble(i),y=(float)ys.applyAsDouble(d[i][3]);if(!st){band.moveTo(x,y);st=true;}else band.lineTo(x,y);}
+            for(int i=n-1;i>=Math.max(0,last);i--)band.lineTo((float)xs.applyAsDouble(i),(float)ys.applyAsDouble(d[i][2]));band.close();p.setStyle(Paint.Style.FILL);p.setColor(alpha(color,t.dark?60:45));c.drawPath(band,p);
+            // Goal
+            float gy=(float)ys.applyAsDouble(target);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(1.5f));p.setColor(ZONE_COLORS[3]);p.setPathEffect(new DashPathEffect(new float[]{dp(2),dp(4)},0));c.drawLine(left,gy,left+cw,gy,p);p.setPathEffect(null);
+            // Forecast
+            Path f=new Path();for(int i=Math.max(0,last);i<n;i++){float x=(float)xs.applyAsDouble(i),y=(float)ys.applyAsDouble(d[i][1]);if(i==Math.max(0,last))f.moveTo(x,y);else f.lineTo(x,y);}
+            p.setStrokeWidth(dp(2.5f));p.setStrokeCap(Paint.Cap.ROUND);p.setColor(color);p.setPathEffect(new DashPathEffect(new float[]{dp(6),dp(4)},0));c.drawPath(f,p);p.setPathEffect(null);
+            // Actual
+            Path a=new Path();for(int i=0;i<=last;i++){float x=(float)xs.applyAsDouble(i),y=(float)ys.applyAsDouble(d[i][0]);if(i==0)a.moveTo(x,y);else a.lineTo(x,y);}
+            p.setColor(t.text);c.drawPath(a,p);p.setStyle(Paint.Style.FILL);
+            if(last>=0){p.setColor(color);c.drawCircle((float)xs.applyAsDouble(last),(float)ys.applyAsDouble(d[last][0]),dp(4),p);}
+            p.setColor(ZONE_COLORS[3]);p.setTextAlign(Paint.Align.LEFT);c.drawText("goal",left+dp(4),gy-dp(4),p);
+        }
+    }
+
     /** Tier colours for badges: bronze (easy), silver (medium), gold (hard), amethyst (extreme). */
     static final int[][] TIER={{Color.rgb(214,140,86),Color.rgb(140,78,40)},{Color.rgb(214,222,232),Color.rgb(120,132,148)},{Color.rgb(255,214,92),Color.rgb(196,128,8)},{Color.rgb(196,140,255),Color.rgb(98,42,190)}};
     static final String[] TIER_NAMES={"Easy","Medium","Hard","Extreme"};

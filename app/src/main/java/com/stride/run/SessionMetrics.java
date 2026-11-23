@@ -51,6 +51,9 @@ final class SessionMetrics {
     final Map<Integer,Double> best=new LinkedHashMap<>();
     double gain=-1,loss=-1,altMin=Double.NaN,altMax=Double.NaN,gapPace=-1;boolean barometer;long[] gradeS;
     double consistency=-1,firstHalfPace=-1,secondHalfPace=-1,vdot=-1;
+    /** Pace consistency: 0–100 (100 = every 250 m at the same pace), the pacing pattern, pace of the first and last
+     *  thirds, surges (250 m stretches 12 %+ faster than your median) and each stretch's pace {seconds per km}. */
+    int paceScore=-1,surges;String pacing="";double firstThird=-1,lastThird=-1;final List<Double> chunkPace=new ArrayList<>();
     int hrAvg=-1,hrMax=-1,maxHr=-1;long[] hrZoneS;String hrSource;
     /** Where the steps-over-time came from: "Kadamm" (8.2+ recording), "Health Connect" (per minute) or "". */
     String stepSource="";boolean seaLevel;
@@ -270,10 +273,20 @@ final class SessionMetrics {
             double[] v=new double[chunks.size()];for(int i=0;i<v.length;i++)v[i]=chunks.get(i);double[] sorted=v.clone();Arrays.sort(sorted);double med=sorted[sorted.length/2];
             double sum=0,n=0;for(double q:v)if(q<med*2.5){sum+=q;n++;}double mean=sum/n,var=0;for(double q:v)if(q<med*2.5)var+=(q-mean)*(q-mean);
             x.consistency=Math.sqrt(var/n)/mean*100;
+            // Stops inflate a stretch's time; those stretches are capped at 2.5× the median so one crossing doesn't decide the score.
+            for(double q:v)x.chunkPace.add(Math.min(q,med*2.5));
+            x.paceScore=(int)Math.round(Math.max(0,Math.min(100,100-3*x.consistency)));
+            int t=Math.max(1,v.length/3);double[] a=Arrays.copyOfRange(v,0,t),b=Arrays.copyOfRange(v,v.length-t,v.length),mid=Arrays.copyOfRange(v,t,v.length-t);
+            x.firstThird=medianOf(a);x.lastThird=medianOf(b);double m2=mid.length>0?medianOf(mid):med;
+            for(double q:v)if(q<med*.88)x.surges++;
+            double diff=(x.lastThird-x.firstThird)/x.firstThird;
+            x.pacing=diff<=-.03?"Negative split":diff>=.06?(x.firstThird<m2*.95?"Fast start, then faded":"Slowed towards the end"):"Even pace";
         }
         double half=timeAt(dist,total/2);
         if(!Double.isNaN(half)&&total>=1000){x.firstHalfPace=(half-dist.get(0)[0])/(total/2000d);x.secondHalfPace=(dist.get(dist.size()-1)[0]-half)/(total/2000d);}
     }
+
+    private static double medianOf(double[] a){double[] b=a.clone();Arrays.sort(b);return b.length%2==1?b[b.length/2]:(b[b.length/2-1]+b[b.length/2])/2;}
 
     /** Fastest time for each standard distance anywhere inside the session (GPS only), with the start point interpolated. */
     private static void bestEfforts(SessionMetrics x,List<P> pts){

@@ -1,5 +1,13 @@
 # Changelog
 
+## 9.7 (versionCode 50)
+
+- Pace consistency score: every walk of 1 km or more gets a score out of 100 for how evenly you held your pace, measured over each 250 m. It shows your pacing pattern (even, negative split, slowed towards the end, or fast start then faded), first and last thirds, surges, a bar per 250 m, and your usual score. The Trainer page tracks the score over your last 20 walks.
+- Step spread: Home shows how evenly today's steps are spread over waking hours (7 am to 10 pm), scored 0 to 10, with active hours, the longest quiet stretch and the busiest hour's share. The Trainer page shows the last four weeks and compares weekdays with weekends.
+- Goal forecast: where today, this week, this month and this year are heading, worked out only from your own history. Each forecast gives a likely range, the date you'll pass the goal, the steps a day you'd need if you're short, and the expected number of goal days. Today's forecast uses what you usually walk after this hour and gives the chance of reaching your goal. A month chart shows the days so far against the forecast and the goal. The forecast reports its own accuracy against the last four weeks, and days under 500 steps (phone not counting) are left out. The year counts from your first day of step data.
+- Calories and weight: active calories a day, week by week, with the last 28 days' fat equivalent, and body weight from Health Connect (scales, Samsung Health and others) or logged in Kadamm. It shows the weight trend in kg per week and, after five weeks, how your active weeks and weight change move together. Logging a weight also updates the weight used for calories.
+- Health Connect now asks to read weight. Grant it under Health Connect permissions to bring in scale readings.
+
 ## 9.6 (versionCode 49)
 
 - Kadamm for Wear OS: a watch app for any Wear OS 3+ watch (Galaxy Watch, Pixel Watch and others), released as Kadamm-Wear-9.6.apk. It shows today's steps ring, streak and the coach's three challenges, and lets you start a walk or run, pause and finish from your wrist; the session records on the phone with GPS. While a session runs, the watch shows time, distance, steps, pace and heart rate, and its heart rate is saved with the session.

@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="9.6";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="9.7";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -268,7 +268,7 @@ public class MainActivity extends Activity {
     private void brand(String eyebrow,String headline,String sub){LinearLayout brand=row();content.addView(brand,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);brand.addView(brandButton(),bbp);if(tabIndex(page)<0){brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));TextView bk=tx("‹  "+backLabel(),13,ink,true);bk.setGravity(Gravity.CENTER);bk.setPadding(dp(14),0,dp(16),0);bk.setBackground(rippleOn(raised,18));bk.setContentDescription("Back to "+backLabel());bk.setOnClickListener(v->goBack());brand.addView(bk,lp(-2,36));}TextView e=tx(eyebrow.toUpperCase(Locale.US),10,muted,true);LinearLayout.LayoutParams ep=lp(-1,25);ep.topMargin=dp(8);content.addView(e,ep);TextView h=tx(headline,29,ink,true);content.addView(h);if(sub!=null){TextView s=tx(sub,13,muted,false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(5);sp.bottomMargin=dp(16);content.addView(s,sp);}}
     private LinearLayout card(){LinearLayout c=col();c.setPadding(dp(16),dp(16),dp(16),dp(16));c.setBackground(panelShape(16));LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(12);content.addView(c,p);return c;}
     private GradientDrawable panelShape(int radius){GradientDrawable d=shape(panel,radius);d.setStroke(dp(1),line);return d;}
-    private void renderToday(){JSONArray hist=history();dayTotals=DaySteps.allDayTotals(this);loadIdleLocation();renderHeader();renderStepSetup();renderBadgeBanner(hist);renderHero(hist);renderCoach();renderStepsByHour();renderTrainerCard(hist);renderPlan(hist);renderMovementQuality();renderSittingBreaks();renderBento(hist);renderDistanceGoal(hist);
+    private void renderToday(){JSONArray hist=history();dayTotals=DaySteps.allDayTotals(this);loadIdleLocation();renderHeader();renderStepSetup();renderBadgeBanner(hist);renderHero(hist);renderCoach();renderStepsByHour();renderSpread();renderTrainerCard(hist);renderPlan(hist);renderMovementQuality();renderSittingBreaks();renderBento(hist);renderDistanceGoal(hist);
         LinearLayout mapCard=card();trackCard=mapCard;LinearLayout head=row();TextView title=tx("Live route",16,ink,true);head.addView(title,new LinearLayout.LayoutParams(0,dp(26),1));status=tx("● READY",10,lime,true);head.addView(status);mapCard.addView(head);FrameLayout mapFrame=new FrameLayout(this);LinearLayout.LayoutParams mfp=lp(-1,190);mfp.topMargin=dp(8);mapCard.addView(mapFrame,mfp);route=new RouteView(this);route.setTheme(bg,raised,lime,darkTheme);route.setContentDescription("Map. Tap to open full screen");route.setOnClickListener(v->openMapView());mapFrame.addView(route,new FrameLayout.LayoutParams(-1,-1));android.widget.ImageView follow=icon(R.drawable.ic_my_location,ink,10);follow.setBackground(rippleOn(raised,12));FrameLayout.LayoutParams flp=new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.RIGHT|Gravity.TOP);flp.setMargins(0,dp(10),dp(10),0);mapFrame.addView(follow,flp);follow.setContentDescription("Follow my location");follow.setOnClickListener(v->{route.setFollowLocation(true);if(prefs.getBoolean("gpsFix",false))route.setCurrentLocation(prefs.getFloat("latitude",0),prefs.getFloat("longitude",0),prefs.getFloat("accuracy",0));else toast("Waiting for a reliable GPS fix");});LinearLayout mapMeta=row();mapCard.addView(mapMeta,lp(-1,26));accuracyLabel=tx("GPS accuracy · waiting for signal",10,muted,false);mapMeta.addView(accuracyLabel,new LinearLayout.LayoutParams(0,dp(26),1));TextView standard=tx("Tap map to explore",10,lime,true);mapMeta.addView(standard);TextView mapHint=tx("© OpenStreetMap contributors · satellite tiles are not available from this map source",9,muted,false);mapCard.addView(mapHint);
         // Track an activity: four clear choices, one Start button; live numbers only while a session runs.
         boolean running=prefs.getBoolean("active",false);LinearLayout box=card();
@@ -835,10 +835,124 @@ public class MainActivity extends Activity {
             top.addView(tx(f.title,13,muted,true),new LinearLayout.LayoutParams(0,-2,1));top.addView(tx(f.value,14,ink,true));
             TextView v=tx(f.verdict,13,ink,false);v.setLineSpacing(dp(2),1f);v.setPadding(0,dp(4),0,0);l.addView(v);}
     }
+    // ---- 9.7: pace consistency, step spread, goal forecast, calories and weight ----
+    /** Session detail: how evenly you held your pace, 250 m at a time. */
+    private void renderPaceConsistency(SessionMetrics m){
+        if(m.paceScore<0||m.chunkPace.size()<4)return;
+        LinearLayout c=metricCard("PACE CONSISTENCY","","How evenly you held your pace, from your speed over every 250 m. 100 means every stretch took the same time; each 1 % of variation takes 3 points off. Stretches slowed by stops count at most 2.5× your median, so a crossing doesn't decide the score.\n\nThe pattern compares the median pace of the first and last thirds: a negative split (finishing 3 %+ faster) is the classic sign of good pacing; slowing 6 %+ means you faded, and a fast start means the first third was 5 %+ quicker than the middle.\n\nSurges are stretches 12 %+ faster than your median.");
+        LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(8);c.addView(r,rp);
+        int col=m.paceScore>=80?positive:m.paceScore>=60?MetricViews.ZONE_COLORS[1]:warning;
+        r.addView(new MetricViews.Ring(this,chartTheme(),m.paceScore/100f,col,String.valueOf(m.paceScore),"of 100"),lp(92,92));
+        LinearLayout l=col();LinearLayout.LayoutParams llp=new LinearLayout.LayoutParams(0,-2,1);llp.leftMargin=dp(16);r.addView(l,llp);
+        l.addView(tx(m.paceScore>=80?"Very steady":m.paceScore>=60?"Steady":m.paceScore>=40?"Uneven":"Stop and go",20,ink,true));
+        boolean good="Negative split".equals(m.pacing)||"Even pace".equals(m.pacing);l.addView(tx(m.pacing,14,good?positive:warning,true));
+        l.addView(tx(String.format(Locale.US,"First third %s · last third %s /km",paceText(m.firstThird),paceText(m.lastThird)),12,muted,false));
+        LinearLayout.LayoutParams bp=lp(-1,110);bp.topMargin=dp(12);c.addView(new MetricViews.PaceBars(this,chartTheme(),m.chunkPace),bp);
+        java.util.List<double[]> all=Trends.paceScores(this,history());java.util.List<Double> others=new java.util.ArrayList<>();for(double[] q:all)if((long)q[0]!=m.id)others.add(q[1]);
+        String usual=others.size()>=3?String.valueOf(Math.round(Vitals.median(others))):"—";
+        statGrid(c,new String[][]{{"Variation",String.format(Locale.US,"%.0f",m.consistency),"%"},{"Surges",String.valueOf(m.surges),""},{"Your usual",usual,"of 100"}},12);
+        TextView k=tx("Blue = surge · green = steady · amber = slow or stopped · line = your median pace",10,muted,false);LinearLayout.LayoutParams kp=lp(-1,-2);kp.topMargin=dp(8);c.addView(k,kp);
+    }
+    /** Trainer: pace scores of your last 20 walks. */
+    private void renderPaceTrend(JSONArray h){
+        java.util.List<double[]> s=Trends.paceScores(this,h);if(s.size()<3)return;
+        LinearLayout c=metricCard("PACE CONSISTENCY","last "+s.size()+" walks","The pace consistency score of each of your last walks of 1 km or more (oldest on the left). See any walk's details for how it's worked out.");
+        java.util.List<double[]> pts=new java.util.ArrayList<>();java.util.List<Double> a=new java.util.ArrayList<>(),b=new java.util.ArrayList<>();
+        for(int i=0;i<s.size();i++){pts.add(new double[]{i,s.get(i)[1],0});(i<s.size()/2?a:b).add(s.get(i)[1]);}
+        double recent=Vitals.median(b),before=Vitals.median(a);
+        LinearLayout r=row();c.addView(r,lp(-1,-2));r.addView(valueUnit(String.valueOf(Math.round(recent)),"recent median",26,ink),new LinearLayout.LayoutParams(0,-2,1));
+        if(a.size()>=2){double d=recent-before;r.addView(tx(Math.abs(d)<3?"Holding steady":d>0?String.format(Locale.US,"▲ %.0f steadier",d):String.format(Locale.US,"▼ %.0f less steady",-d),12,d>=-3?positive:warning,true));}
+        LinearLayout.LayoutParams sp=lp(-1,140);sp.topMargin=dp(8);c.addView(new MetricViews.Series(this,chartTheme(),pts,true,MetricViews.ZONE_COLORS[1],null,Vitals.median(new java.util.ArrayList<Double>(){{addAll(a);addAll(b);}}),v->String.valueOf(Math.round(v)),v->""),sp);
+    }
+    /** Today: how spread out your steps are over the waking day. */
+    private void renderSpread(){
+        double[] hh=Trends.hours(this,todayKey());int now=Calendar.getInstance().get(Calendar.HOUR_OF_DAY);Trends.Spread s=Trends.spread(hh,now+1);if(s==null)return;
+        LinearLayout c=metricCard("STEP SPREAD","today","How evenly your steps are spread over your waking hours (7 am to 10 pm, up to now today), from 0 to 10. 10 means every hour had the same steps; 0 means they all came in one hour. It's the normalised Shannon entropy of your steps per hour.\n\nWhy it matters: long unbroken sitting is linked to poorer blood sugar and heart health even in people who exercise (Dunstan; Diaz, Annals of Internal Medicine 2017). Moving a little every hour beats the same steps in one burst.\n\nActive hours have 250+ steps. A quiet stretch is consecutive hours under 100 steps.");
+        LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(6);c.addView(r,rp);
+        int col=s.score>=8?positive:s.score>=6?MetricViews.ZONE_COLORS[1]:warning;
+        r.addView(new MetricViews.Ring(this,chartTheme(),(float)(s.score/10),col,String.format(Locale.US,"%.1f",s.score),"of 10"),lp(88,88));
+        LinearLayout l=col();LinearLayout.LayoutParams llp=new LinearLayout.LayoutParams(0,-2,1);llp.leftMargin=dp(16);r.addView(l,llp);
+        l.addView(tx(Trends.spreadLabel(s.score),20,ink,true));
+        l.addView(tx(String.format(Locale.US,"%d %% of your steps came at %s",Math.round(s.topShare*100),MetricViews.DotDay.hourName(s.topHour)),12,muted,false));
+        java.util.TreeMap<String,Double> past=Trends.spreadHistory(this,14);if(past.size()>=3){java.util.List<Double> v=new java.util.ArrayList<>(past.values());l.addView(tx(String.format(Locale.US,"Your 2-week median: %.1f",Vitals.median(v)),12,muted,false));}
+        statGrid(c,new String[][]{{"Active hours",s.activeHours+"","of "+s.windowHours},{"Longest quiet",s.longestQuiet+"",s.longestQuiet==1?"hour":"hours"},{"Busiest hour",Math.round(s.topShare*100)+"","%"}},12);
+        if(s.longestQuiet>=3){int qh=s.quietFrom;TextView t=tx(s.longestQuiet+" quiet hours in a row from "+(qh%12==0?12:qh%12)+(qh<12?" am":" pm")+": a 5-minute walk in the middle breaks a stretch like that up.",12,warning,true);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(10);c.addView(t,tp);}
+    }
+    /** Trainer: step spread over the last two weeks. */
+    private void renderSpreadTrend(){
+        java.util.TreeMap<String,Double> past=Trends.spreadHistory(this,28);if(past.size()<5)return;
+        LinearLayout c=metricCard("STEP SPREAD","last "+past.size()+" days","Each day's step spread (0 to 10): how evenly your steps fell across 7 am to 10 pm. See Today for how it's worked out.");
+        java.util.List<double[]> pts=new java.util.ArrayList<>();java.util.List<Double> v=new java.util.ArrayList<>(past.values());int i=0;String best="";double bv=-1;
+        for(java.util.Map.Entry<String,Double> e:past.entrySet()){pts.add(new double[]{i++,e.getValue(),0});if(e.getValue()>bv){bv=e.getValue();best=e.getKey();}}
+        LinearLayout r=row();c.addView(r,lp(-1,-2));r.addView(valueUnit(String.format(Locale.US,"%.1f",Vitals.median(v)),"median",26,ink),new LinearLayout.LayoutParams(0,-2,1));r.addView(tx(String.format(Locale.US,"Best %.1f on %s",bv,prettyDay(best)),12,positive,true));
+        // Weekdays against weekends
+        double wd=0,we=0;int nd=0,ne=0;for(java.util.Map.Entry<String,Double> e:past.entrySet()){Calendar d=Calendar.getInstance();d.setTimeInMillis((long)(Trends.dayNum(e.getKey())*86400000L)+43200000L);int dw=d.get(Calendar.DAY_OF_WEEK);if(dw==Calendar.SATURDAY||dw==Calendar.SUNDAY){we+=e.getValue();ne++;}else{wd+=e.getValue();nd++;}}
+        LinearLayout.LayoutParams sp=lp(-1,130);sp.topMargin=dp(8);c.addView(new MetricViews.Series(this,chartTheme(),pts,true,positive,null,Vitals.median(v),x->String.format(Locale.US,"%.0f",x),x->""),sp);
+        if(nd>=3&&ne>=2){TextView t=tx(String.format(Locale.US,"Weekdays %.1f · weekends %.1f",wd/nd,we/ne),12,muted,false);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(6);c.addView(t,tp);}
+    }
+    /** Trainer: where today, this week, this month and this year are heading. */
+    private void renderForecast(){
+        int goal=dailyGoal();Trends.Forecast f=Trends.forecast(this,goal);
+        LinearLayout c=metricCard("GOAL FORECAST","","Where your steps are heading, from your own history only.\n\nToday: what you have now plus what you usually walk after this time of day (the median of your last 28 days, hour by hour); the range is your quieter and busier quarter of days, and the chance is the share of those days that would have got you to your goal from here.\n\nEach day still to come is expected from your recent days: three quarters the median of your last 28 days, a quarter the median of the same weekday over 8 weeks (so busy and quiet weekdays show). Days under 500 steps are left out as gaps in the data (phone off or not counting). The range adds up how far your real days usually land from that (one standard deviation), so about two times in three the total ends inside it.\n\nGoal days are the days you've reached your daily goal, plus the chance of each remaining day (how often that weekday reached it over 8 weeks).\n\nAccuracy is how far a typical real day (the median) has landed from its forecast over the last 4 weeks.\n\nThe year counts from your first day of step data this year, at your daily goal for each day.");
+        if(f.week==null){c.addView(tx(String.format(Locale.US,"Forecasts start after 14 days of step data (you have %d). Keep Kadamm counting and check back.",f.dataDays),13,muted,false));return;}
+        // Today
+        if(f.todayMid>0){LinearLayout tr=row();tr.setGravity(Gravity.CENTER_VERTICAL);LinearLayout.LayoutParams trp=lp(-1,-2);trp.topMargin=dp(8);c.addView(tr,trp);
+            LinearLayout tl=col();tr.addView(tl,new LinearLayout.LayoutParams(0,-2,1));TextView th=tx("TODAY BY BEDTIME",10,muted,true);th.setLetterSpacing(.08f);tl.addView(th);
+            tl.addView(valueUnit(String.format(Locale.US,"≈%,d",f.todayMid),"steps",24,ink));
+            tl.addView(tx(f.todayLo!=f.todayHi?String.format(Locale.US,"Likely %,d–%,d",f.todayLo,f.todayHi):"From your usual day",12,muted,false));
+            if(f.usualDone>=0)tl.addView(tx(String.format(Locale.US,"By now you usually have %d %% of a day's steps",f.usualDone),12,muted,false));
+            int ch=f.todayChance;if(ch>=0)tr.addView(new MetricViews.Ring(this,chartTheme(),ch/100f,ch>=70?positive:ch>=35?MetricViews.ZONE_COLORS[1]:warning,ch+"%","goal"),lp(80,80));}
+        for(Trends.Outlook o:new Trends.Outlook[]{f.week,f.month,f.year}){
+            View sep=new View(this);sep.setBackgroundColor(line);LinearLayout.LayoutParams sl=lp(-1,1);sl.topMargin=dp(14);sl.bottomMargin=dp(12);c.addView(sep,sl);
+            LinearLayout hr=row();c.addView(hr,lp(-1,-2));TextView ht=tx((o==f.year&&f.yearFrom!=null?"THIS YEAR, SINCE "+prettyDay(f.yearFrom).toUpperCase(Locale.getDefault()):o.name.toUpperCase(Locale.US)),10,muted,true);ht.setLetterSpacing(.08f);hr.addView(ht,new LinearLayout.LayoutParams(0,-2,1));
+            hr.addView(tx(String.format(Locale.US,"%d of %d days left",o.daysLeft,o.totalDays),11,muted,false));
+            boolean on=o.mid>=o.target;
+            c.addView(valueUnit(String.format(Locale.US,"≈%,d",o.mid),String.format(Locale.US,"of %,d",o.target),22,ink));
+            c.addView(tx(String.format(Locale.US,"%,d so far · likely %,d–%,d",o.sofar,o.lo,o.hi),12,muted,false));
+            String verdict;
+            if(o.reached())verdict="Goal reached: "+String.format(Locale.US,"%,d over",o.sofar-o.target);
+            else if(on)verdict=o.crossDay!=null?"On course: you should pass it "+(o.crossDay.equals(todayKey())?"today":"on "+prettyDay(o.crossDay)):"On course to reach it";
+            else verdict=String.format(Locale.US,"Short by ≈%,d: %,d steps a day from today gets you there",o.target-o.mid,Math.round(o.needPerDay));
+            TextView v=tx(verdict,13,o.reached()||on?positive:warning,true);v.setPadding(0,dp(4),0,0);c.addView(v);
+            if(o.goalDays>=0&&o!=f.year)c.addView(tx(String.format(Locale.US,"Goal days: %d so far, ≈%d by the end",o.goalDaysSoFar,Math.round(o.goalDays)),12,muted,false));
+            if(o==f.month&&f.monthPath!=null){LinearLayout.LayoutParams mp=lp(-1,160);mp.topMargin=dp(10);c.addView(new MetricViews.MonthPath(this,chartTheme(),f.monthPath,o.target,GoalCapsule.COLORS[0]),mp);
+                c.addView(tx("Solid = so far · dashed = forecast · shaded = likely range · dotted = goal",10,muted,false));}
+        }
+        if(f.accuracy>=0){TextView a=tx(String.format(Locale.US,"Accuracy: over the last 4 weeks, a typical day landed %,d steps (%.0f %%) from its forecast. Your days vary, so the ranges above are wide on purpose. Based on %d days of data.",f.missSteps,f.accuracy*100,f.dataDays),11,muted,false);a.setPadding(0,dp(14),0,0);c.addView(a);}
+    }
+    /** Trainer: active calories and body weight, and how they move together. */
+    private void renderBody(JSONArray h){
+        Trends.Body b=Trends.body(this,h);
+        LinearLayout c=metricCard("CALORIES AND WEIGHT","","Active calories are an estimate: sessions from your pace, time and body weight (MET values from the Compendium of Physical Activities, resting burn taken off), plus everyday steps at about 0.5 kcal per kg per km. Health Connect's figure is used for today when it's higher.\n\nWeight comes from Health Connect (a smart scale, Samsung Health or any app that logs it) and from weights you log here; yours wins on the same day. Logging a weight also updates the weight used for calories.\n\nThe trend is the straight line through your weigh-ins of the last 28 days, in kg per week. The fat equivalent uses about 7,700 kcal per kg of body fat; real weight change also depends on what you eat, water and muscle.\n\nThe link compares each week's active calories with that week's weight change (5+ weeks with two weigh-ins each). A negative number means more active weeks went with losing weight.");
+        double avg=0;int n=0;String m28=DaySteps.key(System.currentTimeMillis()-28L*86400000L);for(java.util.Map.Entry<String,Double> e:b.kcal.entrySet())if(e.getKey().compareTo(m28)>0){avg+=e.getValue();n++;}if(n>0)avg/=n;
+        Double latest=b.weight.isEmpty()?null:b.weight.lastEntry().getValue();
+        statGrid(c,new String[][]{{"Active a day",n>0?String.format(Locale.US,"%,d",Math.round(avg)):"—","kcal"},{"Weight",latest!=null?String.format(Locale.US,"%.1f",latest):"—","kg"},{"Trend",Double.isNaN(b.kgPerWeek)?"—":String.format(Locale.US,"%+.2f",b.kgPerWeek),"kg/wk"}},8);
+        // Weekly active calories, last 8 weeks
+        double[] wk=new double[8];String[] lab=new String[8];Calendar mon=Calendar.getInstance();mon.add(Calendar.DAY_OF_YEAR,-((mon.get(Calendar.DAY_OF_WEEK)+5)%7));double mx=1;
+        for(int w=0;w<8;w++){Calendar s=(Calendar)mon.clone();s.add(Calendar.DAY_OF_YEAR,-7*(7-w));double t=0;int k=0;for(int i=0;i<7;i++){Double v=b.kcal.get(DaySteps.key(s.getTimeInMillis()));if(v!=null){t+=v;k++;}s.add(Calendar.DAY_OF_YEAR,1);}wk[w]=k>0?t/k:0;mx=Math.max(mx,wk[w]);lab[w]=w==7?"Now":(7-w)+"w";}
+        double[] pct=new double[8];for(int w=0;w<8;w++)pct[w]=wk[w]*100/mx;
+        TextView wt=tx("ACTIVE KCAL A DAY, WEEK BY WEEK",10,muted,true);wt.setLetterSpacing(.08f);LinearLayout.LayoutParams wtp=lp(-1,-2);wtp.topMargin=dp(16);c.addView(wt,wtp);
+        LinearLayout.LayoutParams wbp=lp(-1,110);wbp.topMargin=dp(6);c.addView(new MetricViews.WeekBars(this,chartTheme(),pct,lab,7,MetricViews.ZONE_COLORS[3]),wbp);
+        c.addView(tx(String.format(Locale.US,"Last 28 days: %,d kcal of activity ≈ %.2f kg of body fat",Math.round(b.kcal28),b.kcal28/7700),12,muted,false));
+        // Weight line
+        if(b.weight.size()>=2){java.util.List<double[]> pts=new java.util.ArrayList<>();double d0=Trends.dayNum(b.weight.firstKey());for(java.util.Map.Entry<String,Double> e:b.weight.entrySet())pts.add(new double[]{Trends.dayNum(e.getKey())-d0,e.getValue(),0});
+            TextView tt=tx("WEIGHT",10,muted,true);tt.setLetterSpacing(.08f);LinearLayout.LayoutParams ttp=lp(-1,-2);ttp.topMargin=dp(16);c.addView(tt,ttp);
+            LinearLayout.LayoutParams sp=lp(-1,140);sp.topMargin=dp(6);c.addView(new MetricViews.Series(this,chartTheme(),pts,false,violet,null,0,v->String.format(Locale.US,"%.1f",v),v->""),sp);
+            c.addView(tx(String.format(Locale.US,"%d weigh-ins from %s to %s",b.weight.size(),prettyDay(b.weight.firstKey()),prettyDay(b.weight.lastKey())),11,muted,false));}
+        // The link
+        String link;int tone;
+        if(!Double.isNaN(b.correlation)){double r=b.correlation;link=String.format(Locale.US,"Activity and weight link: %+.2f over %d weeks. ",r,b.weeks.size())+(r<=-.4?"Your more active weeks clearly went with losing weight.":r<=-.15?"More active weeks tended to go with a little weight loss.":r<.15?"No clear link yet: food and water swing weight more than walking.":"More active weeks didn't go with weight loss: what you eat may be making up for it.");tone=r<=-.15?positive:muted;}
+        else{link=b.weight.isEmpty()?"Log your weight once or twice a week (or connect a scale through Health Connect) to see how your activity and weight move together.":String.format(Locale.US,"%d of 5 weeks with two weigh-ins so far: the activity–weight link appears after 5.",b.weeks.size());tone=muted;}
+        TextView lt=tx(link,13,tone==positive?positive:ink,tone==positive);lt.setLineSpacing(dp(2),1f);lt.setPadding(0,dp(12),0,0);c.addView(lt);
+        TextView log=tx("Log today's weight  ›",13,lime,true);log.setPadding(0,dp(14),0,dp(2));c.addView(log);
+        log.setOnClickListener(v->{android.widget.EditText in=new android.widget.EditText(this);in.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);in.setHint("kg");in.setSingleLine(true);
+            if(latest!=null)in.setText(String.format(Locale.US,"%.1f",latest));FrameLayout box=new FrameLayout(this);box.setPadding(dp(20),dp(8),dp(20),0);box.addView(in);
+            dialog().setTitle("Today's weight (kg)").setView(box).setPositiveButton("Save",(d,w)->{try{double kg=Double.parseDouble(in.getText().toString().replace(',','.'));if(kg<25||kg>300){toast("Enter a weight between 25 and 300 kg");return;}Trends.logWeight(this,kg);toast("Saved");renderPageNow();}catch(Exception e){toast("Enter a number, like 72.5");}}).setNegativeButton("Cancel",null).show();});
+    }
     private void renderTrainer(){
         JSONArray h=history();brand("KADAMM TRAINER","Your training","A plan built from your own walks, steps and pace.");
         if(!SessionMetrics.ready()){LinearLayout w=card();w.addView(tx("Analysing your sessions…",13,muted,false));handler.postDelayed(()->{if("Trainer".equals(page))renderPageNow();},800);return;}
-        renderCoachSection(h);renderWeekly(h);renderFriends(h);renderWatchFitness(h);renderRecordsTrend(h);
+        renderCoachSection(h);renderForecast();renderWeekly(h);renderFriends(h);renderPaceTrend(h);renderSpreadTrend();renderBody(h);renderWatchFitness(h);renderRecordsTrend(h);
         Trainer.State st=trainerState(h);KadammTheme th=chartTheme();int teal=GoalCapsule.COLORS[0];
         // Stage ladder
         LinearLayout sc=card();TextView se=tx("STAGE "+(st.stage+1)+" OF 6",10,teal,true);se.setLetterSpacing(.08f);sc.addView(se);sc.addView(tx(Trainer.STAGES[st.stage],24,ink,true));
@@ -2040,6 +2154,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             if(m.consistency>=0){TextView cs=tx((m.consistency<6?"Very steady pace":m.consistency<12?"Steady pace":"Changing pace")+String.format(Locale.US," · %.0f %% variation",m.consistency),12,m.consistency<12?positive:warning,true);LinearLayout.LayoutParams csp=lp(-1,-2);csp.topMargin=dp(10);pc.addView(cs,csp);}
             LinearLayout.LayoutParams pcp=lp(-1,190);pcp.topMargin=dp(8);pc.addView(new SessionChartView(this,th,m.pace,true),pcp);
         }
+        renderPaceConsistency(m);
         if(m.gap.size()>=10){
             LinearLayout gc=metricCard("GRADE ADJUSTED PACE","(min/km)","The pace you'd have held on flat ground with the same effort, from the barometer's gradient and Minetti's energy cost of walking or running on slopes. Climbs make your real pace slower than your GAP; descents make it faster.");
             statGrid(gc,new String[][]{{"Avg GAP",paceText(m.gapPace),"/km"},{"Avg pace",paceText(m.paceMoving),"/km"},{"Hills cost you",m.gapPace>0&&m.paceMoving>0?String.format(Locale.US,"%+d",Math.round(m.paceMoving-m.gapPace)):"—","s/km"}},10);
@@ -2246,6 +2361,8 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         MetricViews.DotDay dd=new MetricViews.DotDay(this,chartTheme(),hours,Calendar.getInstance().get(Calendar.HOUR_OF_DAY),lime);
         LinearLayout.LayoutParams dp1=lp(-1,170);dp1.topMargin=dp(8);c.addView(dd,dp1);
         TextView key=tx("● = "+dd.unit()+" steps",10,muted,false);LinearLayout.LayoutParams kp=lp(-1,-2);kp.topMargin=dp(4);c.addView(key,kp);
+        Trends.Forecast fc=Trends.forecast(this,dailyGoal());
+        if(fc.todayChance>=0&&fc.todaySoFar<fc.goal&&Calendar.getInstance().get(Calendar.HOUR_OF_DAY)<Trends.SLEEP){TextView ft=tx(String.format(Locale.US,"By bedtime ≈ %,d steps (%,d–%,d) · %d %% chance of your goal",fc.todayMid,fc.todayLo,fc.todayHi,fc.todayChance),12,fc.todayChance>=50?positive:warning,true);LinearLayout.LayoutParams fp=lp(-1,-2);fp.topMargin=dp(8);c.addView(ft,fp);ft.setOnClickListener(v->navigate("Trainer"));}
         long gap=Math.round(total-placed);
         if(Math.abs(gap)>Math.max(50,total*.01)){TextView n=tx(gap>0?String.format(Locale.US,"%,d steps don't have an hour yet (Health Connect sends them later)",gap):String.format(Locale.US,"The hours add up to %,d; small differences come from readings around midnight",Math.round(placed)),10,muted,false);c.addView(n);}
     }

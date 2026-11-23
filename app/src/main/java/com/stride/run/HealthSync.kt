@@ -12,6 +12,7 @@ import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.Vo2MaxRecord
+import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
@@ -44,7 +45,8 @@ object HealthSync {
         HealthPermission.getReadPermission(HeartRateRecord::class),
         HealthPermission.getReadPermission(SleepSessionRecord::class),
         HealthPermission.getReadPermission(RestingHeartRateRecord::class),
-        HealthPermission.getReadPermission(Vo2MaxRecord::class)
+        HealthPermission.getReadPermission(Vo2MaxRecord::class),
+        HealthPermission.getReadPermission(WeightRecord::class)
     ) + HealthImport.wanted()
     @JvmStatic fun isRunning() = running
     /** Lets Kadamm read while closed, so the widget and reminders stay current. Only offered where Health Connect supports it. */
@@ -360,7 +362,18 @@ object HealthSync {
             val page = hc.readRecords(ReadRecordsRequest(Vo2MaxRecord::class, range))
             for (r in page.records) { if (r.vo2MillilitersPerMinuteKilogram in 10.0..90.0) { vo2.put(r.time.atZone(zone).toLocalDate().toString(), r.vo2MillilitersPerMinuteKilogram); sources.add(r.metadata.dataOrigin.packageName) } }
         }
-        out.put("sleep", sleep).put("rhr", rhr).put("vo2", vo2).put("sources", JSONArray(sources.toList())).put("at", System.currentTimeMillis())
+        // Body weight from a scale, Samsung Health or any app that logs it: the last 120 days, one reading per day (the latest).
+        val weight = JSONObject()
+        if (granted.contains(HealthPermission.getReadPermission(WeightRecord::class))) {
+            var token: String? = null
+            val wr = TimeRangeFilter.between(today.minusDays(120).atStartOfDay(zone).toInstant(), Instant.now())
+            do {
+                val page = hc.readRecords(ReadRecordsRequest(WeightRecord::class, wr, pageToken = token))
+                for (r in page.records) { val kg = r.weight.inKilograms; if (kg in 25.0..300.0) { weight.put(r.time.atZone(zone).toLocalDate().toString(), Math.round(kg * 10) / 10.0); sources.add(r.metadata.dataOrigin.packageName) } }
+                token = page.pageToken
+            } while (token != null)
+        }
+        out.put("sleep", sleep).put("rhr", rhr).put("vo2", vo2).put("weight", weight).put("sources", JSONArray(sources.toList())).put("at", System.currentTimeMillis())
         prefs.edit().putString("vitals", out.toString()).apply()
     }
 
