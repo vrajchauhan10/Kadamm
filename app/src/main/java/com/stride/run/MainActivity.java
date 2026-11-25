@@ -1068,11 +1068,11 @@ public class MainActivity extends Activity {
         LinearLayout hd=row();c.addView(hd,lp(-1,-2));TextView t=tx("YOUR BODY TODAY",10,muted,true);t.setLetterSpacing(.08f);hd.addView(t,new LinearLayout.LayoutParams(0,-2,1));
         if(!"Body".equals(page)){TextView all=tx("All data  ›",12,lime,true);all.setOnClickListener(x->navigate("Body"));hd.addView(all);}
         LinearLayout rings=row();LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(12);c.addView(rings,rp);
-        String[] keys={"recovery",watch?"strain":"load","sleep"};int[] colors={positive,MetricViews.ZONE_COLORS[1],violet};
-        for(int i=0;i<3;i++){String[] m=bodyMetric(keys[i],hist);LinearLayout cell=col();cell.setGravity(Gravity.CENTER_HORIZONTAL);rings.addView(cell,new LinearLayout.LayoutParams(0,-2,1));
-            float f=0;try{f=keys[i].equals("sleep")?(float)(SleepTracker.night(this,todayKey()).asleep/(double)Pro.sleepNeed(this,hist,todayKey()).total):keys[i].equals("recovery")?Float.parseFloat(m[0])/100f:Float.parseFloat(m[0])/21f;}catch(Exception ignored){}
-            int col=keys[i].equals("recovery")&&!"-2".equals(m[3])?toneColor(m[3]):colors[i];
-            cell.addView(new MetricViews.Ring(this,chartTheme(),Math.min(1,f),col,m[0]+("%".equals(m[1])?"%":""),""),lp(84,84));
+        String[] keys=topRings().toArray(new String[0]);
+        for(int i=0;i<keys.length;i++){String[] m=bodyMetric(keys[i],hist);LinearLayout cell=col();cell.setGravity(Gravity.CENTER_HORIZONTAL);rings.addView(cell,new LinearLayout.LayoutParams(0,-2,1));
+            float f=0;try{f=keys[i].equals("sleep")?(float)(SleepTracker.night(this,todayKey()).asleep/(double)Pro.sleepNeed(this,hist,todayKey()).total):keys[i].equals("recovery")?Float.parseFloat(m[0])/100f:keys[i].equals("strain")||keys[i].equals("load")?Float.parseFloat(m[0])/21f:"-2".equals(m[3])?0:ringFill(keys[i],m[0]);}catch(Exception ignored){}
+            int col=keys[i].equals("recovery")&&!"-2".equals(m[3])?toneColor(m[3]):keys[i].equals("sleep")?violet:keys[i].equals("strain")||keys[i].equals("load")?MetricViews.ZONE_COLORS[1]:"-2".equals(m[3])?muted:toneColor(m[3])==ink?lime:toneColor(m[3]);
+            cell.addView(new MetricViews.Ring(this,chartTheme(),Math.min(1,f),col,"-2".equals(m[3])&&!keys[i].matches("recovery|strain|load|sleep")?"—":m[0]+("%".equals(m[1])?"%":""),"%".equals(m[1])||keys[i].matches("recovery|strain|load|sleep")?"":m[1]),lp(84,84));
             TextView n=tx(bodyName(keys[i]),12,ink,true);n.setGravity(Gravity.CENTER);n.setPadding(0,dp(6),0,0);cell.addView(n);
             TextView s=tx(m[2],10,"-2".equals(m[3])?muted:toneColor(m[3]),false);s.setGravity(Gravity.CENTER);s.setMaxLines(2);cell.addView(s);
             final String k=keys[i];cell.setOnClickListener(x->navigate("Body"));cell.setContentDescription(bodyName(k)+" "+m[0]+" "+m[1]);}
@@ -1092,7 +1092,8 @@ public class MainActivity extends Activity {
             if("live".equals(pins.get(i)))liveValue=val;tile.setOnClickListener(x->navigate("Body"));}
         if(!circles&&pins.size()%2==1&&grid!=null)grid.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
         LinearLayout foot=row();foot.setGravity(Gravity.CENTER_VERTICAL);LinearLayout.LayoutParams ftp=lp(-1,-2);ftp.topMargin=dp(12);c.addView(foot,ftp);
-        TextView choose=tx("Choose what shows here  ›",12,lime,true);foot.addView(choose,new LinearLayout.LayoutParams(0,-2,1));choose.setOnClickListener(x->choosePinned());
+        TextView choose=tx("Choose what shows here  ›",12,lime,true);foot.addView(choose,new LinearLayout.LayoutParams(0,-2,1));
+        choose.setOnClickListener(x->dialog().setTitle("Choose what shows here").setItems(new String[]{"The 3 big circles at the top","Measures below them"},(d,w)->{if(w==0)chooseTopRings();else choosePinned();}).show());
         // Tiles or circles: one tap switches, the choice is kept.
         LinearLayout seg=row();seg.setBackground(shape(raised,14));seg.setPadding(dp(3),dp(3),dp(3),dp(3));foot.addView(seg);
         for(String[] o:new String[][]{{"tiles","Tiles"},{"rings","Circles"}}){boolean sel=o[0].equals(circles?"rings":"tiles");TextView b=tx(o[1],11,sel?accentOn:ink,true);b.setGravity(Gravity.CENTER);b.setPadding(dp(10),0,dp(10),0);b.setBackground(shape(sel?lime:Color.TRANSPARENT,11));seg.addView(b,lp(-2,28));
@@ -1116,12 +1117,30 @@ public class MainActivity extends Activity {
     private TextView liveValue;
     private void choosePinned(){
         // The rings already show Recovery, Strain (Movement load without a watch) and Sleep, so they aren't offered as tiles.
-        java.util.List<String> rings=java.util.Arrays.asList("recovery",watchData()?"strain":"load","sleep");
+        java.util.List<String> rings=topRings();
         java.util.List<String[]> avail=new java.util.ArrayList<>();for(String[] m:BODY_METRICS)if(!unsupported(m[0])&&!rings.contains(m[0]))avail.add(m);
         String[] names=new String[avail.size()];boolean[] on=new boolean[names.length];java.util.List<String> cur=pinned();
         for(int i=0;i<names.length;i++){names[i]=avail.get(i)[1];on[i]=cur.contains(avail.get(i)[0]);}
         dialog().setTitle("Your body today (up to 6)").setMultiChoiceItems(names,on,(d,w,checked)->on[w]=checked).setPositiveButton("Save",(d,w)->{StringBuilder b=new StringBuilder();int n=0;for(int i=0;i<on.length;i++)if(on[i]&&n<6){if(b.length()>0)b.append(',');b.append(avail.get(i)[0]);n++;}
             int picked=0;for(boolean x:on)if(x)picked++;if(picked>6)toast("Home shows 6: the first 6 you picked");getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("pinnedBody",b.toString()).apply();renderPageNow();}).setNegativeButton("Cancel",null).show();
+    }
+
+    /** The 3 big circles at the top of Your body today: Recovery, Strain (Movement load without a watch) and Sleep unless you pick others. */
+    private java.util.List<String> topRings(){
+        String d="recovery,"+(watchData()?"strain":"load")+",sleep";java.util.List<String> out=new java.util.ArrayList<>();
+        for(String k:getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("bodyRings",d).split(","))if(!k.trim().isEmpty()&&!bodyName(k.trim()).equals(k.trim())&&!out.contains(k.trim()))out.add(k.trim());
+        if(out.size()!=3){out.clear();out.addAll(java.util.Arrays.asList(d.split(",")));}return out;
+    }
+    private void chooseTopRings(){
+        java.util.List<String[]> avail=new java.util.ArrayList<>();for(String[] m:BODY_METRICS)if(!unsupported(m[0]))avail.add(m);
+        String[] names=new String[avail.size()];boolean[] on=new boolean[names.length];java.util.List<String> cur=topRings();
+        for(int i=0;i<names.length;i++){names[i]=avail.get(i)[1];on[i]=cur.contains(avail.get(i)[0]);}
+        dialog().setTitle("Pick 3 big circles").setMultiChoiceItems(names,on,(d,w,checked)->on[w]=checked).setPositiveButton("Save",(d,w)->{
+            java.util.List<String> pick=new java.util.ArrayList<>();for(String k:cur)for(int i=0;i<on.length;i++)if(on[i]&&avail.get(i)[0].equals(k))pick.add(k);
+            for(int i=0;i<on.length;i++)if(on[i]&&!pick.contains(avail.get(i)[0]))pick.add(avail.get(i)[0]);
+            if(pick.size()!=3){toast("Pick exactly 3: you picked "+pick.size());return;}
+            getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("bodyRings",android.text.TextUtils.join(",",pick)).apply();renderPageNow();})
+            .setNeutralButton("Default",(d,w)->{getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().remove("bodyRings").apply();renderPageNow();}).setNegativeButton("Cancel",null).show();
     }
 
     // ---- The Health data page ----
