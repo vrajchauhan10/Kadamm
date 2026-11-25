@@ -59,11 +59,8 @@
     <uses-permission android:name="android.permission.health.WRITE_SLEEP" />
     <uses-permission android:name="android.permission.health.WRITE_WEIGHT" />
     <uses-permission android:name="android.permission.health.WRITE_BLOOD_PRESSURE" />
-    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" xmlns:tools="http://schemas.android.com/tools" tools:ignore="ProtectedPermissions" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <application android:theme="@style/Kadamm" android:label="Kadamm" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:usesCleartextTraffic="false" android:allowBackup="true">
         <service android:name=".RecorderService" android:exported="false" android:foregroundServiceType="location|health" />
@@ -91,7 +88,6 @@
         <receiver android:name=".AutoTrack$Check" android:exported="false" />
         <receiver android:name=".WidgetTick" android:exported="false" />
         <receiver android:name=".SleepTracker$Receiver" android:exported="false" />
-        <activity android:name=".PulseActivity" android:exported="false" android:screenOrientation="portrait" android:theme="@style/Kadamm" />
         <receiver android:name=".GoalsWidget" android:exported="true" android:label="Kadamm daily goals">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/goals_widget_info" />

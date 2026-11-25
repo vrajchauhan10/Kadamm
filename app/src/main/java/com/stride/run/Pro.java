@@ -43,36 +43,19 @@ final class Pro {
         if(v.size()<min)return null;double m=0;for(double x:v)m+=x;m/=v.size();double sd=0;for(double x:v)sd+=(x-m)*(x-m);sd=Math.sqrt(sd/v.size());return new double[]{m,sd,v.size()};
     }
 
-    // ---- Spot checks (fingertip camera) ----
-    /** The camera pulse checks, newest last: {at, hr, rmssd}. */
-    static JSONArray spots(Context c){try{return new JSONArray(c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getString("spots","[]"));}catch(Exception e){return new JSONArray();}}
-    static void addSpot(Context c,double hr,double rmssd,int quality){
-        JSONArray a=spots(c);try{a.put(new JSONObject().put("at",System.currentTimeMillis()).put("hr",Math.round(hr)).put("rmssd",Math.round(rmssd*10)/10.0).put("q",quality));}catch(Exception ignored){}
-        JSONArray keep=new JSONArray();for(int i=Math.max(0,a.length()-120);i<a.length();i++)keep.put(a.opt(i));
-        c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).edit().putString("spots",keep.toString()).apply();
-    }
-    /** Morning checks (before 11 am, at rest) by day: {day → hr} or {day → rmssd}. */
-    static TreeMap<String,Double> morningSpots(Context c,String field){
-        TreeMap<String,Double> t=new TreeMap<>();JSONArray a=spots(c);
-        for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;Calendar d=Calendar.getInstance();d.setTimeInMillis(o.optLong("at"));if(d.get(Calendar.HOUR_OF_DAY)>=11)continue;String k=DaySteps.key(o.optLong("at"));if(!t.containsKey(k))t.put(k,o.optDouble(field));}
-        return t;
-    }
-
     // ---- Resting heart rate and HRV ----
-    /** Resting heart rate series: the watch's own figure, else the lowest 30-minute average of your heart rate, else a morning pulse check. */
+    /** Resting heart rate series: the watch's own figure, else the lowest 30-minute average of your heart rate. */
     static TreeMap<String,Double> restSeries(Context c,JSONObject v){
-        TreeMap<String,Double> t=new TreeMap<>(morningSpots(c,"hr"));t.putAll(Vitals.series(v,"hrRest"));t.putAll(Vitals.series(v,"rhr"));return t;
+        TreeMap<String,Double> t=new TreeMap<>(Vitals.series(v,"hrRest"));t.putAll(Vitals.series(v,"rhr"));return t;
     }
     static Reading restingHr(Context c){
         JSONObject v=Vitals.all(c);Reading r=latest(v,"rhr",2);if(r.ok())return r;
         Reading low=latest(v,"hrRest",2);if(low.ok()){low.source="Lowest 30 min of your watch's heart rate";return low;}
-        TreeMap<String,Double> m=morningSpots(c,"hr");if(!m.isEmpty()&&m.lastKey().compareTo(yesterday())>=0){Reading s=new Reading();s.value=m.lastEntry().getValue();s.day=m.lastKey();s.source="Morning pulse check (camera)";return s;}
         return r;
     }
-    static TreeMap<String,Double> hrvSeries(Context c,JSONObject v){TreeMap<String,Double> t=new TreeMap<>(morningSpots(c,"rmssd"));t.putAll(Vitals.series(v,"hrv"));return t;}
+    static TreeMap<String,Double> hrvSeries(Context c,JSONObject v){TreeMap<String,Double> t=new TreeMap<>(Vitals.series(v,"hrv"));return t;}
     static Reading hrv(Context c){
         JSONObject v=Vitals.all(c);Reading r=latest(v,"hrv",2);if(r.ok()){JSONObject n=v.optJSONObject("hrvNight");if(n!=null&&n.optBoolean(r.day))r.source+=" · while asleep";return r;}
-        TreeMap<String,Double> m=morningSpots(c,"rmssd");if(!m.isEmpty()&&m.lastKey().compareTo(yesterday())>=0){Reading s=new Reading();s.value=m.lastEntry().getValue();s.day=m.lastKey();s.source="Morning pulse check (camera)";return s;}
         return r;
     }
 

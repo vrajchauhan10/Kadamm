@@ -4,6 +4,7 @@
 
 - Edit Home: a link at the bottom of Home lets you choose which sections show there (Your body today, Coach, Trainer, plan, steps by hour, step spread, movement quality, sitting breaks, today at a glance, live route map, this week, reports, new badges). Steps and starting an activity always show; "Show all" brings everything back.
 - Your body today: the 3 big circles at the top (Recovery, Strain and Sleep by default) can be any 3 measures you pick, from "Choose what shows here › The 3 big circles at the top"; "Default" restores them. The measures below can show as circles or tiles: one tap on "Tiles · Circles" switches. Each circle fills against its own scale (Stress and Sleep consistency out of 100, heart rate against your max heart rate, blood oxygen 80–100 %, VO₂max out of 60, and so on); a measure with no data shows an empty circle.
+- The camera pulse check is removed: heart rate, resting heart rate and HRV now come only from your watch (through Health Connect or Kadamm on Wear OS). Kadamm no longer asks for the camera.
 - The "crafted by V" mark is no longer plain text in the code, and the app checks that it's the official build signed with the maker's key: a copy rebuilt from the source says "Unofficial build" in the menu and can't install over the official app.
 
 ## 10.1.1 (versionCode 57)

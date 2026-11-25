@@ -47,7 +47,7 @@
 ### On your wrist (Wear OS)
 - **Kadamm for Wear OS** works with any Wear OS 3+ watch (Galaxy Watch 4 and later, Pixel Watch, TicWatch, Fossil and others). It shows your steps ring, streak and today's challenges, and starts, pauses and finishes sessions from your wrist. Your watch's heart rate is saved with the session.
 - **Every watch brand through Health Connect:** sleep stages, all-day heart rate, resting heart rate, HRV, breathing rate, blood oxygen, skin and body temperature, blood pressure, VO₂max and weight from Samsung Health, Fitbit, Garmin, Zepp, Withings, Oura and others.
-- **Your body, measured:** Recovery (0–100 %), Strain (0–21) and Stress from your watch; Movement load, sleep estimates, sleep consistency, a Cooper 12-minute VO₂max test and a fingertip camera pulse check (heart rate and HRV) from the phone alone. Every measure says where it came from, and estimates are labelled.
+- **Your body, measured:** Recovery (0–100 %), Strain (0–21) and Stress from your watch; Movement load, sleep estimates, sleep consistency, and a Cooper 12-minute VO₂max test from the phone; heart rate and HRV come from your watch alone. Every measure says where it came from, and estimates are labelled.
 - **Live:** with Kadamm open on the watch, heart rate reaches the phone every few seconds; all-day heart rate is sampled every 15 minutes.
 - **Install on the watch:** turn on *Developer options › ADB debugging* and *Wireless debugging* on the watch, then on a computer run `adb connect <watch-ip>:<port>` and `adb install Kadamm-Wear-<version>.apk`. Keep Kadamm installed on the phone; the two pair automatically.
 
