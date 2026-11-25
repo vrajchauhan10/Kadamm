@@ -204,13 +204,14 @@ final class Pro {
         java.util.Set<String> pkgs=new java.util.TreeSet<>();JSONArray a=Vitals.all(c).optJSONArray("sources");if(a!=null)for(int i=0;i<a.length();i++)pkgs.add(a.optString(i));
         for(String p:c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getString("healthSources","").split(","))if(!p.trim().isEmpty())pkgs.add(p.trim());
         pkgs.remove(c.getPackageName());boolean any=false;
-        for(String p:pkgs){if(p.startsWith("com.android.healthconnect"))continue;
+        // Google Fit only relays other apps' data, so what it may write says nothing about the watch.
+        for(String p:pkgs){if(p.startsWith("com.android.healthconnect")||p.equals("com.google.android.apps.fitness"))continue;
             try{android.content.pm.PackageInfo pi=c.getPackageManager().getPackageInfo(p,android.content.pm.PackageManager.GET_PERMISSIONS);if(pi.requestedPermissions==null)continue;any=true;
                 for(int i=0;i<pi.requestedPermissions.length;i++)if(("android.permission.health.WRITE_"+type).equals(pi.requestedPermissions[i])&&(pi.requestedPermissionsFlags[i]&android.content.pm.PackageInfo.REQUESTED_PERMISSION_GRANTED)!=0)return true;}catch(Exception ignored){}}
         return any?Boolean.FALSE:null;
     }
     /** The watch apps that share, by name ("Zepp, Google Fit"). */
-    static String sharingApps(Context c){java.util.List<String> n=new ArrayList<>();JSONArray a=Vitals.all(c).optJSONArray("sources");if(a!=null)for(int i=0;i<a.length();i++){String p=a.optString(i);if(p.startsWith("com.android.healthconnect"))continue;String l=HealthSync.label(p);if(!n.contains(l))n.add(l);}return String.join(", ",n);}
+    static String sharingApps(Context c){java.util.List<String> n=new ArrayList<>();JSONArray a=Vitals.all(c).optJSONArray("sources");if(a!=null)for(int i=0;i<a.length();i++){String p=a.optString(i);if(p.startsWith("com.android.healthconnect")||p.equals("com.google.android.apps.fitness"))continue;String l=HealthSync.label(p);if(!n.contains(l))n.add(l);}return String.join(", ",n);}
 
     // ---- Which watch ----
     /** The apps and watches Health Connect data came from, and when it last synced. */

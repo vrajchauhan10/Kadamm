@@ -1,5 +1,10 @@
 # Changelog
 
+## 10.0.4 (versionCode 55)
+
+- Stress is calibrated for real days: a minute counts as still only under 30 % of your heart-rate reserve and in an hour with under 250 steps, and calm sitting (up to 8 % of reserve above resting) scores 0. It works with watches that read heart rate every few minutes (12 readings over 2+ hours are enough).
+- Google Fit no longer counts as a watch app when deciding what your watch can share: it only relays other apps' data. Body temperature is now hidden for watches whose app doesn't share it.
+
 ## 10.0.3 (versionCode 54)
 
 - Strain and Stress no longer wait for your age: without one, the maximum heart rate is the highest your watch recorded in the last 30 days (when it reached 150+). Your age, or a maximum you set, still takes priority.

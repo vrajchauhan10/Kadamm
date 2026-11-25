@@ -183,7 +183,7 @@ object WatchHealth {
             var n = 0; var lastBpm = 0L; var lastAt = 0L; var lastSrc = ""; var todayMinutes: IntArray? = null
             for (back in 0 until DAYS) {
                 val d = today.minusDays(back.toLong()); val key = d.toString()
-                if (back > 1 && hist.has(key)) continue
+                if (back > 1 && hist.has(key) && old.optInt("stressV") == 2) continue
                 val from = d.atStartOfDay(zone).toInstant(); val to = if (back == 0) Instant.now() else d.plusDays(1).atStartOfDay(zone).toInstant()
                 val sum = DoubleArray(1440); val cnt = IntArray(1440)
                 for (r in all(HeartRateRecord::class, TimeRangeFilter.between(from, to))) {
@@ -205,9 +205,9 @@ object WatchHealth {
                 var best = 0.0
                 for (s in 0..1410 step 5) { var a = 0.0; var c = 0; for (i in s until s + 30) if (minute[i] > 0) { a += minute[i]; c++ }; if (c >= 20) { val avg = a / c; if (best == 0.0 || avg < best) best = avg } }
                 if (best > 0) low.put(key, Math.round(best * 10) / 10.0)
-                if (rest > 0 && max > rest) stressDay(minute, rest, max, d == today)?.let { stress.put(key, it) }
+                if (rest > 0 && max > rest) { val sd = stressDay(minute, rest, max, d == today, Trends.hours(context, key)); if (sd != null) stress.put(key, sd) else stress.remove(key) }
             }
-            out.put("hrHist", hist).put("hrRest", low).put("hrMax", high).put("stress", stress); counts.put("hr", n)
+            out.put("hrHist", hist).put("hrRest", low).put("hrMax", high).put("stress", stress).put("stressV", 2); counts.put("hr", n)
             if (todayMinutes != null) out.put("hrToday", JSONArray().apply { todayMinutes.forEach { put(it) } }).put("hrTodayDay", today.toString())
             if (lastAt > 0) out.put("hrLast", JSONObject().put("bpm", lastBpm).put("at", lastAt).put("src", lastSrc))
             else old.optJSONObject("hrLast")?.let { out.put("hrLast", it) }
@@ -226,24 +226,26 @@ object WatchHealth {
     }
 
     /**
-     * Stress from heart rate while still: for minutes when you weren't moving (no step data needed: a minute counts
-     * only if heart rate is under 40 % of your heart-rate reserve, where walking would push it), how far heart rate sits
-     * above resting, as a share of reserve, scaled so 25 % of reserve is 100. Levels: rest 0–25, low 26–50, medium 51–75,
-     * high 76–100. Needs 60+ such minutes between 7 am and 11 pm.
+     * Stress from heart rate while still (no stress data type exists in Health Connect, so it's worked out here):
+     * minutes between 7 am and 11 pm count when heart rate is under 30 % of your heart-rate reserve, not within 5
+     * minutes of activity, and in an hour with under 250 steps (phone or Health Connect). Each counts by how far heart
+     * rate sits above resting: up to 8 % of reserve (calm sitting) is 0, 28 % or more is 100. Levels: rest 0–25, low
+     * 26–50, medium 51–75, high 76–100. Needs 12+ such readings over 2+ hours.
      */
-    private fun stressDay(minute: IntArray, rest: Double, max: Int, today: Boolean): JSONObject? {
+    private fun stressDay(minute: IntArray, rest: Double, max: Int, today: Boolean, hours: DoubleArray?): JSONObject? {
         val reserve = max - rest; var sum = 0.0; var n = 0; val lv = IntArray(4)
         val end = if (today) minOf(1380, (java.time.LocalTime.now().toSecondOfDay() / 60)) else 1380
+        var first = -1; var last = -1
         for (m in 420 until end) {
             val v = minute[m]; if (v <= 0) continue
-            val f = (v - rest) / reserve; if (f > .40) continue
-            // Skip the minutes right after activity: heart rate is still settling.
-            var recent = false; for (k in maxOf(0, m - 5) until m) if (minute[k] > 0 && (minute[k] - rest) / reserve > .40) recent = true
+            val f = (v - rest) / reserve; if (f > .30) continue
+            if (hours != null && hours[m / 60] >= 250) continue
+            var recent = false; for (k in maxOf(0, m - 5) until m) if (minute[k] > 0 && (minute[k] - rest) / reserve > .30) recent = true
             if (recent) continue
-            val s = (f / .25 * 100).coerceIn(0.0, 100.0); sum += s; n++
+            val s = ((f - .08) / .20 * 100).coerceIn(0.0, 100.0); sum += s; n++; if (first < 0) first = m; last = m
             lv[when { s <= 25 -> 0; s <= 50 -> 1; s <= 75 -> 2; else -> 3 }]++
         }
-        if (n < 60) return null
+        if (n < 12 || last - first < 120) return null
         return JSONObject().put("score", Math.round(sum / n)).put("min", n).put("rest", lv[0]).put("low", lv[1]).put("med", lv[2]).put("high", lv[3])
     }
 
