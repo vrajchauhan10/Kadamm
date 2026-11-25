@@ -1,5 +1,11 @@
 # Changelog
 
+## 10.0.3 (versionCode 54)
+
+- Strain and Stress no longer wait for your age: without one, the maximum heart rate is the highest your watch recorded in the last 30 days (when it reached 150+). Your age, or a maximum you set, still takes priority.
+- Measures your watch can't provide are hidden: Kadamm checks which measures the watch's app (Zepp, Samsung Health, Fitbit, Garmin and others) is allowed to share into Health Connect, and leaves out the rest on Home, in "Choose what shows here" and on Health data, with one line saying what isn't shared.
+- ECG is removed: Health Connect has no ECG data type, so no watch can share it with Kadamm.
+
 ## 10.0.2 (versionCode 53)
 
 - Widgets fit any size: every line in the Steps, Daily goals and Week widgets shrinks to fit the widget's width and height instead of running off it, the lines share the widget's height, and the Week widget's chart and ring scale to the space left.

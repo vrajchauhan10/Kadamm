@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="10.0.2";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="10.0.3";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -956,7 +956,14 @@ public class MainActivity extends Activity {
      * One metric's current state: {value, unit, note, tone} with tone 1 good, 0 neutral, -1 attention, -2 no data.
      * The note says where it came from, or why it's missing.
      */
-    private String[] bodyMetric(String key,JSONArray hist){
+    /** Measures that can't arrive at all: no app on this phone that shares into Health Connect may write them. */
+    private boolean unsupported(String key){
+        if(java.util.Arrays.asList("recovery","load","sleep","consistency","vo2","weight","bp").contains(key))return false;
+        String k=java.util.Arrays.asList("strain","stress","live").contains(key)?"hr":key;Boolean can=Pro.canShare(this,k);
+        return Boolean.FALSE.equals(can)&&"-2".equals(bodyMetricRaw(key,history())[3]);
+    }
+    private String[] bodyMetric(String key,JSONArray hist){return bodyMetricRaw(key,hist);}
+    private String[] bodyMetricRaw(String key,JSONArray hist){
         JSONObject v=Vitals.all(this);String today=todayKey();
         switch(key){
             case "recovery":{Pro.Recovery r=Pro.recovery(this);if(r.score<0)return new String[]{"—","",r.need.equals("hr")?"Needs HRV or resting HR":r.need.equals("history")?"Learning your normal: 5 days needed":"Needs last night's sleep too","-2"};
@@ -1030,8 +1037,8 @@ public class MainActivity extends Activity {
         TextView info=tx(src.isEmpty()?(getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false)?"No watch data in Health Connect yet":"Health Connect isn't connected: tap Health Connect to allow it"):"Health data from "+src+(sync>0?" · synced "+ago(System.currentTimeMillis()-sync):""),12,muted,false);info.setPadding(0,dp(12),0,0);c.addView(info);
         if(dev.has("caps")){JSONArray caps=dev.optJSONArray("caps");StringBuilder b=new StringBuilder();for(int i=0;caps!=null&&i<caps.length();i++){if(b.length()>0)b.append(", ");b.append(caps.optString(i));}if(b.length()>0)c.addView(tx("Sensors on the watch: "+b,12,muted,false));}
         // What it shares
-        int have=0;StringBuilder got=new StringBuilder();for(String[] m:BODY_METRICS){String[] x=bodyMetric(m[0],history());if(!"-2".equals(x[3])){have++;if(got.length()>0)got.append(" · ");got.append(m[1]);}}
-        TextView cap=tx(have+" of "+BODY_METRICS.length+" measures available"+(got.length()>0?": "+got:""),12,ink,false);cap.setLineSpacing(dp(2),1f);cap.setPadding(0,dp(8),0,0);c.addView(cap);
+        int have=0,total=0;StringBuilder got=new StringBuilder();for(String[] m:BODY_METRICS){if(unsupported(m[0]))continue;total++;String[] x=bodyMetric(m[0],history());if(!"-2".equals(x[3])){have++;if(got.length()>0)got.append(" · ");got.append(m[1]);}}
+        TextView cap=tx(have+" of "+total+" measures available"+(got.length()>0?": "+got:""),12,ink,false);cap.setLineSpacing(dp(2),1f);cap.setPadding(0,dp(8),0,0);c.addView(cap);
         LinearLayout bs=row();LinearLayout.LayoutParams bsp=lp(-1,44);bsp.topMargin=dp(12);c.addView(bs,bsp);
         Button sync1=button("Sync now",raised,ink);bs.addView(sync1,new LinearLayout.LayoutParams(0,-1,1));sync1.setOnClickListener(x->{toast("Syncing with your watch…");WearBridge.ping(this);refreshHealth(true);});
         Button more=button(full?"Health Connect":"All health data",lime,accentOn);LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(0,-1,1);mp.leftMargin=dp(10);bs.addView(more,mp);
@@ -1056,7 +1063,7 @@ public class MainActivity extends Activity {
             final String k=keys[i];cell.setOnClickListener(x->navigate("Body"));cell.setContentDescription(bodyName(k)+" "+m[0]+" "+m[1]);}
         // Chosen measures
         // The rings already show Recovery, Strain or Movement load, and Sleep; tiles never repeat them.
-        java.util.List<String> pins=pinned();pins.removeAll(java.util.Arrays.asList(keys));LinearLayout grid=null;
+        java.util.List<String> pins=pinned();pins.removeAll(java.util.Arrays.asList(keys));pins.removeIf(this::unsupported);LinearLayout grid=null;
         for(int i=0;i<pins.size();i++){if(i%2==0){grid=row();LinearLayout.LayoutParams gp=lp(-1,-2);gp.topMargin=dp(10);c.addView(grid,gp);}
             String[] m=bodyMetric(pins.get(i),hist);LinearLayout tile=col();tile.setPadding(dp(12),dp(10),dp(12),dp(10));tile.setBackground(shape(raised,14));LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,-2,1);if(i%2==1)tp.leftMargin=dp(10);grid.addView(tile,tp);
             tile.addView(tx(bodyName(pins.get(i)),11,muted,true));TextView val=valueUnit(m[0],m[1],20,"-2".equals(m[3])?muted:ink);tile.addView(val);TextView note=tx(m[2],10,"-2".equals(m[3])?muted:toneColor(m[3]),false);note.setMaxLines(2);tile.addView(note);
@@ -1066,9 +1073,10 @@ public class MainActivity extends Activity {
     }
     private TextView liveValue;
     private void choosePinned(){
-        String[] names=new String[BODY_METRICS.length];boolean[] on=new boolean[names.length];java.util.List<String> cur=pinned();
-        for(int i=0;i<names.length;i++){names[i]=BODY_METRICS[i][1];on[i]=cur.contains(BODY_METRICS[i][0]);}
-        dialog().setTitle("Show on Home (up to 6, besides the rings)").setMultiChoiceItems(names,on,(d,w,checked)->on[w]=checked).setPositiveButton("Save",(d,w)->{StringBuilder b=new StringBuilder();int n=0;for(int i=0;i<on.length;i++)if(on[i]&&n<6){if(b.length()>0)b.append(',');b.append(BODY_METRICS[i][0]);n++;}
+        java.util.List<String[]> avail=new java.util.ArrayList<>();for(String[] m:BODY_METRICS)if(!unsupported(m[0]))avail.add(m);
+        String[] names=new String[avail.size()];boolean[] on=new boolean[names.length];java.util.List<String> cur=pinned();
+        for(int i=0;i<names.length;i++){names[i]=avail.get(i)[1];on[i]=cur.contains(avail.get(i)[0]);}
+        dialog().setTitle("Show on Home (up to 6, besides the rings)").setMultiChoiceItems(names,on,(d,w,checked)->on[w]=checked).setPositiveButton("Save",(d,w)->{StringBuilder b=new StringBuilder();int n=0;for(int i=0;i<on.length;i++)if(on[i]&&n<6){if(b.length()>0)b.append(',');b.append(avail.get(i)[0]);n++;}
             getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("pinnedBody",b.toString()).apply();renderPageNow();}).setNegativeButton("Cancel",null).show();
     }
 
@@ -1078,7 +1086,7 @@ public class MainActivity extends Activity {
         renderWatchConnection(true);renderBodyToday(h);renderRecoveryCard();renderStrainCard(h);renderSleepCard();renderHeartCard();renderStressCard();
         // Breathing, oxygen and temperature only come from a watch: the card appears once any of them does.
         boolean any=false;for(String k:new String[]{"resp","spo2","skin","btemp"})if(!"-2".equals(bodyMetric(k,h)[3]))any=true;if(any)renderOxygenCard();
-        renderBloodPressureCard();renderVo2Card(h);renderEcgCard();renderCatalogCard(h);
+        renderBloodPressureCard();renderVo2Card(h);renderCatalogCard(h);
     }
     private void renderRecoveryCard(){
         Pro.Recovery r=Pro.recovery(this);
@@ -1098,7 +1106,7 @@ public class MainActivity extends Activity {
             if(s.strain<0){c.addView(tx(s.need.equals("age")?"Add your age in Profile so Kadamm knows your maximum heart rate.":"Strain needs a resting heart rate from your watch or a pulse check.",13,ink,false));}
             else{LinearLayout row=row();row.setGravity(Gravity.CENTER_VERTICAL);c.addView(row,lp(-1,-2));row.addView(new MetricViews.Ring(this,chartTheme(),(float)(s.strain/21),MetricViews.ZONE_COLORS[1],String.format(Locale.US,"%.1f",s.strain),"of 21"),lp(92,92));
                 LinearLayout l=col();LinearLayout.LayoutParams llp=new LinearLayout.LayoutParams(0,-2,1);llp.leftMargin=dp(16);row.addView(l,llp);
-                l.addView(tx(s.strain>=18?"All out":s.strain>=14?"Strenuous":s.strain>=10?"Moderate":"Light",18,ink,true));l.addView(tx(String.format(Locale.US,"%,d minutes of heart rate · resting %d, max %d bpm",s.minutes,s.rest,s.max),12,muted,false));
+                l.addView(tx(s.strain>=18?"All out":s.strain>=14?"Strenuous":s.strain>=10?"Moderate":"Light",18,ink,true));l.addView(tx(String.format(Locale.US,"%,d minutes of heart rate · resting %d, max %d bpm (from %s)",s.minutes,s.rest,s.max,SessionMetrics.maxHeartRateSource(this)),12,muted,false));
                 String[][] z=new String[5][];for(int i=0;i<5;i++)z[i]=new String[]{"Zone "+(i+1),String.valueOf(s.zoneMin[i]),"min"};statGrid(c,z,12);}
         }
         Pro.Load l=Pro.load(this,h,todayKey());
@@ -1170,9 +1178,12 @@ public class MainActivity extends Activity {
     }
     private void renderOxygenCard(){
         String[] r=bodyMetric("resp",history()),o=bodyMetric("spo2",history()),sk=bodyMetric("skin",history()),bt=bodyMetric("btemp",history());
-        LinearLayout c=metricCard("BREATHING, OXYGEN AND TEMPERATURE","","Breathing rate: breaths a minute during sleep (12–20 is typical); a rise of 1+ over your normal often comes before illness.\n\nBlood oxygen (SpO₂): 95–100 % is normal; repeated lows under 90 % at night are worth discussing with a doctor.\n\nSkin temperature: the change from your own baseline overnight, in °C; body temperature: a thermometer reading. Readings are shown only when a watch or app shares them through Health Connect.");
-        statGrid(c,new String[][]{{"Breathing",r[0],r[1]},{"Blood oxygen",o[0],o[1]},{"Skin temp",sk[0],sk[1]},{"Body temp",bt[0],bt[1]}},6);
-        TextView t=tx("Breathing: "+r[2]+"\nBlood oxygen: "+o[2]+"\nSkin temperature: "+sk[2]+"\nBody temperature: "+bt[2],11,muted,false);t.setLineSpacing(dp(2),1f);t.setPadding(0,dp(8),0,0);c.addView(t);
+        LinearLayout c=metricCard(unsupported("skin")&&unsupported("btemp")?"BREATHING AND BLOOD OXYGEN":"BREATHING, OXYGEN AND TEMPERATURE","","Breathing rate: breaths a minute during sleep (12–20 is typical); a rise of 1+ over your normal often comes before illness.\n\nBlood oxygen (SpO₂): 95–100 % is normal; repeated lows under 90 % at night are worth discussing with a doctor.\n\nSkin temperature: the change from your own baseline overnight, in °C; body temperature: a thermometer reading. Readings are shown only when a watch or app shares them through Health Connect.");
+        java.util.List<String[]> cells=new java.util.ArrayList<>();StringBuilder src=new StringBuilder();
+        String[][] all={{"resp","Breathing","Breathing"},{"spo2","Blood oxygen","Blood oxygen"},{"skin","Skin temp","Skin temperature"},{"btemp","Body temp","Body temperature"}};String[][] vals={r,o,sk,bt};
+        for(int i=0;i<4;i++){if(unsupported(all[i][0]))continue;cells.add(new String[]{all[i][1],vals[i][0],vals[i][1]});if(src.length()>0)src.append("\n");src.append(all[i][2]).append(": ").append(vals[i][2]);}
+        statGrid(c,cells.toArray(new String[0][]),6);
+        TextView t=tx(src.toString(),11,muted,false);t.setLineSpacing(dp(2),1f);t.setPadding(0,dp(8),0,0);c.addView(t);
     }
     private void renderBloodPressureCard(){
         String[] b=bodyMetric("bp",history());
@@ -1197,11 +1208,6 @@ public class MainActivity extends Activity {
         t.setOnClickListener(x->dialog().setTitle("Cooper 12-minute test").setMessage("Warm up first. Then run (or walk as fast as you can) for 12 minutes on a flat route with a clear GPS signal. Kadamm records it as a run and stops by itself at 12:00, then works out your VO₂max from the distance.\n\nStop if you feel unwell. It's a maximal test: skip it if you have a heart condition, without your doctor's OK.").setNegativeButton("Cancel",null)
             .setPositiveButton("Start",(d,w)->{prefs.edit().putBoolean("cooperTest",true).putString("activityMode","outdoor").apply();activityType="Run";beginRecord();}).show());
     }
-    private void renderEcgCard(){
-        LinearLayout c=metricCard("ECG","","An ECG (electrocardiogram) records your heart's electrical rhythm for 30 seconds to check for atrial fibrillation. Watches with an ECG sensor (Galaxy Watch, Pixel Watch, Fitbit Sense, Apple Watch) keep these recordings inside their own medical apps, because they are regulated medical devices; Health Connect has no ECG data type, so no other app, Kadamm included, can read them.");
-        c.addView(tx("Not available to Kadamm: ECG recordings stay in your watch's own app (Samsung Health Monitor, Fitbit or Pixel Watch). Kadamm doesn't estimate them.",13,ink,false));
-        if(pkgInstalled("com.samsung.android.shealthmonitor")){Button b=button("Open Samsung Health Monitor",raised,ink);LinearLayout.LayoutParams bp=lp(-1,44);bp.topMargin=dp(12);c.addView(b,bp);b.setOnClickListener(x->{Intent i=getPackageManager().getLaunchIntentForPackage("com.samsung.android.shealthmonitor");if(i!=null)startActivity(i);});}
-    }
     private boolean pkgInstalled(String p){try{getPackageManager().getPackageInfo(p,0);return true;}catch(Exception e){return false;}}
     /** What Kadamm reads and from where, with how to turn on what's missing. */
     private void renderCatalogCard(JSONArray h){
@@ -1211,7 +1217,7 @@ public class MainActivity extends Activity {
             b.addView(tx("Connect Health Connect",14,ink,true));b.addView(tx("Your watch's sleep, heart rate, HRV, blood oxygen and more reach Kadamm through Health Connect. Until then, Kadamm uses the phone alone.",12,muted,false));}
         String[][] hk={{"sleep","sleep"},{"rhr","rhr"},{"hrv","hrv"},{"resp","resp"},{"spo2","spo2"},{"skin","skin"},{"btemp","btemp"},{"bp","bp"},{"vo2","vo2"},{"weight","weight"},{"strain","hr"},{"stress","hr"}};
         for(int pass=0;pass<2;pass++){boolean header=false;
-            for(String[] m:BODY_METRICS){String[] x=bodyMetric(m[0],h);boolean ok=!"-2".equals(x[3]);if(ok!=(pass==0))continue;
+            for(String[] m:BODY_METRICS){if(unsupported(m[0]))continue;String[] x=bodyMetric(m[0],h);boolean ok=!"-2".equals(x[3]);if(ok!=(pass==0))continue;
                 if(!header){TextView t=tx(pass==0?"AVAILABLE NOW":"NOT AVAILABLE YET",10,muted,true);t.setLetterSpacing(.08f);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(pass==0?14:18);c.addView(t,tp);header=true;}
                 String key=null;for(String[] p:hk)if(p[0].equals(m[0]))key=p[1];
                 LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);r.setPadding(0,dp(8),0,dp(8));c.addView(r,lp(-1,-2));
@@ -1220,6 +1226,8 @@ public class MainActivity extends Activity {
                 String note=x[2];if(key!=null&&hc){int n=Pro.count(v,key);if(n>0)note+=String.format(Locale.US," · %,d readings",n);else if(!Pro.granted(v,key)&&!ok)note=java.util.Arrays.asList("resp","spo2","skin","btemp","stress","strain").contains(m[0])?"Allow it in Health Connect":x[2]+" · or allow it in Health Connect";}
                 TextView nt=tx(note,11,muted,false);nt.setMaxLines(2);l.addView(nt);
                 if(ok){TextView val=valueUnit(m[0].equals("recovery")?x[0]+"%":x[0],m[0].equals("recovery")?"":x[1],14,ink);val.setGravity(Gravity.END);r.addView(val);}}}
+        java.util.List<String> nope=new java.util.ArrayList<>();for(String[] m:BODY_METRICS)if(unsupported(m[0]))nope.add(m[1].toLowerCase(Locale.US));
+        if(!nope.isEmpty()){String apps=Pro.sharingApps(this);TextView nt=tx("Not measured or not shared by "+(apps.isEmpty()?"your watch's app":apps)+": "+String.join(", ",nope)+". These stay hidden until a watch shares them.",11,muted,false);nt.setLineSpacing(dp(2),1f);nt.setPadding(0,dp(14),0,0);c.addView(nt);}
         Button perms=button(hc?"Health Connect permissions":"Connect Health Connect",hc?raised:lime,hc?ink:accentOn);LinearLayout.LayoutParams pp=lp(-1,44);pp.topMargin=dp(12);c.addView(perms,pp);perms.setOnClickListener(x->{try{startActivity(new Intent(this,HealthConnectActivity.class));}catch(Exception e){toast("Health Connect could not be opened");}});
         Button w=button("Add weight",raised,ink);LinearLayout.LayoutParams wp=lp(-1,44);wp.topMargin=dp(8);c.addView(w,wp);w.setOnClickListener(x->{android.widget.EditText in=new android.widget.EditText(this);in.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);in.setHint("kg");FrameLayout box=new FrameLayout(this);box.setPadding(dp(20),dp(8),dp(20),0);box.addView(in);
             dialog().setTitle("Today's weight (kg)").setView(box).setPositiveButton("Save",(d,k)->{try{double kg=Double.parseDouble(in.getText().toString().replace(',','.'));if(kg<25||kg>300){toast("Enter a weight between 25 and 300 kg");return;}Trends.logWeight(this,kg);WatchHealth.writeWeight(this,kg,msg->toast(msg==null?"Saved, and shared to Health Connect":msg));renderPageNow();}catch(Exception e){toast("Enter a number, like 72.5");}}).setNegativeButton("Cancel",null).show();});

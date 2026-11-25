@@ -185,6 +185,33 @@ final class Pro {
         return best!=null&&best.vo2>=10?best:null;
     }
 
+    // ---- What the watch's app can share ----
+    /** The Health Connect type a measure needs written by the watch's app. */
+    private static final String[][] WRITES={{"sleep","SLEEP"},{"hr","HEART_RATE"},{"rhr","RESTING_HEART_RATE"},{"hrv","HEART_RATE_VARIABILITY"},{"resp","RESPIRATORY_RATE"},
+        {"spo2","OXYGEN_SATURATION"},{"skin","SKIN_TEMPERATURE"},{"btemp","BODY_TEMPERATURE"},{"bp","BLOOD_PRESSURE"},{"vo2","VO2_MAX"},{"weight","WEIGHT"}};
+    /**
+     * Whether any app that shares into Health Connect on this phone (the watch's app: Zepp, Samsung Health, Fitbit,
+     * Garmin…) is allowed to write this measure: TRUE yes, FALSE none of them can (so it can't arrive), null when no
+     * such app is known. Read from Android's own record of each app's granted Health Connect permissions.
+     */
+    private static final java.util.Map<String,Object[]> shareCache=new java.util.HashMap<>();
+    static Boolean canShare(Context c,String key){
+        synchronized(shareCache){Object[] hit=shareCache.get(key);if(hit!=null&&System.currentTimeMillis()-(long)hit[0]<60000)return (Boolean)hit[1];}
+        Boolean r=canShareNow(c,key);synchronized(shareCache){shareCache.put(key,new Object[]{System.currentTimeMillis(),r});}return r;
+    }
+    private static Boolean canShareNow(Context c,String key){
+        String type=null;for(String[] w:WRITES)if(w[0].equals(key))type=w[1];if(type==null)return null;
+        java.util.Set<String> pkgs=new java.util.TreeSet<>();JSONArray a=Vitals.all(c).optJSONArray("sources");if(a!=null)for(int i=0;i<a.length();i++)pkgs.add(a.optString(i));
+        for(String p:c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getString("healthSources","").split(","))if(!p.trim().isEmpty())pkgs.add(p.trim());
+        pkgs.remove(c.getPackageName());boolean any=false;
+        for(String p:pkgs){if(p.startsWith("com.android.healthconnect"))continue;
+            try{android.content.pm.PackageInfo pi=c.getPackageManager().getPackageInfo(p,android.content.pm.PackageManager.GET_PERMISSIONS);if(pi.requestedPermissions==null)continue;any=true;
+                for(int i=0;i<pi.requestedPermissions.length;i++)if(("android.permission.health.WRITE_"+type).equals(pi.requestedPermissions[i])&&(pi.requestedPermissionsFlags[i]&android.content.pm.PackageInfo.REQUESTED_PERMISSION_GRANTED)!=0)return true;}catch(Exception ignored){}}
+        return any?Boolean.FALSE:null;
+    }
+    /** The watch apps that share, by name ("Zepp, Google Fit"). */
+    static String sharingApps(Context c){java.util.List<String> n=new ArrayList<>();JSONArray a=Vitals.all(c).optJSONArray("sources");if(a!=null)for(int i=0;i<a.length();i++){String p=a.optString(i);if(p.startsWith("com.android.healthconnect"))continue;String l=HealthSync.label(p);if(!n.contains(l))n.add(l);}return String.join(", ",n);}
+
     // ---- Which watch ----
     /** The apps and watches Health Connect data came from, and when it last synced. */
     static String connectedSources(Context c){return Vitals.sources(Vitals.all(c));}

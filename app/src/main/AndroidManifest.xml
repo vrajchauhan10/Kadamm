@@ -12,6 +12,15 @@
         <package android:name="com.withings.wiscale2" />
         <package android:name="com.ouraring.oura" />
         <package android:name="fi.polar.polarflow" />
+        <package android:name="com.huawei.health" />
+        <package android:name="com.mi.health" />
+        <package android:name="com.xiaomi.wearable" />
+        <package android:name="com.noisefit" />
+        <package android:name="com.coros.coros" />
+        <package android:name="com.suunto.connectivity" />
+        <package android:name="com.oplus.healthservice" />
+        <package android:name="com.heytap.health" />
+        <package android:name="com.google.android.apps.fitness" />
         <package android:name="com.whatsapp" />
         <package android:name="com.whatsapp.w4b" />
     </queries>

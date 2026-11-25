@@ -104,7 +104,14 @@ final class SessionMetrics {
     private static SharedPreferences settings(Context c){return c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE);}
     private static String settingsKey(Context c){SharedPreferences s=settings(c);return s.getInt("strideLengthCm",72)+"/"+s.getInt("ageYears",0)+"/"+s.getInt("maxHr",0);}
     /** Maximum heart rate: the user's own figure if set, else 208 − 0.7 × age (Tanaka 2001); -1 without either. */
-    static int maxHeartRate(Context c){SharedPreferences s=settings(c);int set=s.getInt("maxHr",0);if(set>0)return set;int age=s.getInt("ageYears",0);return age>0?(int)Math.round(208-.7*age):-1;}
+    /**
+     * Maximum heart rate: the user's own figure; else 208 − 0.7 × age (Tanaka 2001); else the highest heart rate the
+     * watch recorded in the last 30 days, when it reached 150+ (a measured lower bound of the real maximum). -1 with none.
+     */
+    static int maxHeartRate(Context c){SharedPreferences s=settings(c);int set=s.getInt("maxHr",0);if(set>0)return set;int age=s.getInt("ageYears",0);if(age>0)return (int)Math.round(208-.7*age);int seen=observedMax(c);return seen>=150?seen:-1;}
+    static int observedMax(Context c){int m=0;try{org.json.JSONObject h=Vitals.all(c).optJSONObject("hrMax");if(h!=null)for(java.util.Iterator<String> it=h.keys();it.hasNext();)m=Math.max(m,h.optInt(it.next()));}catch(Exception ignored){}return m;}
+    /** Where the maximum heart rate comes from, for explanations. */
+    static String maxHeartRateSource(Context c){SharedPreferences s=settings(c);if(s.getInt("maxHr",0)>0)return "your setting";if(s.getInt("ageYears",0)>0)return "your age";return "the highest your watch recorded in 30 days";}
 
     // ---- Computation ----
     private static final class P { double lat,lon,m,alt=Double.NaN,baro=Double.NaN;long s,k=-1;boolean run,brk; }
