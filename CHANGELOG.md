@@ -1,5 +1,13 @@
 # Changelog
 
+## 10.0.1 (versionCode 52)
+
+- Fixes a crash on Home on mornings when Recovery is green (the coach's message had a broken percent sign).
+- HRV and breathing rate now use readings taken while asleep (inside that night's sleep) when the watch records them all day, so Recovery compares night with night. HRV says "while asleep" when it does.
+- Lowest blood oxygen is the 5th percentile of the night's readings (10+ needed), so one movement artefact doesn't show as a low.
+- When the same night arrives from the watch's app and from Google Fit, the watch app's night is kept and named as the source.
+- Long values (like "8h 34m") shrink to fit inside the rings.
+
 ## 10.0 (versionCode 51)
 
 - Your watch, any brand: Profile and Home show which watch is connected (Wear OS, Bluetooth or through Health Connect), when its data last arrived, and which measures it shares. The new Health data page lists every measure with where it came from, how many readings arrived in the last 30 days, and how to turn on what's missing.

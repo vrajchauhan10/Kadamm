@@ -90,7 +90,13 @@ object WatchHealth {
             for (r in all(SleepSessionRecord::class)) {
                 val total = Duration.between(r.startTime, r.endTime).toMinutes(); if (total < 60 || total > 16 * 60) continue
                 val key = day(r.endTime); val prev = detail.optJSONObject(key)
-                if (prev != null && prev.optLong("inBed") >= total) continue
+                // The same night often arrives twice: from the watch's own app and copied by Google Fit. Keep the
+                // watch app's (Fit only when it's clearly longer), else the longer one.
+                if (prev != null) {
+                    val fit = "com.google.android.apps.fitness"; val prevFit = prev.optString("src") == fit; val thisFit = r.metadata.dataOrigin.packageName == fit
+                    if (prevFit != thisFit) { if (thisFit && total < prev.optLong("inBed") + 30) continue; if (!thisFit && total + 30 < prev.optLong("inBed")) continue }
+                    else if (prev.optLong("inBed") >= total) continue
+                }
                 var light = 0L; var deep = 0L; var rem = 0L; var awake = 0L; var asleepUnknown = 0L; val st = JSONArray()
                 for (s in r.stages) {
                     val m = Duration.between(s.startTime, s.endTime).toMinutes(); if (m <= 0) continue
@@ -118,16 +124,37 @@ object WatchHealth {
                 out.put(key, medianByDay(byDay)); counts.put(key, n)
             } catch (_: Exception) { }
         }
+        // HRV and breathing rate are compared night to night: readings taken while asleep (inside that night's sleep
+        // window) are used when there are 5 or more; otherwise the day's readings.
+        val nights = mutableMapOf<String, LongArray>()
+        out.optJSONObject("sleepDetail")?.let { sd -> for (k in sd.keys()) sd.optJSONObject(k)?.let { nights[k] = longArrayOf(it.optLong("s"), it.optLong("e")) } }
+        suspend fun <T : Record> nightly(key: String, type: KClass<T>, time: (T) -> Instant, value: (T) -> Double, ok: (Double) -> Boolean) {
+            if (!has(key)) return
+            try {
+                val night = mutableMapOf<String, MutableList<Double>>(); val dayVals = mutableMapOf<String, MutableList<Double>>(); var n = 0
+                for (r in all(type)) {
+                    val v = value(r); if (!ok(v)) continue; val t = time(r).toEpochMilli(); n++; src(key, r.metadata.dataOrigin.packageName)
+                    val nk = nights.entries.firstOrNull { t >= it.value[0] && t <= it.value[1] }?.key
+                    if (nk != null) night.getOrPut(nk) { mutableListOf() }.add(v) else dayVals.getOrPut(day(time(r))) { mutableListOf() }.add(v)
+                }
+                val merged = mutableMapOf<String, MutableList<Double>>(); val asleep = JSONObject()
+                for ((k, v) in dayVals) merged[k] = v
+                for ((k, v) in night) if (v.size >= 5) { merged[k] = v; asleep.put(k, true) }
+                out.put(key, medianByDay(merged)).put(key + "Night", asleep); counts.put(key, n)
+            } catch (_: Exception) { }
+        }
+        nightly("hrv", HeartRateVariabilityRmssdRecord::class, { it.time }, { it.heartRateVariabilityMillis }, { it in 3.0..250.0 })
+        nightly("resp", RespiratoryRateRecord::class, { it.time }, { it.rate }, { it in 4.0..40.0 })
         simple("rhr", RestingHeartRateRecord::class, { it.time }, { it.beatsPerMinute.toDouble() }, { it in 30.0..120.0 })
-        simple("hrv", HeartRateVariabilityRmssdRecord::class, { it.time }, { it.heartRateVariabilityMillis }, { it in 3.0..250.0 })
-        simple("resp", RespiratoryRateRecord::class, { it.time }, { it.rate }, { it in 4.0..40.0 })
         simple("spo2", OxygenSaturationRecord::class, { it.time }, { it.percentage.value }, { it in 70.0..100.0 })
         simple("btemp", BodyTemperatureRecord::class, { it.time }, { it.temperature.inCelsius }, { it in 34.0..42.0 })
         simple("vo2", Vo2MaxRecord::class, { it.time }, { it.vo2MillilitersPerMinuteKilogram }, { it in 10.0..90.0 })
         simple("weight", WeightRecord::class, { it.time }, { it.weight.inKilograms }, { it in 25.0..300.0 })
         // The lowest SpO2 of each night matters as much as the average.
         if (has("spo2")) try {
-            val low = JSONObject(); for (r in all(OxygenSaturationRecord::class)) { val v = r.percentage.value; if (v !in 70.0..100.0) continue; val k = day(r.time); if (!low.has(k) || v < low.optDouble(k)) low.put(k, v) }
+            // The night's low: the 5th percentile of the day's readings (10+ needed), so one motion artefact doesn't count.
+            val byDay = mutableMapOf<String, MutableList<Double>>(); for (r in all(OxygenSaturationRecord::class)) { val v = r.percentage.value; if (v in 70.0..100.0) byDay.getOrPut(day(r.time)) { mutableListOf() }.add(v) }
+            val low = JSONObject(); for ((k, v) in byDay) { val s = v.sorted(); low.put(k, if (s.size >= 10) s[(s.size * .05).toInt()] else s.first()) }
             out.put("spo2Low", low)
         } catch (_: Exception) { }
         // Skin temperature: change from the person's own baseline, in °C (what watches measure overnight).

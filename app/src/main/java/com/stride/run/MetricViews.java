@@ -126,7 +126,7 @@ final class MetricViews {
             p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(st);p.setStrokeCap(Paint.Cap.ROUND);p.setColor(alpha(color,45));c.drawOval(o,p);
             p.setColor(color);c.drawArc(o,-90,360*Math.min(1,f),false,p);
             if(f>1){p.setColor(blendC(color,Color.WHITE,.45f));c.drawArc(o,-90,360*Math.min(1,f-1),false,p);}
-            p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);p.setColor(t.text);p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));p.setTextSize(s*.22f);c.drawText(big,cx,cy+s*.06f,p);
+            p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);p.setColor(t.text);p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));p.setTextSize(s*.22f);float inner=s-4*st;if(p.measureText(big)>inner*.86f)p.setTextSize(s*.22f*inner*.86f/p.measureText(big));c.drawText(big,cx,cy+s*.06f,p);
             p.setTypeface(null);p.setTextSize(Math.max(dp(9),s*.085f));p.setColor(t.textMuted);c.drawText(small,cx,cy+s*.2f,p);p.setTextAlign(Paint.Align.LEFT);
         }
     }

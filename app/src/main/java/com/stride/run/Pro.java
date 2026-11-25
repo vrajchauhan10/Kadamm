@@ -71,7 +71,7 @@ final class Pro {
     }
     static TreeMap<String,Double> hrvSeries(Context c,JSONObject v){TreeMap<String,Double> t=new TreeMap<>(morningSpots(c,"rmssd"));t.putAll(Vitals.series(v,"hrv"));return t;}
     static Reading hrv(Context c){
-        JSONObject v=Vitals.all(c);Reading r=latest(v,"hrv",2);if(r.ok())return r;
+        JSONObject v=Vitals.all(c);Reading r=latest(v,"hrv",2);if(r.ok()){JSONObject n=v.optJSONObject("hrvNight");if(n!=null&&n.optBoolean(r.day))r.source+=" · while asleep";return r;}
         TreeMap<String,Double> m=morningSpots(c,"rmssd");if(!m.isEmpty()&&m.lastKey().compareTo(yesterday())>=0){Reading s=new Reading();s.value=m.lastEntry().getValue();s.day=m.lastKey();s.source="Morning pulse check (camera)";return s;}
         return r;
     }
