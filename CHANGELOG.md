@@ -1,5 +1,11 @@
 # Changelog
 
+## 10.1.1 (versionCode 57)
+
+- Recovery updates through the day: "Recovery now" starts from this morning's Recovery and goes down as today's Strain (or Movement load) and Stress add up, recalculated with every sync. Home's ring shows it ("65 % · 68 % this morning"), the Recovery card shows what's been spent, and the coach's line shows both. Morning Recovery still comes from last night and sets the coach's targets.
+- After a sync, the Trainer page redraws too, so every screen that shows a linked measure (Recovery, Strain, Stress, sleep, coach) updates together.
+- No more grey square when moving between pages: buttons no longer cast Android's default shadow, which stayed visible while the page faded.
+
 ## 10.1.0 (versionCode 56)
 
 - Health data is tidier: the watch card shows the watch, how it's connected, when it last synced, and one line ("13 of 14 measures available") that opens the full list. "What Kadamm captures" is collapsed until you tap it.

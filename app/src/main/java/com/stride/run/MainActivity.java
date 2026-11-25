@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="10.1.0";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="10.1.1";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -363,7 +363,7 @@ public class MainActivity extends Activity {
     private void healthRow(LinearLayout c,String label,String value,int state){LinearLayout r=row();LinearLayout.LayoutParams p=lp(-1,34);c.addView(r,p);r.addView(tx(label,10,muted,true),new LinearLayout.LayoutParams(0,-2,1));r.addView(tx("●  "+value,11,state,true));}
     private TextView metric(LinearLayout parent,String label,String value,String unit){LinearLayout c=col();c.setPadding(dp(12),dp(13),dp(8),dp(9));c.setBackground(panelShape(14));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(94),1);if(parent.getChildCount()>0)p.leftMargin=dp(8);parent.addView(c,p);c.addView(tx(label,9,muted,true));TextView v=tx(value,24,ink,true);LinearLayout.LayoutParams vp=lp(-1,34);vp.topMargin=dp(4);c.addView(v,vp);c.addView(tx(unit,10,muted,false));if(label.startsWith("TODAY"))todayCount=v;else if(label.equals("DISTANCE"))todayDistance=v;else if(label.equals("ACTIVE TIME"))todayActiveTime=v;else if(label.equals("WALKING"))todayWalkDistance=v;else if(label.equals("RUNNING"))todayRunDistance=v;return v;}
     private TextView value(LinearLayout parent,String label,String val){LinearLayout c=col();LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1);parent.addView(c,p);c.addView(tx(label,9,muted,true));TextView v=tx(val,17,ink,false);v.setTypeface(Typeface.create("monospace",0));LinearLayout.LayoutParams vp=lp(-1,34);vp.topMargin=dp(5);c.addView(v,vp);return v;}
-    private Button button(String s,int color,int textColor){Button b=new Button(this);b.setText(s);b.setTextSize(13);b.setAllCaps(false);b.setTextColor(textColor);GradientDrawable base=shape(color,11);base.setStroke(dp(1),line);b.setBackground(ripple(base));b.setOnFocusChangeListener((v,has)->{GradientDrawable d=shape(color,11);d.setStroke(dp(has?2:1),has?focus:line);b.setBackground(ripple(d));});return b;}private Button smallChoice(String s,boolean selected){int selectedColor="Run".equals(s)?violet:lime;Button b=button(s,selected?selectedColor:raised,selected?accentOn:ink);return b;}
+    private Button button(String s,int color,int textColor){Button b=new Button(this);b.setStateListAnimator(null);b.setElevation(0);b.setText(s);b.setTextSize(13);b.setAllCaps(false);b.setTextColor(textColor);GradientDrawable base=shape(color,11);base.setStroke(dp(1),line);b.setBackground(ripple(base));b.setOnFocusChangeListener((v,has)->{GradientDrawable d=shape(color,11);d.setStroke(dp(has?2:1),has?focus:line);b.setBackground(ripple(d));});return b;}private Button smallChoice(String s,boolean selected){int selectedColor="Run".equals(s)?violet:lime;Button b=button(s,selected?selectedColor:raised,selected?accentOn:ink);return b;}
     private void renderHistory(){
         dayTotals=DaySteps.allDayTotals(this);brand("YOUR ACTIVITY","History","Tap a day to see its steps and sessions.");
         JSONArray h=history();int goal=dailyGoal();Calendar now=Calendar.getInstance();
@@ -707,7 +707,7 @@ public class MainActivity extends Activity {
         l.addView(tx("Coach Kadamm",big?20:17,ink,true));l.addView(tx(cd.greeting,12,muted,false));
         TextView cnt=tx(cd.done+"/"+cd.list.size(),big?20:16,cd.allDone?positive:ink,true);cnt.setGravity(Gravity.CENTER);cnt.setPadding(dp(10),dp(4),dp(10),dp(4));cnt.setBackground(shape(cd.allDone?blend(panel,positive,.25f):raised,14));r.addView(cnt,lp(-2,-2));
         // Recovery guidance: today's Recovery and the load that suits it (from the watch, or a morning pulse check).
-        String g=TrainerCoach.guidance(cd);if(g!=null){int col=cd.restNow||cd.recScore<34?critical:cd.recScore>=67?positive:MetricViews.ZONE_COLORS[3];
+        String g=TrainerCoach.guidance(this,cd);if(g!=null){int col=cd.restNow||cd.recScore<34?critical:cd.recScore>=67?positive:MetricViews.ZONE_COLORS[3];
             TextView gt=tx((cd.restNow?"🛌  ":"♥  ")+g,12,col,true);gt.setPadding(dp(12),dp(8),dp(12),dp(8));gt.setBackground(shape(blend(panel,col,darkTheme?.18f:.10f),12));LinearLayout.LayoutParams gp=lp(-1,-2);gp.topMargin=dp(12);c.addView(gt,gp);gt.setOnClickListener(x->navigate("Body"));}
     }
     private View coachBar(TrainerCoach.Challenge ch,int i){
@@ -967,7 +967,9 @@ public class MainActivity extends Activity {
         JSONObject v=Vitals.all(this);String today=todayKey();
         switch(key){
             case "recovery":{Pro.Recovery r=Pro.recovery(this);if(r.score<0)return new String[]{"—","",r.need.equals("hr")?"Needs HRV or resting HR":r.need.equals("history")?"Learning your normal: 5 days needed":"Needs last night's sleep too","-2"};
-                return new String[]{r.score+"","%",r.zone(),r.score>=67?"1":r.score>=34?"0":"-1"};}
+                // The live figure: this morning's Recovery less what today's strain and stress have used.
+                Pro.Now nw=Pro.recoveryNow(this);int rv=nw.now>=0?nw.now:r.score;String zone=rv>=67?"Green":rv>=34?"Yellow":"Red";
+                return new String[]{rv+"","%",nw.now>=0&&nw.now!=r.score?zone+" · "+r.score+" % this morning":zone,rv>=67?"1":rv>=34?"0":"-1"};}
             case "strain":{Pro.Strain s=Pro.strain(this,today);if(s.strain<0)return new String[]{"—","",s.need.equals("age")?"Add your age in Profile":s.need.equals("rest")?"Needs a resting heart rate":"Needs heart rate from a watch","-2"};
                 return new String[]{String.format(Locale.US,"%.1f",s.strain),"of 21",s.strain>=14?"Strenuous":s.strain>=10?"Moderate":"Light","0"};}
             case "load":{Pro.Load l=Pro.load(this,hist,today);if(l.load<0)return new String[]{"—","","No steps yet today","-2"};return new String[]{String.format(Locale.US,"%.1f",l.load),"of 21",l.load>=14?"Heavy day":l.load>=8?"Active day":"Light day","0"};}
@@ -1121,11 +1123,14 @@ public class MainActivity extends Activity {
     }
     private void renderRecoveryCard(){
         Pro.Recovery r=Pro.recovery(this);
-        LinearLayout c=metricCard("RECOVERY","","How ready your body is today, 0–100 %. It compares last night's HRV (45 %), resting heart rate (25 %), sleep against your sleep need (25 %; see Sleep) and breathing rate (5 %) with your own normal over the last 30 days. HRV or resting heart rate one standard deviation better than your normal adds 25 points to that part; missing parts are left out and the rest re-weighted.\n\nGreen (67–100 %): ready for a hard day. Yellow (34–66 %): normal training. Red (0–33 %): take it easy; the coach eases your challenges.\n\nHRV and resting heart rate come from your watch, or from a morning pulse check with the camera when no watch measures them.");
+        LinearLayout c=metricCard("RECOVERY","","How ready your body is today, 0–100 %. The big figure is this morning's Recovery, set by last night; \"Now\" lowers it through the day by 2 points for every point of Strain (or Movement load) and up to 15 for stress, and updates with every sync. It compares last night's HRV (45 %), resting heart rate (25 %), sleep against your sleep need (25 %; see Sleep) and breathing rate (5 %) with your own normal over the last 30 days. HRV or resting heart rate one standard deviation better than your normal adds 25 points to that part; missing parts are left out and the rest re-weighted.\n\nGreen (67–100 %): ready for a hard day. Yellow (34–66 %): normal training. Red (0–33 %): take it easy; the coach eases your challenges.\n\nHRV and resting heart rate come from your watch, or from a morning pulse check with the camera when no watch measures them.");
         if(r.score<0){c.addView(tx(r.need.equals("hr")?"Recovery needs HRV or a resting heart rate. Wear a watch to bed, or do a pulse check with the camera after waking, before getting up.":r.need.equals("history")?"Kadamm is learning your normal: Recovery appears after 5 days of HRV or resting heart rate.":"Recovery also needs last night's sleep (from a watch, the phone, or added by you).",13,ink,false));pulseButton(c);return;}
         LinearLayout row=row();row.setGravity(Gravity.CENTER_VERTICAL);c.addView(row,lp(-1,-2));
         int col=r.score>=67?positive:r.score>=34?MetricViews.ZONE_COLORS[3]:critical;row.addView(new MetricViews.Ring(this,chartTheme(),r.score/100f,col,r.score+"%",r.zone()),lp(96,96));
         LinearLayout l=col();LinearLayout.LayoutParams llp=new LinearLayout.LayoutParams(0,-2,1);llp.leftMargin=dp(16);row.addView(l,llp);
+        Pro.Now nw=Pro.recoveryNow(this);
+        if(nw.now>=0){TextView nt=tx(String.format(Locale.US,"Now %d %%",nw.now),15,nw.now>=67?positive:nw.now>=34?MetricViews.ZONE_COLORS[3]:critical,true);l.addView(nt);
+            if(nw.strainDrain+nw.stressDrain>=1)l.addView(tx(String.format(Locale.US,"%s%s since this morning",nw.strainDrain>=1?String.format(Locale.US,"−%.0f for %s %.1f",nw.strainDrain,nw.loadName.toLowerCase(Locale.US),nw.load):"",nw.stressDrain>=1?String.format(Locale.US,"%s−%.0f for stress",nw.strainDrain>=1?", ":"",nw.stressDrain):""),11,muted,false));}
         l.addView(tx(r.score>=67?"Ready to push":r.score>=34?"Ready for a normal day":"Take it easy today",18,ink,true));
         l.addView(tx(r.score>=67?"Your body has recovered well. A good day for a long or brisk walk.":r.score>=34?"Keep to your usual training.":"Your body is still recovering. Walk gently and sleep early.",12,muted,false));
         for(String[] p:r.parts){LinearLayout pr=row();pr.setPadding(0,dp(10),0,0);c.addView(pr,lp(-1,-2));pr.addView(tx(p[0],13,ink,true),new LinearLayout.LayoutParams(0,-2,1));pr.addView(tx(p[1]+"  ·  "+p[2],12,muted,false));TextView sc=tx(p[3],13,Integer.parseInt(p[3])>=60?positive:Integer.parseInt(p[3])>=40?ink:warning,true);sc.setGravity(Gravity.END);pr.addView(sc,lp(40,-2));}
@@ -1281,7 +1286,7 @@ public class MainActivity extends Activity {
     }
     /** While Home, Profile or Health data is open: live heart rate every 2 s, Health Connect every minute. */
     private final Runnable bodyTick=new Runnable(){public void run(){
-        if(!resumed)return;boolean on="Today".equals(page)||"Body".equals(page)||"Profile".equals(page);
+        if(!resumed)return;boolean on="Today".equals(page)||"Body".equals(page)||"Profile".equals(page)||"Trainer".equals(page);
         if(on){if(liveStatus!=null)liveStatus.run();if(liveValue!=null){long[] l=WearBridge.live(MainActivity.this);if(l!=null)liveValue.setText(l[0]+" bpm");}
             if(android.os.SystemClock.elapsedRealtime()-lastHealthRefresh>60000){WearBridge.ping(MainActivity.this);refreshHealth(true);}}
         handler.postDelayed(this,2000);}};
@@ -1879,7 +1884,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     }
     private void refreshHealth(boolean force){
         long now=android.os.SystemClock.elapsedRealtime();if(!force&&now-lastHealthRefresh<120000)return;lastHealthRefresh=now;
-        try{HealthSync.refresh(this,()->{StepsWidget.refresh(this);if(resumed&&!dragging&&("Health".equals(page)||"Today".equals(page)||"Body".equals(page)||"Profile".equals(page))){int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));}syncing=false;});}catch(Throwable ignored){}
+        try{HealthSync.refresh(this,()->{StepsWidget.refresh(this);if(resumed&&!dragging&&("Health".equals(page)||"Today".equals(page)||"Body".equals(page)||"Profile".equals(page)||"Trainer".equals(page))){int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));}syncing=false;});}catch(Throwable ignored){}
     }
     @Override protected void onResume(){
         super.onResume();resumed=true;checkForUpdateOnce();WidgetTick.schedule(this);handler.removeCallbacks(refresh);handler.post(refresh);startStepCounting();refreshHealth(true);handler.postDelayed(()->SessionMetrics.warm(this,history()),1500);handler.postDelayed(()->{WearBridge.pushToday(this);WearBridge.pushLive(this);WearBridge.ping(this);},4000);SleepTracker.register(this);handler.removeCallbacks(bodyTick);handler.postDelayed(bodyTick,2000);
@@ -2134,7 +2139,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         TextView v=tx("—",size,white,true);v.setGravity(Gravity.CENTER);c.addView(v);TextView l=tx(label,11,sub,false);l.setGravity(Gravity.CENTER);c.addView(l);return v;
     }
     private Button pill(String text,int color,int textColor){
-        Button b=new Button(this);b.setText(text);b.setAllCaps(false);b.setTextSize(17);b.setTypeface(Typeface.create("sans-serif-medium",0));b.setTextColor(textColor);b.setBackground(ripple(shape(color,29)));b.setStateListAnimator(null);return b;
+        Button b=new Button(this);b.setStateListAnimator(null);b.setElevation(0);b.setText(text);b.setAllCaps(false);b.setTextSize(17);b.setTypeface(Typeface.create("sans-serif-medium",0));b.setTextColor(textColor);b.setBackground(ripple(shape(color,29)));b.setStateListAnimator(null);return b;
     }
     private void updateLiveOverlay(){
         if(liveLayer==null||liveLayer.getVisibility()!=View.VISIBLE)return;

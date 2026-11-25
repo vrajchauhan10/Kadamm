@@ -68,7 +68,7 @@ public class PulseActivity extends Activity {
         bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(SECONDS*10);bar.setProgressTintList(android.content.res.ColorStateList.valueOf(th.accent));LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,dp(10));bp.topMargin=dp(16);root.addView(bar,bp);
         status=text("Starting the camera…",15,th.text,true);status.setGravity(Gravity.CENTER);status.setPadding(0,dp(12),0,0);root.addView(status);
         View sp=new View(this);root.addView(sp,new LinearLayout.LayoutParams(-1,0,1));
-        Button cancel=new Button(this);cancel.setText("Cancel");cancel.setAllCaps(false);cancel.setTextColor(th.text);GradientDrawable g=new GradientDrawable();g.setColor(th.surfaceRaised);g.setCornerRadius(dp(14));cancel.setBackground(g);cancel.setOnClickListener(v->finish());root.addView(cancel,new LinearLayout.LayoutParams(-1,dp(50)));
+        Button cancel=new Button(this);cancel.setStateListAnimator(null);cancel.setText("Cancel");cancel.setAllCaps(false);cancel.setTextColor(th.text);GradientDrawable g=new GradientDrawable();g.setColor(th.surfaceRaised);g.setCornerRadius(dp(14));cancel.setBackground(g);cancel.setOnClickListener(v->finish());root.addView(cancel,new LinearLayout.LayoutParams(-1,dp(50)));
         if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.CAMERA},REQ);
     }
     @Override public void onRequestPermissionsResult(int code,String[] perms,int[] res){if(code==REQ&&(res.length==0||res[0]!=PackageManager.PERMISSION_GRANTED)){status.setText("Kadamm needs the camera to see your pulse in your fingertip. Nothing is recorded or saved except the result.");status.setTextColor(th.warning);}else if(code==REQ)open();}
@@ -156,7 +156,7 @@ public class PulseActivity extends Activity {
     private void finish(double[] r){
         close();bar.setProgress(SECONDS*10);
         if(r==null||r[4]<1){big.setText("—");status.setTextColor(th.warning);status.setText(r==null?"Not enough clear beats. Press a little more gently, keep the finger and phone still, and try again.":String.format(Locale.US,"Only %.0f %% of beats were clear, so nothing was saved. Keep still and try again.",r[2]));
-            Button again=new Button(this);again.setText("Try again");again.setAllCaps(false);again.setOnClickListener(v->recreate());root.addView(again,root.getChildCount()-1,new LinearLayout.LayoutParams(-1,dp(50)));return;}
+            Button again=new Button(this);again.setStateListAnimator(null);again.setText("Try again");again.setAllCaps(false);again.setOnClickListener(v->recreate());root.addView(again,root.getChildCount()-1,new LinearLayout.LayoutParams(-1,dp(50)));return;}
         Pro.addSpot(this,r[0],r[1],(int)Math.round(r[2]));big.setText(String.valueOf(Math.round(r[0])));status.setTextColor(th.positive);
         status.setText(r[1]>0?String.format(Locale.US,"Saved · HRV %.0f ms (RMSSD) · %d beats, %.0f %% clear",r[1],Math.round(r[3]),r[2]):String.format(Locale.US,"Saved · %d beats, %.0f %% clear (too few clean pairs for HRV)",Math.round(r[3]),r[2]));
         hint.setText(java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)<11?"A morning check at rest feeds your Recovery score when no watch measures HRV.":"Checks before 11 am, at rest, are the ones used for Recovery.");

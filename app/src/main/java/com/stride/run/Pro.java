@@ -124,6 +124,21 @@ final class Pro {
         if(r.parts.size()<2){r.need="more";return r;}
         r.score=(int)Math.round(sum/wsum);return r;
     }
+    static final class Now { int morning=-1,now=-1;double strainDrain,stressDrain,load=-1;String loadName=""; }
+    /**
+     * Recovery now: this morning's Recovery, lowered through the day by what you've spent: 2 points for every point of
+     * today's Strain (Movement load without a watch), and up to 15 points for stress, in proportion to how high your
+     * Stress has been and how much of the day it covers (stressed for 8+ hours counts in full). It's recalculated with
+     * every sync, so it moves as the day's heart rate, steps and stress arrive. Morning Recovery itself only changes when
+     * last night's data does.
+     */
+    static Now recoveryNow(Context c){
+        Now n=new Now();Recovery r=recovery(c);n.morning=r.score;if(r.score<0)return n;String today=DaySteps.todayKey();
+        Strain st=strain(c,today);if(st.strain>=0){n.load=st.strain;n.loadName="Strain";}else{Load l=load(c,DaySteps.sessions(c),today);if(l.load>=0){n.load=l.load;n.loadName="Movement load";}}
+        if(n.load>0)n.strainDrain=n.load*2;
+        JSONObject ss=stress(c,today);if(ss!=null){int sc=ss.optInt("score");double hours=ss.optInt("min")/60.0;if(sc>25)n.stressDrain=Math.min(15,(sc-25)/75.0*15*Math.min(1,hours/8));}
+        n.now=(int)Math.round(clamp(r.score-n.strainDrain-n.stressDrain));return n;
+    }
     static double clamp(double x){return Math.max(0,Math.min(100,x));}
     static String hm(long min){return String.format(Locale.US,"%dh %02dm",min/60,min%60);}
 

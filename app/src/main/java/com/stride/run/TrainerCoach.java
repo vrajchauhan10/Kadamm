@@ -132,10 +132,12 @@ final class TrainerCoach {
         return "";
     }
     /** One line for the coach card: today's Recovery and how much load suits it, or null without a Recovery score. */
-    static String guidance(Day d){
+    static String guidance(Context c,Day d){
         if(d.recScore<0)return null;String zone=d.recScore>=67?"green":d.recScore>=34?"yellow":"red";
         String load=d.strainNow>=0?String.format(Locale.US," · %s %.1f, best today %.0f–%.0f",d.strainName,d.strainNow,d.strainLo,d.strainHi):String.format(Locale.US," · best load today %.0f–%.0f",d.strainLo,d.strainHi);
-        return String.format(Locale.US,"Recovery %d %% (%s)%s%s",d.recScore,zone,load,d.restNow?" · rest now":"");
+        Pro.Now nw=null;try{nw=Pro.recoveryNow(c);}catch(Exception ignored){}
+        String now=nw!=null&&nw.now>=0&&nw.now!=d.recScore?String.format(Locale.US,", now %d %%",nw.now):"";
+        return String.format(Locale.US,"Recovery %d %% (%s)%s%s%s",d.recScore,zone,now,load,d.restNow?" · rest now":"");
     }
     /** The coach's words, built from the numbers. */
     private static void words(Context c,Day day,Map<String,Long> totals,double steps,double brisk,int minute){
