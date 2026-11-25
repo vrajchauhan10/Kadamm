@@ -76,11 +76,34 @@ final class Pro {
         return r;
     }
 
+    // ---- Sleep need ----
+    static final class SleepNeed { int base,strain,debt,total;String basis; }
+    /**
+     * Tonight's sleep need, in minutes, built like WHOOP's: a base for your age (9 h under 18, 8 h from 18 to 64 (the
+     * middle of the recommended 7–9 h), 7 h 30 m from 65, from the US National Sleep Foundation's ranges), plus 6 minutes
+     * for every point of yesterday's Strain (or Movement load) above 10 (at most 45), plus a seventh of the sleep you
+     * missed against the base over the last 7 nights (at most 60), so a short week is paid back gradually.
+     */
+    private static final java.util.Map<String,Object[]> needCache=new java.util.HashMap<>();
+    static SleepNeed sleepNeed(Context c,JSONArray hist,String forDay){
+        String k=forDay+"|"+Vitals.all(c).optLong("at");synchronized(needCache){Object[] hit=needCache.get(k);if(hit!=null&&System.currentTimeMillis()-(long)hit[0]<60000)return (SleepNeed)hit[1];}
+        SleepNeed n=sleepNeedNow(c,hist,forDay);synchronized(needCache){needCache.put(k,new Object[]{System.currentTimeMillis(),n});}return n;
+    }
+    private static SleepNeed sleepNeedNow(Context c,JSONArray hist,String forDay){
+        SleepNeed n=new SleepNeed();int age=c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getInt("ageYears",0);
+        n.base=age<=0?480:age<18?540:age>=65?450:480;n.basis=age<=0?"8 h (the middle of 7–9 h; add your age to fit it)":age<18?"9 h for your age":age>=65?"7 h 30 m for your age":"8 h for your age";
+        try{Calendar d=Calendar.getInstance();d.setTime(new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US).parse(forDay));d.add(Calendar.DAY_OF_YEAR,-1);String y=DaySteps.key(d.getTimeInMillis());
+            Strain st=strain(c,y);double load=st.strain>=0?st.strain:load(c,hist,y).load;if(load>10)n.strain=(int)Math.min(45,Math.round((load-10)*6));
+            int missed=0;Calendar k=(Calendar)d.clone();for(int i=0;i<7;i++){SleepTracker.Night x=SleepTracker.night(c,DaySteps.key(k.getTimeInMillis()));if(x!=null&&x.asleep>=180)missed+=Math.max(0,n.base-x.asleep);k.add(Calendar.DAY_OF_YEAR,-1);}
+            n.debt=Math.min(60,missed/7);}catch(Exception ignored){}
+        n.total=n.base+n.strain+n.debt;return n;
+    }
+
     // ---- Recovery ----
     static final class Recovery { int score=-1;String need="";final List<String[]> parts=new ArrayList<>(); String zone(){return score>=67?"Green":score>=34?"Yellow":"Red";} }
     /**
      * Recovery (0–100 %), WHOOP-style but from open data: last night's HRV against your 30-day normal (45 %), resting
-     * heart rate against normal (25 %), sleep against an 8-hour need (25 %) and breathing rate against normal (5 %).
+     * heart rate against normal (25 %), sleep against your sleep need (25 %) and breathing rate against normal (5 %).
      * HRV and resting heart rate count by how many standard deviations they sit from your own normal: one SD better
      * than usual adds 25 points to that part. Parts with no data are left out and the rest re-weighted; it needs HRV or
      * resting heart rate with 5+ days of history, plus one more part.
@@ -89,12 +112,12 @@ final class Pro {
         Recovery r=new Recovery();JSONObject v=Vitals.all(c);String today=DaySteps.todayKey();double wsum=0,sum=0;int core=0;
         Reading h=hrv(c);double[] hb=baseline(hrvSeries(c,v),h.day.isEmpty()?today:h.day,5,true);
         if(h.ok()&&hb!=null){double z=(Math.log(h.value)-hb[0])/Math.max(.05,hb[1]);double p=clamp(50+25*z);sum+=.45*p;wsum+=.45;core++;
-            r.parts.add(new String[]{"HRV",String.format(Locale.US,"%.0f ms",h.value),String.format(Locale.US,"normal %.0f ms",Math.exp(hb[0])),String.valueOf(Math.round(p))});}
+            r.parts.add(new String[]{"HRV",String.format(Locale.US,"%.0f ms",h.value)+(h.day.equals(today)?"":" (yesterday)"),String.format(Locale.US,"normal %.0f ms",Math.exp(hb[0])),String.valueOf(Math.round(p))});}
         Reading rh=restingHr(c);double[] rb=baseline(restSeries(c,v),rh.day.isEmpty()?today:rh.day,5,false);
         if(rh.ok()&&rb!=null){double z=(rh.value-rb[0])/Math.max(1.5,rb[1]);double p=clamp(50-25*z);sum+=.25*p;wsum+=.25;core++;
-            r.parts.add(new String[]{"Resting heart rate",Math.round(rh.value)+" bpm",String.format(Locale.US,"normal %.0f bpm",rb[0]),String.valueOf(Math.round(p))});}
+            r.parts.add(new String[]{"Resting heart rate",Math.round(rh.value)+" bpm"+(rh.day.equals(today)?"":" (yesterday)"),String.format(Locale.US,"normal %.0f bpm",rb[0]),String.valueOf(Math.round(p))});}
         SleepTracker.Night n=SleepTracker.night(c,today);
-        if(n!=null){double p=clamp(n.asleep/480.0*100);sum+=.25*p;wsum+=.25;r.parts.add(new String[]{"Sleep",hm(n.asleep),"need 8h 00m",String.valueOf(Math.round(p))});}
+        if(n!=null){int need=sleepNeed(c,DaySteps.sessions(c),today).total;double p=clamp(n.asleep*100.0/need);sum+=.25*p;wsum+=.25;r.parts.add(new String[]{"Sleep",hm(n.asleep),"need "+hm(need),String.valueOf(Math.round(p))});}
         Reading rs=latest(v,"resp",1);double[] rsb=baseline(Vitals.series(v,"resp"),rs.day.isEmpty()?today:rs.day,5,false);
         if(rs.ok()&&rsb!=null){double d=rs.value-rsb[0];double p=d<.5?100:clamp(100-(d-.5)*40);sum+=.05*p;wsum+=.05;r.parts.add(new String[]{"Breathing rate",String.format(Locale.US,"%.1f /min",rs.value),String.format(Locale.US,"normal %.1f",rsb[0]),String.valueOf(Math.round(p))});}
         if(core==0){r.need=h.ok()||rh.ok()?"history":"hr";return r;}

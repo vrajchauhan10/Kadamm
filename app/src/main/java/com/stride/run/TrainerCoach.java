@@ -117,6 +117,20 @@ final class TrainerCoach {
         return day;
     }
 
+    /**
+     * The coach's sleep advice for today, when sleep is the thing to work on: a short night against your sleep need,
+     * or bedtimes and wake times that vary a lot (consistency under 60 %). Empty otherwise.
+     */
+    static String sleepFocus(Context c){
+        try{String today=DaySteps.todayKey();SleepTracker.Night n=SleepTracker.night(c,today);SleepTracker.Consistency cs=SleepTracker.consistency(c);
+            Pro.SleepNeed tonight=Pro.sleepNeed(c,DaySteps.sessions(c),DaySteps.key(System.currentTimeMillis()+86400000L));
+            String bed=cs.score>=0?SleepTracker.clock(((cs.avgWake-tonight.total-15)%1440+1440)%1440):null;
+            if(n!=null&&n.asleep>=180){int need=Pro.sleepNeed(c,DaySteps.sessions(c),today).total;
+                if(n.asleep<need-60)return String.format(Locale.US,"Focus on sleep: you slept %s, short of the %s your body needs. %s ",Pro.hm(n.asleep),Pro.hm(need),bed!=null?"Be in bed by "+bed+" tonight.":"Get to bed early tonight.");}
+            if(cs.score>=0&&cs.score<60)return String.format(Locale.US,"Focus on sleep timing: your bedtime varies by about %.0f minutes and your wake time by %.0f (consistency %d %%). Going to bed within 30 minutes of the same time every night helps recovery more than an extra walk%s. ",cs.sdBed,cs.sdWake,cs.score,bed!=null?"; tonight, aim for "+bed:"");
+        }catch(Exception ignored){}
+        return "";
+    }
     /** One line for the coach card: today's Recovery and how much load suits it, or null without a Recovery score. */
     static String guidance(Day d){
         if(d.recScore<0)return null;String zone=d.recScore>=67?"green":d.recScore>=34?"yellow":"red";
@@ -143,6 +157,7 @@ final class TrainerCoach {
             if(day.recovery&&day.recScore>=0&&day.recScore<34)m.append(String.format(Locale.US,"Your Recovery is %d %% (red): your body hasn't bounced back yet. Today is an easy day, so I've eased your targets. Keep the pace comfortable. ",day.recScore));
             else if(day.recovery)m.append(String.format(Locale.US,"Yesterday was a big day: effort %d, about %.1f× your usual. Today is an easy day, so I've eased your targets. Keep the pace comfortable. ",Math.round(day.yEffort),day.yEffort/day.usualEffort));
             else if(yv!=null&&yv>0&&minute<12*60)m.append(String.format(Locale.US,"Yesterday you walked %,d steps%s. ",yv,yDone>=3?" and finished every challenge, brilliant":yDone==2?" and finished two of three challenges":""));
+            m.append(sleepFocus(c));
             Challenge next=null;for(Challenge ch:day.list)if(!ch.done&&(next==null||ch.fraction()>next.fraction()))next=ch;
             if(day.done==0)m.append("Here are today's three challenges, set from your last four weeks. ");
             else m.append(day.done==1?"One challenge down, two to go. ":"Two done, one to go. ");

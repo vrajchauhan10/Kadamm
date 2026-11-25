@@ -43,7 +43,8 @@ final class SleepTracker {
         String day,source,kind;long start,end;int inBed,asleep,light=-1,deep=-1,rem=-1,awake=-1;boolean staged,estimate;JSONArray stages;
         /** Bedtime and wake time as minutes from midnight, bedtime negative before midnight (−60 = 11 pm). */
         int bedMin(){Calendar d=Calendar.getInstance();d.setTimeInMillis(start);int m=d.get(Calendar.HOUR_OF_DAY)*60+d.get(Calendar.MINUTE);return m>=12*60?m-1440:m;}
-        int wakeMin(){Calendar d=Calendar.getInstance();d.setTimeInMillis(end);return d.get(Calendar.HOUR_OF_DAY)*60+d.get(Calendar.MINUTE);}
+        /** Wake time as minutes from midnight; after 6 pm it counts as before midnight (negative), so the spread stays fair. */
+        int wakeMin(){Calendar d=Calendar.getInstance();d.setTimeInMillis(end);int m=d.get(Calendar.HOUR_OF_DAY)*60+d.get(Calendar.MINUTE);return m>=18*60?m-1440:m;}
     }
 
     // ---- Google's Sleep API ----
@@ -113,7 +114,7 @@ final class SleepTracker {
             n.source=HealthSync.label(x.optString("src"));n.kind="health";return n;}
         // Sleep API: the segments ending that day (after 2 pm the day before), the longest one.
         try{JSONArray a=new JSONArray(p(c).getString("api","[]"));long[] best=null;
-            for(int k=0;k<a.length();k++){JSONArray s=a.getJSONArray(k);long st=s.getLong(0),en=s.getLong(1);if(!day.equals(DaySteps.key(en)))continue;if(best==null||en-st>best[1]-best[0])best=new long[]{st,en};}
+            for(int k=0;k<a.length();k++){JSONArray s=a.getJSONArray(k);long st=s.getLong(0),en=s.getLong(1);if(!day.equals(DaySteps.key(en+6*3600000L)))continue;if(best==null||en-st>best[1]-best[0])best=new long[]{st,en};}
             if(best!=null&&best[1]-best[0]>=2*3600000L){n.start=best[0];n.end=best[1];n.inBed=n.asleep=(int)((n.end-n.start)/60000);n.source="Google Sleep API";n.kind="sleepapi";n.estimate=true;return n;}}catch(Exception ignored){}
         try{Calendar cal=Calendar.getInstance();cal.setTime(new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US).parse(day));
             // Past nights don't change: their screen-off estimate is worked out once and kept.
@@ -136,8 +137,15 @@ final class SleepTracker {
      * minutes). 100 = the same times every night; each 1.2 minutes of average spread takes a point off, so a 30-minute
      * spread scores 75 and a 2-hour spread scores 0.
      */
+    private static Object[] consCache;
     static Consistency consistency(Context c){
-        Consistency r=new Consistency();List<Night> ns=nights(c,14);r.nights=ns.size();if(ns.size()<5)return r;
+        String k=DaySteps.todayKey()+"|"+Vitals.all(c).optLong("at")+"|"+p(c).getString("manual","");Object[] hit=consCache;
+        if(hit!=null&&k.equals(hit[0])&&System.currentTimeMillis()-(long)hit[1]<60000)return (Consistency)hit[2];
+        Consistency r=consistencyNow(c);consCache=new Object[]{k,System.currentTimeMillis(),r};return r;
+    }
+    private static Consistency consistencyNow(Context c){
+        // Naps and fragments (under 3 hours asleep) aren't a night's sleep and would distort the spread.
+        Consistency r=new Consistency();List<Night> ns=nights(c,14);ns.removeIf(n->n.asleep<180);r.nights=ns.size();if(ns.size()<5)return r;
         double[] b=new double[ns.size()],w=new double[ns.size()];for(int i=0;i<ns.size();i++){b[i]=ns.get(i).bedMin();w[i]=ns.get(i).wakeMin();}
         r.sdBed=sd(b);r.sdWake=sd(w);r.avgBed=(int)Math.round(mean(b));r.avgWake=(int)Math.round(mean(w));
         r.score=(int)Math.round(Math.max(0,Math.min(100,100-(r.sdBed+r.sdWake)/2/1.2)));return r;

@@ -271,7 +271,7 @@ public class MainActivity extends Activity {
     private void brand(String eyebrow,String headline,String sub){LinearLayout brand=row();content.addView(brand,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);brand.addView(brandButton(),bbp);if(tabIndex(page)<0){brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));boolean narrowBack=getResources().getConfiguration().screenWidthDp<400;TextView bk=tx(narrowBack?"‹":"‹  "+backLabel(),narrowBack?20:13,ink,true);bk.setGravity(Gravity.CENTER);bk.setPadding(narrowBack?0:dp(14),0,narrowBack?0:dp(16),narrowBack?dp(2):0);bk.setBackground(rippleOn(raised,18));bk.setContentDescription("Back to "+backLabel());bk.setOnClickListener(v->goBack());brand.addView(bk,narrowBack?lp(40,40):lp(-2,36));}TextView e=tx(eyebrow.toUpperCase(Locale.US),10,muted,true);LinearLayout.LayoutParams ep=lp(-1,25);ep.topMargin=dp(8);content.addView(e,ep);TextView h=tx(headline,29,ink,true);content.addView(h);if(sub!=null){TextView s=tx(sub,13,muted,false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(5);sp.bottomMargin=dp(16);content.addView(s,sp);}}
     private LinearLayout card(){LinearLayout c=col();c.setPadding(dp(16),dp(16),dp(16),dp(16));c.setBackground(panelShape(16));LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(12);content.addView(c,p);return c;}
     private GradientDrawable panelShape(int radius){GradientDrawable d=shape(panel,radius);d.setStroke(dp(1),line);return d;}
-    private void renderToday(){JSONArray hist=history();dayTotals=DaySteps.allDayTotals(this);loadIdleLocation();renderHeader();renderStepSetup();renderBadgeBanner(hist);renderHero(hist);renderBodyToday(hist);renderCoach();renderStepsByHour();renderSpread();renderTrainerCard(hist);renderPlan(hist);renderMovementQuality();renderSittingBreaks();renderBento(hist);renderDistanceGoal(hist);
+    private void renderToday(){JSONArray hist=history();dayTotals=DaySteps.allDayTotals(this);loadIdleLocation();renderHeader();renderStepSetup();renderBadgeBanner(hist);renderHero(hist);deferBodyToday(hist);renderCoach();renderStepsByHour();renderSpread();renderTrainerCard(hist);renderPlan(hist);renderMovementQuality();renderSittingBreaks();renderBento(hist);renderDistanceGoal(hist);
         LinearLayout mapCard=card();trackCard=mapCard;LinearLayout head=row();TextView title=tx("Live route",16,ink,true);head.addView(title,new LinearLayout.LayoutParams(0,dp(26),1));status=tx("● READY",10,lime,true);head.addView(status);mapCard.addView(head);FrameLayout mapFrame=new FrameLayout(this);LinearLayout.LayoutParams mfp=lp(-1,190);mfp.topMargin=dp(8);mapCard.addView(mapFrame,mfp);route=new RouteView(this);route.setTheme(bg,raised,lime,darkTheme);route.setContentDescription("Map. Tap to open full screen");route.setOnClickListener(v->openMapView());mapFrame.addView(route,new FrameLayout.LayoutParams(-1,-1));android.widget.ImageView follow=icon(R.drawable.ic_my_location,ink,10);follow.setBackground(rippleOn(raised,12));FrameLayout.LayoutParams flp=new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.RIGHT|Gravity.TOP);flp.setMargins(0,dp(10),dp(10),0);mapFrame.addView(follow,flp);follow.setContentDescription("Follow my location");follow.setOnClickListener(v->{route.setFollowLocation(true);if(prefs.getBoolean("gpsFix",false))route.setCurrentLocation(prefs.getFloat("latitude",0),prefs.getFloat("longitude",0),prefs.getFloat("accuracy",0));else toast("Waiting for a reliable GPS fix");});LinearLayout mapMeta=row();mapCard.addView(mapMeta,lp(-1,26));accuracyLabel=tx("GPS accuracy · waiting for signal",10,muted,false);mapMeta.addView(accuracyLabel,new LinearLayout.LayoutParams(0,dp(26),1));TextView standard=tx("Tap map to explore",10,lime,true);mapMeta.addView(standard);TextView mapHint=tx("© OpenStreetMap contributors · satellite tiles are not available from this map source",9,muted,false);mapCard.addView(mapHint);
         // Track an activity: four clear choices, one Start button; live numbers only while a session runs.
         boolean running=prefs.getBoolean("active",false);LinearLayout box=card();
@@ -960,7 +960,7 @@ public class MainActivity extends Activity {
     private boolean unsupported(String key){
         if(java.util.Arrays.asList("recovery","load","sleep","consistency","vo2","weight","bp").contains(key))return false;
         String k=java.util.Arrays.asList("strain","stress","live").contains(key)?"hr":key;Boolean can=Pro.canShare(this,k);
-        return Boolean.FALSE.equals(can)&&"-2".equals(bodyMetricRaw(key,history())[3]);
+        if(!Boolean.FALSE.equals(can))return false;return "-2".equals(bodyMetricRaw(key,history())[3]);
     }
     private String[] bodyMetric(String key,JSONArray hist){return bodyMetricRaw(key,hist);}
     private String[] bodyMetricRaw(String key,JSONArray hist){
@@ -972,7 +972,7 @@ public class MainActivity extends Activity {
                 return new String[]{String.format(Locale.US,"%.1f",s.strain),"of 21",s.strain>=14?"Strenuous":s.strain>=10?"Moderate":"Light","0"};}
             case "load":{Pro.Load l=Pro.load(this,hist,today);if(l.load<0)return new String[]{"—","","No steps yet today","-2"};return new String[]{String.format(Locale.US,"%.1f",l.load),"of 21",l.load>=14?"Heavy day":l.load>=8?"Active day":"Light day","0"};}
             case "sleep":{SleepTracker.Night n=SleepTracker.night(this,today);if(n==null)return new String[]{"—","","No sleep recorded for last night","-2"};
-                return new String[]{Pro.hm(n.asleep),"",n.source+(n.estimate?" · estimate":""),n.asleep>=420?"1":n.asleep>=360?"0":"-1"};}
+                int need=Pro.sleepNeed(this,hist,today).total;return new String[]{Pro.hm(n.asleep),"",(n.asleep>=need-15?"Met your need":"of "+Pro.hm(need)+" needed")+" · "+n.source+(n.estimate?" · estimate":""),n.asleep>=need-15?"1":n.asleep>=need-90?"0":"-1"};}
             case "consistency":{SleepTracker.Consistency cs=SleepTracker.consistency(this);if(cs.score<0)return new String[]{"—","",cs.nights+" of 5 nights so far","-2"};return new String[]{cs.score+"","%",String.format(Locale.US,"bed ±%.0f · wake ±%.0f min",cs.sdBed,cs.sdWake),cs.score>=75?"1":cs.score>=50?"0":"-1"};}
             case "live":{long[] l=WearBridge.live(this);JSONObject hl=v.optJSONObject("hrLast");if(l!=null)return new String[]{l[0]+"","bpm",ago(l[1])+" · Kadamm on your watch","0"};
                 if(hl!=null&&System.currentTimeMillis()-hl.optLong("at")<60*60000L)return new String[]{hl.optLong("bpm")+"","bpm",ago(System.currentTimeMillis()-hl.optLong("at"))+" · "+HealthSync.label(hl.optString("src")),"0"};
@@ -1055,7 +1055,7 @@ public class MainActivity extends Activity {
         LinearLayout rings=row();LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(12);c.addView(rings,rp);
         String[] keys={"recovery",watch?"strain":"load","sleep"};int[] colors={positive,MetricViews.ZONE_COLORS[1],violet};
         for(int i=0;i<3;i++){String[] m=bodyMetric(keys[i],hist);LinearLayout cell=col();cell.setGravity(Gravity.CENTER_HORIZONTAL);rings.addView(cell,new LinearLayout.LayoutParams(0,-2,1));
-            float f=0;try{f=keys[i].equals("sleep")?(float)(SleepTracker.night(this,todayKey()).asleep/480.0):keys[i].equals("recovery")?Float.parseFloat(m[0])/100f:Float.parseFloat(m[0])/21f;}catch(Exception ignored){}
+            float f=0;try{f=keys[i].equals("sleep")?(float)(SleepTracker.night(this,todayKey()).asleep/(double)Pro.sleepNeed(this,hist,todayKey()).total):keys[i].equals("recovery")?Float.parseFloat(m[0])/100f:Float.parseFloat(m[0])/21f;}catch(Exception ignored){}
             int col=keys[i].equals("recovery")&&!"-2".equals(m[3])?toneColor(m[3]):colors[i];
             cell.addView(new MetricViews.Ring(this,chartTheme(),Math.min(1,f),col,m[0]+("%".equals(m[1])?"%":""),""),lp(84,84));
             TextView n=tx(bodyName(keys[i]),12,ink,true);n.setGravity(Gravity.CENTER);n.setPadding(0,dp(6),0,0);cell.addView(n);
@@ -1071,26 +1071,51 @@ public class MainActivity extends Activity {
         if(pins.size()%2==1&&grid!=null)grid.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
         TextView choose=tx("Choose what shows here  ›",12,lime,true);choose.setPadding(0,dp(12),0,0);c.addView(choose);choose.setOnClickListener(x->choosePinned());
     }
+    /** Home's body card is below the first screen: it's drawn right after the first frame so Home appears at once. */
+    private void deferBodyToday(JSONArray hist){
+        LinearLayout holder=col();content.addView(holder,lp(-1,-2));String forPage=renderedPage;
+        holder.post(()->{if(!"Today".equals(page)||!forPage.equals(renderedPage)||holder.getParent()!=content)return;LinearLayout real=content;content=holder;try{renderBodyToday(hist);}catch(Exception ignored){}finally{content=real;}});
+    }
     private TextView liveValue;
     private void choosePinned(){
-        java.util.List<String[]> avail=new java.util.ArrayList<>();for(String[] m:BODY_METRICS)if(!unsupported(m[0]))avail.add(m);
+        // The rings already show Recovery, Strain (Movement load without a watch) and Sleep, so they aren't offered as tiles.
+        java.util.List<String> rings=java.util.Arrays.asList("recovery",watchData()?"strain":"load","sleep");
+        java.util.List<String[]> avail=new java.util.ArrayList<>();for(String[] m:BODY_METRICS)if(!unsupported(m[0])&&!rings.contains(m[0]))avail.add(m);
         String[] names=new String[avail.size()];boolean[] on=new boolean[names.length];java.util.List<String> cur=pinned();
         for(int i=0;i<names.length;i++){names[i]=avail.get(i)[1];on[i]=cur.contains(avail.get(i)[0]);}
-        dialog().setTitle("Show on Home (up to 6, besides the rings)").setMultiChoiceItems(names,on,(d,w,checked)->on[w]=checked).setPositiveButton("Save",(d,w)->{StringBuilder b=new StringBuilder();int n=0;for(int i=0;i<on.length;i++)if(on[i]&&n<6){if(b.length()>0)b.append(',');b.append(avail.get(i)[0]);n++;}
-            getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("pinnedBody",b.toString()).apply();renderPageNow();}).setNegativeButton("Cancel",null).show();
+        dialog().setTitle("Show on Home (up to 6)").setMultiChoiceItems(names,on,(d,w,checked)->on[w]=checked).setPositiveButton("Save",(d,w)->{StringBuilder b=new StringBuilder();int n=0;for(int i=0;i<on.length;i++)if(on[i]&&n<6){if(b.length()>0)b.append(',');b.append(avail.get(i)[0]);n++;}
+            int picked=0;for(boolean x:on)if(x)picked++;if(picked>6)toast("Home shows 6: the first 6 you picked");getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("pinnedBody",b.toString()).apply();renderPageNow();}).setNegativeButton("Cancel",null).show();
     }
 
     // ---- The Health data page ----
     private void renderBody(){
         JSONArray h=history();brand("YOUR BODY","Health data","Everything your watch and phone measure, in one place. Measured values come first; estimates say so.");
-        renderWatchConnection(true);renderBodyToday(h);renderRecoveryCard();renderStrainCard(h);renderSleepCard();renderHeartCard();renderStressCard();
+        renderWatchConnection(true);renderSyncHealth();renderAlertsCard();renderBodyToday(h);renderRecoveryCard();renderStrainCard(h);renderSleepCard();renderHeartCard();renderStressCard();
         // Breathing, oxygen and temperature only come from a watch: the card appears once any of them does.
         boolean any=false;for(String k:new String[]{"resp","spo2","skin","btemp"})if(!"-2".equals(bodyMetric(k,h)[3]))any=true;if(any)renderOxygenCard();
         renderBloodPressureCard();renderVo2Card(h);renderCatalogCard(h);
     }
+    /** When Android may pause Kadamm in the background, watch data stops arriving while it's closed: one tap fixes it. */
+    private void renderSyncHealth(){
+        android.os.PowerManager pm=(android.os.PowerManager)getSystemService(POWER_SERVICE);if(pm==null||pm.isIgnoringBatteryOptimizations(getPackageName()))return;
+        LinearLayout c=card();c.setBackground(shape(blend(panel,warning,darkTheme?.16f:.08f),16));
+        c.addView(tx("Keep your watch data syncing",15,ink,true));
+        String brand=Build.MANUFACTURER.toLowerCase(Locale.US);boolean strict=brand.matches(".*(oppo|oneplus|realme|xiaomi|redmi|poco|vivo|iqoo|huawei|honor|meizu|asus|samsung).*");
+        TextView t=tx("Android is saving battery by pausing Kadamm when it's closed, so watch data and steps can stop for hours. Allow Kadamm to run in the background (it checks briefly every 15 minutes)."+(strict?" On "+Build.MANUFACTURER+" phones, also turn on background activity in the app's battery settings.":""),12,ink,false);t.setLineSpacing(dp(2),1f);t.setPadding(0,dp(4),0,0);c.addView(t);
+        LinearLayout bs=row();LinearLayout.LayoutParams bsp=lp(-1,44);bsp.topMargin=dp(12);c.addView(bs,bsp);
+        Button allow=button("Allow",lime,accentOn);bs.addView(allow,new LinearLayout.LayoutParams(0,-1,1));allow.setOnClickListener(x->{try{startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:"+getPackageName())));}catch(Exception e){toast("Couldn't open the setting");}});
+        if(strict){Button app=button("Battery settings",raised,ink);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(0,-1,1);ap.leftMargin=dp(10);bs.addView(app,ap);app.setOnClickListener(x->{try{startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())));}catch(Exception e){toast("Couldn't open the setting");}});}
+    }
+    /** Today's health alerts with what to do, the same ones the notifications send. */
+    private void renderAlertsCard(){
+        java.util.List<HealthAlerts.Alert> al=HealthAlerts.current(this);if(al.isEmpty())return;
+        LinearLayout c=metricCard("NEEDS ATTENTION","today","When a measure moves well outside your own normal (your last 30 days), Kadamm says what changed and what helps. The same alerts arrive as notifications, at most 3 a day and never at night; turn them off in Notifications › Health alerts.");
+        for(int i=0;i<al.size();i++){HealthAlerts.Alert a=al.get(i);if(i>0){View sep=new View(this);sep.setBackgroundColor(line);LinearLayout.LayoutParams sl=lp(-1,1);sl.topMargin=dp(10);c.addView(sep,sl);}
+            TextView ti=tx(a.title,14,a.key.equals("bedtime")?violet:warning,true);ti.setPadding(0,dp(10),0,dp(2));c.addView(ti);TextView tx2=tx(a.text,12,ink,false);tx2.setLineSpacing(dp(2),1f);c.addView(tx2);}
+    }
     private void renderRecoveryCard(){
         Pro.Recovery r=Pro.recovery(this);
-        LinearLayout c=metricCard("RECOVERY","","How ready your body is today, 0–100 %. It compares last night's HRV (45 %), resting heart rate (25 %), sleep against an 8-hour need (25 %) and breathing rate (5 %) with your own normal over the last 30 days. HRV or resting heart rate one standard deviation better than your normal adds 25 points to that part; missing parts are left out and the rest re-weighted.\n\nGreen (67–100 %): ready for a hard day. Yellow (34–66 %): normal training. Red (0–33 %): take it easy; the coach eases your challenges.\n\nHRV and resting heart rate come from your watch, or from a morning pulse check with the camera when no watch measures them.");
+        LinearLayout c=metricCard("RECOVERY","","How ready your body is today, 0–100 %. It compares last night's HRV (45 %), resting heart rate (25 %), sleep against your sleep need (25 %; see Sleep) and breathing rate (5 %) with your own normal over the last 30 days. HRV or resting heart rate one standard deviation better than your normal adds 25 points to that part; missing parts are left out and the rest re-weighted.\n\nGreen (67–100 %): ready for a hard day. Yellow (34–66 %): normal training. Red (0–33 %): take it easy; the coach eases your challenges.\n\nHRV and resting heart rate come from your watch, or from a morning pulse check with the camera when no watch measures them.");
         if(r.score<0){c.addView(tx(r.need.equals("hr")?"Recovery needs HRV or a resting heart rate. Wear a watch to bed, or do a pulse check with the camera after waking, before getting up.":r.need.equals("history")?"Kadamm is learning your normal: Recovery appears after 5 days of HRV or resting heart rate.":"Recovery also needs last night's sleep (from a watch, the phone, or added by you).",13,ink,false));pulseButton(c);return;}
         LinearLayout row=row();row.setGravity(Gravity.CENTER_VERTICAL);c.addView(row,lp(-1,-2));
         int col=r.score>=67?positive:r.score>=34?MetricViews.ZONE_COLORS[3]:critical;row.addView(new MetricViews.Ring(this,chartTheme(),r.score/100f,col,r.score+"%",r.zone()),lp(96,96));
@@ -1120,10 +1145,12 @@ public class MainActivity extends Activity {
     }
     private void renderSleepCard(){
         SleepTracker.Night n=SleepTracker.night(this,todayKey());
-        LinearLayout c=metricCard("SLEEP","last night","Sleep comes from the best source for each night: what you add yourself; a watch or app through Health Connect (with light, deep and REM sleep when the watch measures stages); Google's Sleep API on this phone; or the longest overnight stretch your screen stayed off (needs Usage access). Phone sources give duration and timing only and are marked as estimates.\n\nAdults need 7–9 hours. In a typical night about 50–60 % is light sleep, 13–23 % deep and 20–25 % REM.\n\nSleep consistency compares your bedtimes and wake times over the last 14 nights: 100 % is the same time every night; a 30-minute spread scores 75 %.");
+        LinearLayout c=metricCard("SLEEP","last night","Sleep comes from the best source for each night: what you add yourself; a watch or app through Health Connect (with light, deep and REM sleep when the watch measures stages); Google's Sleep API on this phone; or the longest overnight stretch your screen stayed off (needs Usage access). Phone sources give duration and timing only and are marked as estimates.\n\nYour sleep need starts at 8 h for adults (the middle of the recommended 7–9 h; 9 h under 18, 7 h 30 m from 65), plus extra after a hard day and to repay a short week. In a typical night about 50–60 % is light sleep, 13–23 % deep and 20–25 % REM.\n\nSleep consistency compares your bedtimes and wake times over the last 14 nights: 100 % is the same time every night; a 30-minute spread scores 75 %.");
         if(n==null){c.addView(tx("No sleep recorded for last night.",13,ink,false));}
         else{LinearLayout row=row();c.addView(row,lp(-1,-2));row.addView(valueUnit(Pro.hm(n.asleep),"asleep",28,ink),new LinearLayout.LayoutParams(0,-2,1));TextView src=tx(n.source+(n.estimate?" · estimate":""),11,n.estimate?warning:muted,true);src.setGravity(Gravity.END);row.addView(src);
             c.addView(tx(SleepTracker.clock(n.bedMin())+" → "+SleepTracker.clock(n.wakeMin())+(n.inBed>n.asleep?" · "+Pro.hm(n.inBed)+" in bed":""),12,muted,false));
+            Pro.SleepNeed need=Pro.sleepNeed(this,history(),todayKey());int diff=n.asleep-need.total;
+            c.addView(tx((diff>=-15?"✓ Met your need of ":"Short of your need of ")+Pro.hm(need.total)+(diff<-15?" by "+Pro.hm(-diff):""),13,diff>=-15?positive:warning,true));
             if(n.staged&&n.stages!=null){LinearLayout.LayoutParams hp=lp(-1,130);hp.topMargin=dp(10);c.addView(new MetricViews.Hypno(this,chartTheme(),n.stages,n.inBed,n.start),hp);
                 int tot=Math.max(1,n.light+n.deep+n.rem);statGrid(c,new String[][]{{"Deep",Pro.hm(n.deep),Math.round(n.deep*100.0/tot)+"%"},{"REM",Pro.hm(n.rem),Math.round(n.rem*100.0/tot)+"%"},{"Light",Pro.hm(n.light),Math.round(n.light*100.0/tot)+"%"},{"Awake",n.awake+"","min"}},10);}
             else if(!n.estimate&&"health".equals(n.kind))c.addView(tx("Your watch's app shared this night without stages.",11,muted,false));}
@@ -1134,7 +1161,14 @@ public class MainActivity extends Activity {
             TextView t=tx("LAST 7 NIGHTS",10,muted,true);t.setLetterSpacing(.08f);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(14);c.addView(t,tp);
             LinearLayout.LayoutParams bp=lp(-1,100);bp.topMargin=dp(6);c.addView(new MetricViews.WeekBars(this,chartTheme(),v,lab,6,violet),bp);
             double avg=0;for(SleepTracker.Night x:ns)avg+=x.asleep;avg/=ns.size();c.addView(tx("Average "+Pro.hm(Math.round(avg))+" over "+ns.size()+" nights · bars up to 10 h",11,muted,false));}
-        SleepTracker.Consistency cs=SleepTracker.consistency(this);
+        // Tonight's need and when to be in bed for it.
+        Pro.SleepNeed tn=Pro.sleepNeed(this,history(),DaySteps.key(System.currentTimeMillis()+86400000L));SleepTracker.Consistency cs0=SleepTracker.consistency(this);
+        LinearLayout nb=col();nb.setPadding(dp(14),dp(12),dp(14),dp(12));nb.setBackground(shape(blend(panel,violet,darkTheme?.16f:.08f),14));LinearLayout.LayoutParams nbp=lp(-1,-2);nbp.topMargin=dp(14);c.addView(nb,nbp);
+        nb.addView(tx("TONIGHT YOU NEED "+Pro.hm(tn.total).toUpperCase(Locale.US),10,violet,true));
+        StringBuilder why=new StringBuilder(tn.basis);if(tn.strain>0)why.append(" + ").append(tn.strain).append(" min after yesterday's load");if(tn.debt>0)why.append(" + ").append(tn.debt).append(" min to repay this week's sleep debt");
+        nb.addView(tx(why.toString(),12,ink,false));
+        if(cs0.score>=0){int bed=((cs0.avgWake-tn.total-15)%1440+1440)%1440;nb.addView(tx("To wake at your usual "+SleepTracker.clock(cs0.avgWake)+", be in bed by "+SleepTracker.clock(bed)+" (15 minutes to fall asleep).",12,muted,false));}
+        SleepTracker.Consistency cs=cs0;
         TextView ct=tx(cs.score>=0?String.format(Locale.US,"Sleep consistency %d %% · usually %s → %s (bedtime ±%.0f min, wake ±%.0f min)",cs.score,SleepTracker.clock(cs.avgBed),SleepTracker.clock(cs.avgWake),cs.sdBed,cs.sdWake):"Sleep consistency needs 5 nights ("+cs.nights+" so far).",13,cs.score>=75?positive:cs.score>=0?ink:muted,cs.score>=0);ct.setPadding(0,dp(12),0,0);c.addView(ct);
         LinearLayout bs=row();LinearLayout.LayoutParams bsp=lp(-1,44);bsp.topMargin=dp(12);c.addView(bs,bsp);
         Button add=button(n!=null&&"manual".equals(n.kind)?"Edit last night":"Add last night",raised,ink);bs.addView(add,new LinearLayout.LayoutParams(0,-1,1));add.setOnClickListener(x->addSleep());

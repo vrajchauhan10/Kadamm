@@ -89,7 +89,9 @@ object WatchHealth {
             val sleep = JSONObject(); val detail = JSONObject()
             for (r in all(SleepSessionRecord::class)) {
                 val total = Duration.between(r.startTime, r.endTime).toMinutes(); if (total < 60 || total > 16 * 60) continue
-                val key = day(r.endTime); val prev = detail.optJSONObject(key)
+                // A night belongs to the morning it ends on: a part saved before midnight (a watch app sometimes
+                // splits one night) counts toward the next day's night, where the longer record wins.
+                val key = day(r.endTime.plus(Duration.ofHours(6))); val prev = detail.optJSONObject(key)
                 // The same night often arrives twice: from the watch's own app and copied by Google Fit. Keep the
                 // watch app's (Fit only when it's clearly longer), else the longer one.
                 if (prev != null) {

@@ -4,6 +4,14 @@
 
 - Stress is calibrated for real days: a minute counts as still only under 30 % of your heart-rate reserve and in an hour with under 250 steps, and calm sitting (up to 8 % of reserve above resting) scores 0. It works with watches that read heart rate every few minutes (12 readings over 2+ hours are enough).
 - Google Fit no longer counts as a watch app when deciding what your watch can share: it only relays other apps' data. Body temperature is now hidden for watches whose app doesn't share it.
+- Health alerts: a notification when a measure moves well outside your own normal, with what to do: red Recovery, resting heart rate up 7+ bpm, low HRV, blood oxygen under 90 % overnight, breathing rate up, a short night, sleep times that vary a lot (weekly), high Stress, today's load reached, high blood pressure, and a wind-down reminder 45 minutes before your bedtime. At most 3 a day, never at night except the wind-down reminder, each kind as its own notification. The Health data page lists today's alerts under "Needs attention". Switch them off in Notifications › Health alerts.
+- Personal sleep need instead of a fixed 8 hours: 8 h for adults (9 h under 18, 7 h 30 m from 65), plus up to 45 minutes after a hard day and up to an hour to repay a short week. Sleep shows "met your need" or how far short, Recovery scores sleep against it, and the Sleep card says tonight's need and when to be in bed for it.
+- Sleep consistency fixed: a night that a watch app saved in two parts (one ending before midnight) was read as a night ending in the evening, which made the score 0 %. Nights now belong to the morning they end on, and naps under 3 hours don't count.
+- The coach says when sleep is the thing to work on: a short night against your need, or bedtimes that vary a lot, with tonight's bedtime.
+- Recovery marks HRV and resting heart rate "(yesterday)" when last night's haven't synced yet.
+- The Health data page asks to let Kadamm run in the background when Android is pausing it (with phone-specific advice for OPPO, OnePlus, Xiaomi, Samsung and others), so watch data keeps syncing while Kadamm is closed.
+- Stress levels show as shares of still time, and data you added yourself is labelled "You (Kadamm)".
+- "Choose what shows here" no longer offers the measures already shown as rings, and says when more than 6 are picked.
 
 ## 10.0.3 (versionCode 54)
 
