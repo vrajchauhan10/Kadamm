@@ -3,17 +3,12 @@
     android:background="@drawable/widget_bg" android:gravity="center_vertical" android:orientation="horizontal" android:padding="12dp">
     <ImageView android:id="@+id/goals_capsule" android:layout_width="58dp" android:layout_height="match_parent"
         android:scaleType="fitCenter" android:contentDescription="@string/goals_widget_description" />
-    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+    <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
         android:layout_marginStart="12dp" android:orientation="vertical">
-        <TextView android:id="@+id/goals_title" android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:textColor="#9AA0A6" android:textSize="12sp" android:textStyle="bold" android:maxLines="1" />
-        <TextView android:id="@+id/goals_big" android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_marginTop="2dp" android:textColor="#FFFFFF" android:textSize="30sp" android:textStyle="bold" android:maxLines="1" />
-        <TextView android:id="@+id/goals_steps" android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_marginTop="6dp" android:textColor="#9AA0A6" android:textSize="12sp" android:maxLines="1" />
-        <TextView android:id="@+id/goals_brisk" android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_marginTop="4dp" android:textColor="#9AA0A6" android:textSize="12sp" android:maxLines="1" />
-        <TextView android:id="@+id/goals_km" android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_marginTop="4dp" android:textColor="#9AA0A6" android:textSize="12sp" android:maxLines="1" />
+        <TextView android:id="@+id/goals_title" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="0.9" android:textColor="#9AA0A6" android:textSize="12sp" android:textStyle="bold" android:maxLines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="12sp" android:autoSizeStepGranularity="1sp" android:includeFontPadding="false" android:gravity="center_vertical" />
+        <TextView android:id="@+id/goals_big" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="2" android:textColor="#FFFFFF" android:textSize="30sp" android:textStyle="bold" android:maxLines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="30sp" android:autoSizeStepGranularity="1sp" android:includeFontPadding="false" android:gravity="center_vertical" />
+        <TextView android:id="@+id/goals_steps" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="0.9" android:textColor="#9AA0A6" android:textSize="12sp" android:maxLines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="12sp" android:autoSizeStepGranularity="1sp" android:includeFontPadding="false" android:gravity="center_vertical" />
+        <TextView android:id="@+id/goals_brisk" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="0.9" android:textColor="#9AA0A6" android:textSize="12sp" android:maxLines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="12sp" android:autoSizeStepGranularity="1sp" android:includeFontPadding="false" android:gravity="center_vertical" />
+        <TextView android:id="@+id/goals_km" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="0.9" android:textColor="#9AA0A6" android:textSize="12sp" android:maxLines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="12sp" android:autoSizeStepGranularity="1sp" android:includeFontPadding="false" android:gravity="center_vertical" />
     </LinearLayout>
 </LinearLayout>

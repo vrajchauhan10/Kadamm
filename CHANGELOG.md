@@ -1,5 +1,12 @@
 # Changelog
 
+## 10.0.2 (versionCode 53)
+
+- Widgets fit any size: every line in the Steps, Daily goals and Week widgets shrinks to fit the widget's width and height instead of running off it, the lines share the widget's height, and the Week widget's chart and ring scale to the space left.
+- Session list rows (day title, session count, km · time · steps) shrink to fit narrow screens instead of ending in "…", and so does every stat grid in the app.
+- Calendar day numbers scale to the cell width.
+- On screens under 400 dp, the back button is a round "‹" instead of a cut-off label.
+
 ## 10.0.1 (versionCode 52)
 
 - Fixes a crash on Home on mornings when Recovery is green (the coach's message had a broken percent sign).

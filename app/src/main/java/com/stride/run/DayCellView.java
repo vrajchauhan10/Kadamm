@@ -40,7 +40,7 @@ final class DayCellView extends View {
             if(fraction>0){float bw=(box.width()-r*1.2f)*Math.min(1,fraction),bx=box.left+r*.6f,by=box.bottom-dp(5);p.setColor(alpha(t.accent,220));c.drawRoundRect(new RectF(bx,by-dp(2.5f),bx+Math.max(dp(3),bw),by),dp(2),dp(2),p);}}
         else if(!future){p.setColor(t.dark?Color.rgb(22,22,26):Color.rgb(241,241,243));c.drawPath(path,p);}
         if(selected||today){p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(selected?2:1.5f));p.setColor(selected?t.accent:t.text);RectF o=new RectF(pad-dp(1.5f),top-dp(1.5f),w-pad+dp(1.5f),bottom+dp(1.5f));c.drawRoundRect(o,r+dp(1.5f),r+dp(1.5f),p);p.setStyle(Paint.Style.FILL);}
-        p.setTextAlign(Paint.Align.CENTER);p.setTextSize(dp(13));
+        p.setTextAlign(Paint.Align.CENTER);p.setTextSize(Math.min(dp(13),Math.min(w*.36f,(bottom-top)*.55f)));
         p.setTypeface(Typeface.create(today||selected||done?"sans-serif-medium":"sans-serif",Typeface.NORMAL));
         p.setColor(done?(t.dark?Color.rgb(11,42,20):Color.WHITE):future?alpha(t.textMuted,110):data?t.text:t.textMuted);
         c.drawText(String.valueOf(day),w/2,(top+bottom)/2+dp(4.5f)-(data&&!done&&fraction>0?dp(2):0),p);

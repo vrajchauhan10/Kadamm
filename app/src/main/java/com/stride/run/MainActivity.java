@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="10.0.1";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="10.0.2";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -268,7 +268,7 @@ public class MainActivity extends Activity {
     private String backLabel(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.peek();return "DaySummary".equals(to)?"Day summary":"Import".equals(to)?"Import":"Detail".equals(to)?"Session":"Auto".equals(to)?"Auto tracking":"Body".equals(to)?"Health data":"Today".equals(to)?"Home":to;}
     private void renderPageInner(){trackBack();if(replayAnim!=null){replayAnim.cancel();replayAnim=null;}if(!page.equals(renderedPage)&&scroller!=null)scroller.scrollTo(0,0);renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else if(page.equals("Routes"))renderRoutes();else if(page.equals("Notifications"))renderNotifications();else if(page.equals("Reports"))renderReports();else if(page.equals("Achievements"))renderAchievements();else if(page.equals("Permissions"))renderPermissions();else if(page.equals("Auto"))renderAutoTracking();else if(page.equals("Storage"))renderStorage();else if(page.equals("Places"))renderPlaces();else if(page.equals("Sessions"))renderSessions();else if(page.equals("DaySummary"))renderDaySummary();else if(page.equals("Trainer"))renderTrainer();else if(page.equals("Import"))renderImport();else if(page.equals("Body"))renderBody();else renderDetail(lastSession);if(content.getChildCount()>0)signatureAtEnd();}
     private void styleNavItem(LinearLayout item,boolean selected){int color=selected?lime:muted;item.setBackground(rippleOn(selected?raised:Color.TRANSPARENT,14));((android.widget.ImageView)item.getChildAt(0)).setImageTintList(android.content.res.ColorStateList.valueOf(color));((TextView)item.getChildAt(1)).setTextColor(selected?ink:muted);}
-    private void brand(String eyebrow,String headline,String sub){LinearLayout brand=row();content.addView(brand,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);brand.addView(brandButton(),bbp);if(tabIndex(page)<0){brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));TextView bk=tx("‹  "+backLabel(),13,ink,true);bk.setGravity(Gravity.CENTER);bk.setPadding(dp(14),0,dp(16),0);bk.setBackground(rippleOn(raised,18));bk.setContentDescription("Back to "+backLabel());bk.setOnClickListener(v->goBack());brand.addView(bk,lp(-2,36));}TextView e=tx(eyebrow.toUpperCase(Locale.US),10,muted,true);LinearLayout.LayoutParams ep=lp(-1,25);ep.topMargin=dp(8);content.addView(e,ep);TextView h=tx(headline,29,ink,true);content.addView(h);if(sub!=null){TextView s=tx(sub,13,muted,false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(5);sp.bottomMargin=dp(16);content.addView(s,sp);}}
+    private void brand(String eyebrow,String headline,String sub){LinearLayout brand=row();content.addView(brand,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);brand.addView(brandButton(),bbp);if(tabIndex(page)<0){brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));boolean narrowBack=getResources().getConfiguration().screenWidthDp<400;TextView bk=tx(narrowBack?"‹":"‹  "+backLabel(),narrowBack?20:13,ink,true);bk.setGravity(Gravity.CENTER);bk.setPadding(narrowBack?0:dp(14),0,narrowBack?0:dp(16),narrowBack?dp(2):0);bk.setBackground(rippleOn(raised,18));bk.setContentDescription("Back to "+backLabel());bk.setOnClickListener(v->goBack());brand.addView(bk,narrowBack?lp(40,40):lp(-2,36));}TextView e=tx(eyebrow.toUpperCase(Locale.US),10,muted,true);LinearLayout.LayoutParams ep=lp(-1,25);ep.topMargin=dp(8);content.addView(e,ep);TextView h=tx(headline,29,ink,true);content.addView(h);if(sub!=null){TextView s=tx(sub,13,muted,false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(5);sp.bottomMargin=dp(16);content.addView(s,sp);}}
     private LinearLayout card(){LinearLayout c=col();c.setPadding(dp(16),dp(16),dp(16),dp(16));c.setBackground(panelShape(16));LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(12);content.addView(c,p);return c;}
     private GradientDrawable panelShape(int radius){GradientDrawable d=shape(panel,radius);d.setStroke(dp(1),line);return d;}
     private void renderToday(){JSONArray hist=history();dayTotals=DaySteps.allDayTotals(this);loadIdleLocation();renderHeader();renderStepSetup();renderBadgeBanner(hist);renderHero(hist);renderBodyToday(hist);renderCoach();renderStepsByHour();renderSpread();renderTrainerCard(hist);renderPlan(hist);renderMovementQuality();renderSittingBreaks();renderBento(hist);renderDistanceGoal(hist);
@@ -1528,11 +1528,11 @@ public class MainActivity extends Activity {
         String dn=day.length()>=10?String.valueOf(Integer.parseInt(day.substring(8,10))):"";String wd="";try{wd=new java.text.SimpleDateFormat("EEE",Locale.getDefault()).format(new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US).parse(day)).toUpperCase(Locale.getDefault());}catch(Exception ignored){}
         date.addView(tx(dn,20,ink,true));TextView w=tx(wd,9,lime,true);w.setLetterSpacing(.08f);date.addView(w);
         LinearLayout mid=col();LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(0,-2,1);mp.leftMargin=dp(12);top.addView(mid,mp);
-        mid.addView(tx(dayTitle(day),17,ink,true));
+        TextView dt=tx(dayTitle(day),17,ink,true);mid.addView(dt);fitLine(dt,12);
         StringBuilder kinds=new StringBuilder(n+(n==1?" session":" sessions"));
         if(n==1)kinds.append(auto==1?" · auto":" · started by you");else if(auto==0)kinds.append(" · ").append(n).append(" manual");else if(auto==n)kinds.append(" · all auto");else kinds.append(" · ").append(auto).append(" auto · ").append(n-auto).append(" manual");
-        mid.addView(tx(kinds.toString(),12,muted,false));
-        TextView tot=tx(String.format(Locale.US,"%.2f km · %s",km,ms>=3600000?String.format(Locale.US,"%dh %02dm",ms/3600000,(ms/60000)%60):formatDuration(ms))+(steps>0?" · "+(steps>=1000?String.format(Locale.US,"%.1fk",steps/1000d):String.valueOf(steps))+" steps":""),12,ink,false);tot.setMaxLines(1);tot.setEllipsize(android.text.TextUtils.TruncateAt.END);LinearLayout.LayoutParams totp=lp(-1,-2);totp.topMargin=dp(2);mid.addView(tot,totp);
+        TextView kd=tx(kinds.toString(),12,muted,false);mid.addView(kd);fitLine(kd,9);
+        TextView tot=tx(String.format(Locale.US,"%.2f km · %s",km,ms>=3600000?String.format(Locale.US,"%dh %02dm",ms/3600000,(ms/60000)%60):formatDuration(ms))+(steps>0?" · "+(steps>=1000?String.format(Locale.US,"%.1fk",steps/1000d):String.valueOf(steps))+" steps":""),12,ink,false);fitLine(tot,9);LinearLayout.LayoutParams totp=lp(-1,-2);totp.topMargin=dp(2);mid.addView(tot,totp);
         // Route thumbnail of the longest outdoor session, with a count badge.
         JSONObject best=null;for(JSONObject o:list)if(!"[]".equals(o.optString("route","[]"))&&(best==null||o.optDouble("distanceKm",0)>best.optDouble("distanceKm",0)))best=o;
         FrameLayout thumb=new FrameLayout(this);LinearLayout.LayoutParams tp=lp(54,54);tp.leftMargin=dp(6);top.addView(thumb,tp);
@@ -2311,13 +2311,26 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         s.setSpan(new android.text.style.RelativeSizeSpan(.5f),value.length(),s.length(),0);s.setSpan(new android.text.style.ForegroundColorSpan(muted),value.length(),s.length(),0);
         TextView t=tx("",size,color,true);t.setText(s);return t;
     }
+    /**
+     * Keeps a line on one line at any screen width: after layout, the text shrinks a step at a time (down to
+     * {@code minSp}) until it fits; only below that is it cut with "…".
+     */
+    private void fitLine(TextView t,float minSp){
+        // Android's own auto-sizing (uniform, 0.5 sp steps) between minSp and the design size. It needs a fixed
+        // height, so the line keeps the height of one line at the design size.
+        t.setMaxLines(1);t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        float max=t.getTextSize()/getResources().getDisplayMetrics().scaledDensity;int h=(int)Math.ceil(t.getPaint().getFontSpacing()*1.12f)+t.getPaddingTop()+t.getPaddingBottom();
+        android.view.ViewGroup.LayoutParams lp=t.getLayoutParams();if(lp!=null){lp.height=h;t.setLayoutParams(lp);}else t.setLayoutParams(new LinearLayout.LayoutParams(-1,h));
+        if(lp!=null&&lp.width==android.view.ViewGroup.LayoutParams.WRAP_CONTENT&&lp instanceof LinearLayout.LayoutParams&&((LinearLayout.LayoutParams)lp).weight==0){lp.width=android.view.ViewGroup.LayoutParams.MATCH_PARENT;t.setLayoutParams(lp);}
+        t.setAutoSizeTextTypeUniformWithConfiguration(Math.max(1,Math.round(minSp)),Math.max(Math.round(minSp)+1,Math.round(max)),1,android.util.TypedValue.COMPLEX_UNIT_SP);
+    }
     /** Cells of {label, value, unit} in rows of three. */
     private void statGrid(LinearLayout parent,String[][] cells,int topDp){
         LinearLayout r=null;
         for(int i=0;i<cells.length;i++){
             if(i%3==0){r=row();r.setGravity(Gravity.TOP);LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(i==0?topDp:14);parent.addView(r,rp);}
             LinearLayout cell=col();r.addView(cell,new LinearLayout.LayoutParams(0,-2,1));
-            cell.addView(valueUnit(cells[i][1],cells[i][2],19,ink));TextView l=tx(cells[i][0],10,muted,false);cell.addView(l);
+            TextView vu=valueUnit(cells[i][1],cells[i][2],19,ink);cell.addView(vu);fitLine(vu,11);TextView l=tx(cells[i][0],10,muted,false);cell.addView(l);fitLine(l,8);
         }
         if(r!=null)for(int k=cells.length%3;k>0&&k<3;k++)r.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
     }
