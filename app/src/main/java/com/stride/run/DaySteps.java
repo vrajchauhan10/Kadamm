@@ -228,7 +228,13 @@ final class DaySteps {
         return out;
     }
     /** Minutes since you last walked (10+ steps), or -1 if unknown. */
-    static long stillMinutes(Context c){long a=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getLong("activeAt",0);return a<=0?-1:(System.currentTimeMillis()-a)/60000;}
+    /** Minutes since you last walked: the later of this phone's step sensor and Health Connect's minute steps (a watch's, when shared). */
+    static long stillMinutes(Context c){long a=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getLong("activeAt",0);
+        JSONObject m=minuteDays(c).optJSONObject(todayKey());int lm=m==null?-1:m.optInt("lastMove",-1);
+        if(lm>=0){Calendar mid=Calendar.getInstance();mid.set(Calendar.HOUR_OF_DAY,0);mid.set(Calendar.MINUTE,0);mid.set(Calendar.SECOND,0);mid.set(Calendar.MILLISECOND,0);a=Math.max(a,mid.getTimeInMillis()+(lm+1)*60000L);}
+        return a<=0?-1:Math.max(0,(System.currentTimeMillis()-a)/60000);}
+    /** Where sitting and moving come from: the Health Connect app whose minute steps are used, or this phone. */
+    static String sitSource(Context c){JSONObject m=minuteDays(c).optJSONObject(todayKey());if(m!=null&&m.has("sits")){String o=c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getString("healthOrigin","");return (o.isEmpty()?"Health Connect":HealthSync.label(o))+", minute by minute";}return "this phone's step sensor";}
     /** The phone step counter's last raw reading (since boot), or 0. */
     static long rawCounter(Context c){return c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getLong("lastCounter",0);}
     /** Whether Health Connect's step figures are used at all (Settings: Step sources). Off means Kadamm counts on its own. */

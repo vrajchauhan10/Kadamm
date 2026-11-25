@@ -1,5 +1,12 @@
 # Changelog
 
+## 10.1.0 (versionCode 56)
+
+- Health data is tidier: the watch card shows the watch, how it's connected, when it last synced, and one line ("13 of 14 measures available") that opens the full list. "What Kadamm captures" is collapsed until you tap it.
+- The Health Connect screen is written for every brand, not only Samsung Health: it explains Health Connect in one line, offers an "Open" button for each health app actually on your phone (Zepp, Samsung Health, Fitbit, Garmin, Google Fit and others), and opens Health Connect's own settings. Samsung-only wording elsewhere is now general, and long descriptions are shorter.
+- Sitting breaks: "sitting now" and the sitting reminder also use Health Connect's latest minute steps (from your watch, when it shares them), not only this phone's sensor, so walking with the phone on a desk no longer counts as sitting. The card says where its data comes from.
+- Checked: the coach's Recovery line uses the same synced Recovery and Strain as the Health data page.
+
 ## 10.0.4 (versionCode 55)
 
 - Stress is calibrated for real days: a minute counts as still only under 30 % of your heart-rate reserve and in an hour with under 250 steps, and calm sitting (up to 8 % of reserve above resting) scores 0. It works with watches that read heart rate every few minutes (12 readings over 2+ hours are enough).

@@ -405,7 +405,9 @@ object HealthSync {
             val h = JSONArray(); for (v in hours) h.put(v)
             // Minutes by step rate, for movement load: 20–59, 60–99, 100–129 and 130+ steps a minute.
             val bands = JSONArray().put(perMinute.count { it in 20L..59L }).put(perMinute.count { it in 60L..99L }).put(perMinute.count { it in 100L..129L }).put(perMinute.count { it >= 130L })
-            days.put(key, JSONObject().put("p30", Math.round(top.average())).put("brisk", brisk).put("sit", sit).put("sits", sits).put("h", h).put("b", bands))
+            // The last minute with 10+ steps (from the watch or phone), so "sitting now" also knows when the watch saw you walk.
+            var lastMove = -1; for (mm in 0 until 1440) if (perMinute[mm] >= 10L) lastMove = mm
+            days.put(key, JSONObject().put("p30", Math.round(top.average())).put("brisk", brisk).put("sit", sit).put("sits", sits).put("h", h).put("b", bands).put("lastMove", lastMove))
         }
         prefs.edit().putString("minuteDays", days.toString()).apply()
     }

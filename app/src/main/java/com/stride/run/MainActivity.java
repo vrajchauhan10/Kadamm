@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="10.0.4";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="10.1.0";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -477,11 +477,11 @@ public class MainActivity extends Activity {
         if(connected){
             c.addView(tx(imported>0?String.format(Locale.US,"%,d steps shared today",imported)+(sources.isEmpty()?"":" · from "+sources):"No steps shared today yet",12,muted,false));
             c.addView(tx("Last sync: "+sync+" · refreshes each time you open Kadamm",12,muted,false));
-            if(imported<=0)c.addView(tx("Samsung Health keeps its count private until you allow sharing: Samsung Health > Settings > Health Connect > Steps.",11,warning,false));
-        }else c.addView(tx("Adds steps counted by Samsung Health and other apps, and fills in up to 30 past days on your calendar.",12,muted,false));
-        settingSwitch(c,"Use Health Connect steps","Adds steps from Samsung Health and other apps. Turn off to count only with this phone and your Kadamm sessions; useful when Samsung Health counts steps while you ride.","hcSteps",true,
-            "Stop using Health Connect steps?","Kadamm will count only with this phone's step sensor and your sessions. Steps from Samsung Health, including any counted in a vehicle, won't be added, and minute-by-minute charts will use Kadamm's own data. You can turn it back on any time.",
-            "Use Health Connect steps?","Kadamm will add steps from Samsung Health and other apps, taking the most complete count each day (never adding sources together).",()->refreshHealth(true));
+            if(imported<=0)c.addView(tx("No steps shared yet. In your watch's or health app, turn on sharing to Health Connect.",11,warning,false));
+        }else c.addView(tx("Adds data from your watch's app, Google Fit and other health apps, and fills in 30 past days.",12,muted,false));
+        settingSwitch(c,"Use Health Connect steps","Adds steps from your watch and health apps. Turn off to count with this phone only; useful when another app counts steps while you ride.","hcSteps",true,
+            "Stop using Health Connect steps?","Kadamm will count only with this phone's step sensor and your sessions. Steps from other apps, including any counted in a vehicle, won't be added, and minute-by-minute charts will use Kadamm's own data. You can turn it back on any time.",
+            "Use Health Connect steps?","Kadamm will add steps from your watch and health apps, taking the most complete count each day (never adding sources together).",()->refreshHealth(true));
         settingSwitch(c,"Heart rate from a watch","Reads heart rate a watch writes to Health Connect for each session: zones and a more exact effort.","hcHeart",true,
             "Stop reading heart rate?","New sessions won't get heart rate from your watch. Heart rate already saved stays.",
             "Read heart rate?","Kadamm will read heart rate for your sessions from Health Connect, about 30 minutes after each one ends.",null);
@@ -1038,7 +1038,9 @@ public class MainActivity extends Activity {
         if(dev.has("caps")){JSONArray caps=dev.optJSONArray("caps");StringBuilder b=new StringBuilder();for(int i=0;caps!=null&&i<caps.length();i++){if(b.length()>0)b.append(", ");b.append(caps.optString(i));}if(b.length()>0)c.addView(tx("Sensors on the watch: "+b,12,muted,false));}
         // What it shares
         int have=0,total=0;StringBuilder got=new StringBuilder();for(String[] m:BODY_METRICS){if(unsupported(m[0]))continue;total++;String[] x=bodyMetric(m[0],history());if(!"-2".equals(x[3])){have++;if(got.length()>0)got.append(" · ");got.append(m[1]);}}
-        TextView cap=tx(have+" of "+total+" measures available"+(got.length()>0?": "+got:""),12,ink,false);cap.setLineSpacing(dp(2),1f);cap.setPadding(0,dp(8),0,0);c.addView(cap);
+        // One short line; the full list is "What Kadamm captures" on the Health data page.
+        TextView cap=tx(have+" of "+total+" measures available  ›",13,lime,true);cap.setPadding(0,dp(10),0,dp(2));c.addView(cap);
+        cap.setOnClickListener(x->{catalogOpen=true;scrollToCatalog=true;if("Body".equals(page))renderPageNow();else navigate("Body");});
         LinearLayout bs=row();LinearLayout.LayoutParams bsp=lp(-1,44);bsp.topMargin=dp(12);c.addView(bs,bsp);
         Button sync1=button("Sync now",raised,ink);bs.addView(sync1,new LinearLayout.LayoutParams(0,-1,1));sync1.setOnClickListener(x->{toast("Syncing with your watch…");WearBridge.ping(this);refreshHealth(true);});
         Button more=button(full?"Health Connect":"All health data",lime,accentOn);LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(0,-1,1);mp.leftMargin=dp(10);bs.addView(more,mp);
@@ -1076,6 +1078,7 @@ public class MainActivity extends Activity {
         LinearLayout holder=col();content.addView(holder,lp(-1,-2));String forPage=renderedPage;
         holder.post(()->{if(!"Today".equals(page)||!forPage.equals(renderedPage)||holder.getParent()!=content)return;LinearLayout real=content;content=holder;try{renderBodyToday(hist);}catch(Exception ignored){}finally{content=real;}});
     }
+    private boolean catalogOpen,scrollToCatalog;private View catalogCard;
     private TextView liveValue;
     private void choosePinned(){
         // The rings already show Recovery, Strain (Movement load without a watch) and Sleep, so they aren't offered as tiles.
@@ -1089,11 +1092,14 @@ public class MainActivity extends Activity {
 
     // ---- The Health data page ----
     private void renderBody(){
-        JSONArray h=history();brand("YOUR BODY","Health data","Everything your watch and phone measure, in one place. Measured values come first; estimates say so.");
+        JSONArray h=history();brand("YOUR BODY","Health data","What your watch and phone measure. Estimates are marked.");
         renderWatchConnection(true);renderSyncHealth();renderAlertsCard();renderBodyToday(h);renderRecoveryCard();renderStrainCard(h);renderSleepCard();renderHeartCard();renderStressCard();
         // Breathing, oxygen and temperature only come from a watch: the card appears once any of them does.
         boolean any=false;for(String k:new String[]{"resp","spo2","skin","btemp"})if(!"-2".equals(bodyMetric(k,h)[3]))any=true;if(any)renderOxygenCard();
         renderBloodPressureCard();renderVo2Card(h);renderCatalogCard(h);
+        // Scroll to the list once the page has been laid out (its position isn't known before).
+        if(scrollToCatalog&&catalogCard!=null){scrollToCatalog=false;View target=catalogCard;target.getViewTreeObserver().addOnGlobalLayoutListener(new android.view.ViewTreeObserver.OnGlobalLayoutListener(){@Override public void onGlobalLayout(){
+            if(target.getHeight()==0)return;target.getViewTreeObserver().removeOnGlobalLayoutListener(this);scroller.post(()->scroller.smoothScrollTo(0,Math.max(0,target.getTop()-dp(12))));}});}
     }
     /** When Android may pause Kadamm in the background, watch data stops arriving while it's closed: one tap fixes it. */
     private void renderSyncHealth(){
@@ -1101,7 +1107,7 @@ public class MainActivity extends Activity {
         LinearLayout c=card();c.setBackground(shape(blend(panel,warning,darkTheme?.16f:.08f),16));
         c.addView(tx("Keep your watch data syncing",15,ink,true));
         String brand=Build.MANUFACTURER.toLowerCase(Locale.US);boolean strict=brand.matches(".*(oppo|oneplus|realme|xiaomi|redmi|poco|vivo|iqoo|huawei|honor|meizu|asus|samsung).*");
-        TextView t=tx("Android is saving battery by pausing Kadamm when it's closed, so watch data and steps can stop for hours. Allow Kadamm to run in the background (it checks briefly every 15 minutes)."+(strict?" On "+Build.MANUFACTURER+" phones, also turn on background activity in the app's battery settings.":""),12,ink,false);t.setLineSpacing(dp(2),1f);t.setPadding(0,dp(4),0,0);c.addView(t);
+        TextView t=tx("Android pauses Kadamm when it's closed, so watch data can stop for hours. Allow it to run in the background."+(strict?" On "+Build.MANUFACTURER+", also allow background activity in battery settings.":""),12,ink,false);t.setLineSpacing(dp(2),1f);t.setPadding(0,dp(4),0,0);c.addView(t);
         LinearLayout bs=row();LinearLayout.LayoutParams bsp=lp(-1,44);bsp.topMargin=dp(12);c.addView(bs,bsp);
         Button allow=button("Allow",lime,accentOn);bs.addView(allow,new LinearLayout.LayoutParams(0,-1,1));allow.setOnClickListener(x->{try{startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:"+getPackageName())));}catch(Exception e){toast("Couldn't open the setting");}});
         if(strict){Button app=button("Battery settings",raised,ink);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(0,-1,1);ap.leftMargin=dp(10);bs.addView(app,ap);app.setOnClickListener(x->{try{startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())));}catch(Exception e){toast("Couldn't open the setting");}});}
@@ -1249,10 +1255,14 @@ public class MainActivity extends Activity {
     /** What Kadamm reads and from where, with how to turn on what's missing. */
     private void renderCatalogCard(JSONArray h){
         JSONObject v=Vitals.all(this);boolean hc=getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false)||v.optJSONArray("granted")!=null&&v.optJSONArray("granted").length()>0;
-        LinearLayout c=metricCard("WHAT KADAMM CAPTURES","","Each measure, where today's value comes from, and how many readings Health Connect shared in the last 30 days. A measure is missing when your watch's app doesn't share it into Health Connect, or when Kadamm isn't allowed to read it: open Health Connect › App permissions › Kadamm, and in your watch's app (for Samsung: Samsung Health › Settings › Health Connect) allow sharing.");
+        catalogCard=null;LinearLayout c=metricCard("WHAT KADAMM CAPTURES","","Each measure, where today's value comes from, and how many readings Health Connect shared in the last 30 days. A measure is missing when your watch's app doesn't share it into Health Connect, or when Kadamm isn't allowed to read it: open Health Connect › App permissions › Kadamm, and in your watch's app (for Samsung: Samsung Health › Settings › Health Connect) allow sharing.");
         if(!hc){LinearLayout b=col();b.setPadding(dp(14),dp(12),dp(14),dp(12));b.setBackground(shape(blend(panel,lime,darkTheme?.16f:.08f),14));LinearLayout.LayoutParams bp=lp(-1,-2);bp.topMargin=dp(10);c.addView(b,bp);
             b.addView(tx("Connect Health Connect",14,ink,true));b.addView(tx("Your watch's sleep, heart rate, HRV, blood oxygen and more reach Kadamm through Health Connect. Until then, Kadamm uses the phone alone.",12,muted,false));}
         String[][] hk={{"sleep","sleep"},{"rhr","rhr"},{"hrv","hrv"},{"resp","resp"},{"spo2","spo2"},{"skin","skin"},{"btemp","btemp"},{"bp","bp"},{"vo2","vo2"},{"weight","weight"},{"strain","hr"},{"stress","hr"}};
+        catalogCard=c;int avail=0,tot=0;for(String[] m:BODY_METRICS){if(unsupported(m[0]))continue;tot++;if(!"-2".equals(bodyMetric(m[0],h)[3]))avail++;}
+        TextView toggle=tx(avail+" of "+tot+" available · "+(catalogOpen?"hide the list  ▴":"show each measure  ▾"),13,lime,true);toggle.setPadding(0,dp(10),0,dp(4));c.addView(toggle);
+        toggle.setOnClickListener(x->{catalogOpen=!catalogOpen;int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));});
+        if(catalogOpen)
         for(int pass=0;pass<2;pass++){boolean header=false;
             for(String[] m:BODY_METRICS){if(unsupported(m[0]))continue;String[] x=bodyMetric(m[0],h);boolean ok=!"-2".equals(x[3]);if(ok!=(pass==0))continue;
                 if(!header){TextView t=tx(pass==0?"AVAILABLE NOW":"NOT AVAILABLE YET",10,muted,true);t.setLetterSpacing(.08f);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(pass==0?14:18);c.addView(t,tp);header=true;}
@@ -2547,7 +2557,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             String spk=m.km>0&&m.stepsOk?String.format(Locale.US,"%,d",Math.round(m.steps/m.km)):"—";
             statGrid(cc,m.cadenceMax>0?new String[][]{{"Avg",String.valueOf(Math.round(m.cadenceAvg)),"spm"},{"Max",String.valueOf(Math.round(m.cadenceMax)),"spm"},{"Steps per km",spk,""}}:new String[][]{{"Avg",String.valueOf(Math.round(m.cadenceAvg)),"spm"},{"Steps per km",spk,""},{"Steps",String.format(Locale.US,"%,d",m.steps),""}},10);
             if(m.cadence.size()>=6){LinearLayout.LayoutParams p=lp(-1,170);p.topMargin=dp(10);cc.addView(new MetricViews.Series(this,th,m.cadence,true,lime,new double[]{80,100,115,130},m.cadenceAvg,v->String.valueOf(Math.round(v)),MetricViews::mmss),p);}
-            if(m.cadence.size()>=6&&"Health Connect".equals(m.stepSource)){TextView n=tx("Minute by minute from Samsung Health, through Health Connect",10,muted,false);cc.addView(n);}
+            if(m.cadence.size()>=6&&"Health Connect".equals(m.stepSource)){TextView n=tx("Minute by minute from Health Connect",10,muted,false);cc.addView(n);}
             else if(m.cadence.size()<6){TextView n=tx("A cadence chart over time appears once Health Connect has minute-level steps for this session, and for every session recorded with Kadamm 8.2 or later.",11,muted,false);LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(8);cc.addView(n,p);}
         }
         // Stride
@@ -2699,6 +2709,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             }
         }
         boolean remind=Reminders.inactiveOn(this);int after=Reminders.get(this,"remAfter",Reminders.DEF_AFTER);
+        TextView srcS=tx("From "+DaySteps.sitSource(this),10,muted,false);srcS.setPadding(0,dp(10),0,0);c.addView(srcS);
         TextView rem=tx((remind?"Reminder after "+mins(after)+" still · change":"Sitting reminder is off · turn on")+"  ›",12,lime,true);rem.setPadding(0,dp(14),0,dp(2));rem.setOnClickListener(v->navigate("Notifications"));c.addView(rem);
     }
     private String mins(long m){return m>=60?(m%60==0?(m/60)+(m/60==1?" hour":" hours"):String.format(Locale.US,"%dh %02dm",m/60,m%60)):m+" min";}
@@ -3098,7 +3109,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         permissionRow(R.drawable.ic_run,"Location all the time","Only needed for Auto-tracking, so a walk Kadamm starts by itself still gets its route. Choose \"Allow all the time\".",AutoTrack.backgroundLocation(this)||!AutoTrack.enabled(this),"Allow",()->requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},BG_LOCATION_PERMISSION));
         permissionRow(R.drawable.ic_walk,"Physical activity","Counts your steps all day and on the treadmill, with the phone's step sensor.",DaySteps.permitted(this),"Allow",this::requestStepPermission);
         permissionRow(R.drawable.ic_bell,"Notifications","The live session card, goal alerts, reminders and your daily summary.",notificationsAllowed(),"Allow",()->navigate("Notifications"));
-        permissionRow(R.drawable.ic_heart,"Health Connect","Brings in Samsung Health's steps, distance and calories. Optional.",hc,"Connect",()->navigate("Health"));
+        permissionRow(R.drawable.ic_heart,"Health Connect","Brings in your watch's and health apps' data. Optional.",hc,"Connect",()->navigate("Health"));
     }
     private void openAppSettings(){try{startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.fromParts("package",getPackageName(),null)));}catch(Exception ignored){}}
     private void permissionRow(int res,String title,String why,boolean ok,String action,Runnable fix){

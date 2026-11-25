@@ -19,7 +19,7 @@ class HealthConnectActivity : ComponentActivity() {
     private lateinit var statusText: TextView
     private lateinit var theme: KadammTheme
     private var client: HealthConnectClient? = null
-    private var refreshAfterSamsungHealth = false
+    private var refreshOnReturn = false
     private var askedExtras = false
 
     private val permissionLauncher = registerForActivityResult(
@@ -84,19 +84,34 @@ class HealthConnectActivity : ComponentActivity() {
             }
         }
         layout.addView(statusText)
-        layout.addView(action("Connect / refresh steps", true) { connect() })
+        layout.addView(action("Allow access and sync", true) { connect() })
         layout.addView(TextView(this).apply {
-            text = "Samsung Health keeps its step count private until you switch on sharing: Samsung Health > Settings > Health Connect > allow Steps. Kadamm only reads steps, distance and calories, and nothing leaves this phone."
+            text = "Health Connect is Android's shared health store. Your watch's app and apps like Google Fit save data there, and Kadamm reads it. Nothing leaves this phone."
             textSize = 13f
             setTextColor(theme.textMuted)
-            setPadding(0, dp(18f), 0, dp(2f))
+            setPadding(0, dp(18f), 0, dp(6f))
         })
-        layout.addView(action("Open Samsung Health", false) {
-            val launch = packageManager.getLaunchIntentForPackage("com.sec.android.app.shealth")
-            if (launch != null) {
-                refreshAfterSamsungHealth = true
-                startActivity(launch)
-            } else showStatus("Samsung Health is not installed. Connect another step source to Health Connect, then refresh.")
+        // The health apps on this phone, so you can switch on their sharing to Health Connect.
+        val apps = listOf(
+            "com.huami.watch.hmwatchmanager" to "Zepp", "com.sec.android.app.shealth" to "Samsung Health", "com.fitbit.FitbitMobile" to "Fitbit",
+            "com.garmin.android.apps.connectmobile" to "Garmin Connect", "com.google.android.apps.fitness" to "Google Fit", "com.mi.health" to "Mi Fitness",
+            "com.xiaomi.wearable" to "Mi Fitness", "com.huawei.health" to "Huawei Health", "com.ouraring.oura" to "Oura", "com.withings.wiscale2" to "Withings",
+            "fi.polar.polarflow" to "Polar Flow", "com.oplus.healthservice" to "OPPO Health", "com.heytap.health" to "HeyTap Health"
+        ).filter { packageManager.getLaunchIntentForPackage(it.first) != null }.distinctBy { it.second }
+        if (apps.isNotEmpty()) {
+            layout.addView(TextView(this).apply {
+                text = "In each app, turn on sharing to Health Connect:"
+                textSize = 13f
+                setTextColor(theme.text)
+                setPadding(0, dp(10f), 0, 0)
+            })
+            for ((pkg, name) in apps) layout.addView(action("Open $name", false) {
+                packageManager.getLaunchIntentForPackage(pkg)?.let { refreshOnReturn = true; startActivity(it) }
+            })
+        }
+        layout.addView(action("Health Connect settings", false) {
+            try { startActivity(android.content.Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS)); refreshOnReturn = true }
+            catch (_: Exception) { showStatus("Health Connect settings couldn't be opened on this phone.") }
         })
         layout.addView(action("Done", false) { finish() })
         val scroll = ScrollView(this).apply {
@@ -112,18 +127,18 @@ class HealthConnectActivity : ComponentActivity() {
                 client = HealthConnectClient.getOrCreate(this)
                 lifecycleScope.launch {
                     if (client!!.permissionController.getGrantedPermissions().containsAll(HealthSync.readSteps)) syncSteps()
-                    else showStatus("Health Connect is available. Grant step access to add steps counted by Samsung Health and other apps.")
+                    else showStatus("Health Connect is ready. Tap Allow access to bring in your watch and health apps' data.")
                 }
             }
-            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> showStatus("Health Connect needs to be installed or updated. Do that, then come back and tap Connect / refresh steps.")
+            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> showStatus("Health Connect needs to be installed or updated from Google Play. Then come back and tap Allow access.")
             else -> showStatus("Health Connect is unavailable on this device. Kadamm keeps counting with your phone's step sensor.")
         }
     }
 
     override fun onResume() {
         super.onResume()
-        if (refreshAfterSamsungHealth) {
-            refreshAfterSamsungHealth = false
+        if (refreshOnReturn) {
+            refreshOnReturn = false
             connect()
         }
     }
