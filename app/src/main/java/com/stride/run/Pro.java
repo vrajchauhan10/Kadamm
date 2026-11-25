@@ -211,7 +211,7 @@ final class Pro {
         return any?Boolean.FALSE:null;
     }
     /** The watch apps that share, by name ("Zepp, Google Fit"). */
-    static String sharingApps(Context c){java.util.List<String> n=new ArrayList<>();JSONArray a=Vitals.all(c).optJSONArray("sources");if(a!=null)for(int i=0;i<a.length();i++){String p=a.optString(i);if(p.startsWith("com.android.healthconnect")||p.equals("com.google.android.apps.fitness"))continue;String l=HealthSync.label(p);if(!n.contains(l))n.add(l);}return String.join(", ",n);}
+    static String sharingApps(Context c){java.util.List<String> n=new ArrayList<>();JSONArray a=Vitals.all(c).optJSONArray("sources");if(a!=null)for(int i=0;i<a.length();i++){String p=a.optString(i);if(p.startsWith("com.android.healthconnect")||p.equals("com.google.android.apps.fitness")||p.equals(c.getPackageName()))continue;String l=HealthSync.label(p);if(!n.contains(l))n.add(l);}return String.join(", ",n);}
 
     // ---- Which watch ----
     /** The apps and watches Health Connect data came from, and when it last synced. */

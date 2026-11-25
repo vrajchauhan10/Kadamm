@@ -1174,7 +1174,10 @@ public class MainActivity extends Activity {
         LinearLayout c=metricCard("STRESS","today","Stress from your heart rate while you're still, 0–100: for minutes between 7 am and 11 pm when you weren't moving (heart rate under 30 % of your reserve, not in the 5 minutes after activity, and in an hour with under 250 steps), how far heart rate sits above your resting rate. Up to 8 % of your heart-rate reserve above resting (calm sitting) counts as 0; 28 % or more counts as 100. Rest 0–25, low 26–50, medium 51–75, high 76–100.\n\nWatches that measure HRV all day (Garmin, Samsung's own app) score stress differently; Kadamm uses only what's shared with it.");
         if(s==null){c.addView(tx("Needs 2 hours of heart rate while you're still today.",13,muted,false));return;}
         int sc=s.optInt("score");LinearLayout row=row();c.addView(row,lp(-1,-2));row.addView(valueUnit(sc+"","of 100",30,ink),new LinearLayout.LayoutParams(0,-2,1));row.addView(tx(Pro.stressLevel(sc),16,sc<=50?positive:sc<=75?MetricViews.ZONE_COLORS[3]:critical,true));
-        statGrid(c,new String[][]{{"Rest",s.optInt("rest")+"","min"},{"Low",s.optInt("low")+"","min"},{"Medium",s.optInt("med")+"","min"},{"High",s.optInt("high")+"","min"}},10);
+        // Watches differ in how often they read heart rate, so levels are shown as shares of the still time measured.
+        int tot=Math.max(1,s.optInt("rest")+s.optInt("low")+s.optInt("med")+s.optInt("high"));
+        statGrid(c,new String[][]{{"Rest",Math.round(100.0*s.optInt("rest")/tot)+"","%"},{"Low",Math.round(100.0*s.optInt("low")/tot)+"","%"},{"Medium",Math.round(100.0*s.optInt("med")/tot)+"","%"},{"High",Math.round(100.0*s.optInt("high")/tot)+"","%"}},10);
+        TextView sn=tx(String.format(Locale.US,"Share of %d heart-rate readings while you were still today",s.optInt("min")),11,muted,false);sn.setPadding(0,dp(8),0,0);c.addView(sn);
     }
     private void renderOxygenCard(){
         String[] r=bodyMetric("resp",history()),o=bodyMetric("spo2",history()),sk=bodyMetric("skin",history()),bt=bodyMetric("btemp",history());
@@ -2864,7 +2867,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         ll.addView(tx("Live session card",14,ink,true));ll.addView(tx("Time, distance, pace and Pause/Finish. Android requires it while recording.",11,muted,false));live.addView(tx("Always",11,positive,true));
         reminderSwitch(ses,"Show details on the lock screen","Off: the lock screen shows only that a session is running","notifyLockPublic");
         LinearLayout goals=card();goals.addView(tx("GOALS",10,muted,true));
-        reminderSwitch(goals,"Daily goal reached","Once a day, when you hit your step goal","notifyGoal");
+        reminderSwitch(goals,"Daily goal reached","Once a day, when you hit your step goal","notifyGoal");reminderSwitch(goals,"Health alerts","When a watch measure moves well outside your normal, with what to do (at most 3 a day, never at night)","bodyAlerts");
         reminderSwitch(goals,"You're making progress","Once a day, at 60% of your goal","notifyProgress");
         reminderSwitch(goals,"Weekly report","Monday morning: last week's steps, goal days and sessions","notifyWeekly");
         int sumAt=Reminders.get(this,"sumAt",21*60);

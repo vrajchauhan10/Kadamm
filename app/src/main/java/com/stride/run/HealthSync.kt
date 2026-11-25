@@ -70,6 +70,7 @@ object HealthSync {
         pkg == "com.fitbit.FitbitMobile" -> "Fitbit"
         pkg == "com.garmin.android.apps.connectmobile" -> "Garmin Connect"
         pkg == "com.strava" -> "Strava"
+        pkg == "com.stride.run" -> "You (Kadamm)"
         pkg.isEmpty() -> "Health Connect"
         else -> pkg.substringAfterLast('.')
     }
