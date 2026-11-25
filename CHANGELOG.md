@@ -1,5 +1,11 @@
 # Changelog
 
+## 10.2.0 (versionCode 58)
+
+- Edit Home: a link at the bottom of Home lets you choose which sections show there (Your body today, Coach, Trainer, plan, steps by hour, step spread, movement quality, sitting breaks, today at a glance, live route map, this week, reports, new badges). Steps and starting an activity always show; "Show all" brings everything back.
+- Your body today can show your chosen measures as circles or tiles: one tap on "Tiles · Circles" switches. Each circle fills against its own scale (Stress and Sleep consistency out of 100, heart rate against your max heart rate, blood oxygen 80–100 %, VO₂max out of 60, and so on); a measure with no data shows an empty circle.
+- The "crafted by V" mark is no longer plain text in the code, and the app checks that it's the official build signed with the maker's key: a copy rebuilt from the source says "Unofficial build" in the menu and can't install over the official app.
+
 ## 10.1.1 (versionCode 57)
 
 - Recovery updates through the day: "Recovery now" starts from this morning's Recovery and goes down as today's Strain (or Movement load) and Stress add up, recalculated with every sync. Home's ring shows it ("65 % · 68 % this morning"), the Recovery card shows what's been spent, and the coach's line shows both. Morning Recovery still comes from last night and sets the coach's targets.

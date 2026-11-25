@@ -83,7 +83,7 @@ final class ShareCard {
         try{
             Paint a=new Paint(Paint.ANTI_ALIAS_FLAG);a.setColor(Color.argb(170,Color.red(color),Color.green(color),Color.blue(color)));
             Paint v=new Paint(a);a.setTypeface(c.getResources().getFont(R.font.great_vibes));a.setTextSize(52*scale);v.setTypeface(c.getResources().getFont(R.font.parisienne));v.setTextSize(56*scale);
-            float vw=v.measureText("V"),aw=a.measureText("crafted by ");cv.drawText("crafted by ",right-vw-aw,baseline,a);cv.drawText("V",right-vw,baseline,v);
+            String by=Maker.by(),vv=Maker.v();float vw=v.measureText(vv),aw=a.measureText(by);cv.drawText(by,right-vw-aw,baseline,a);cv.drawText(vv,right-vw,baseline,v);
         }catch(Exception ignored){}
     }
     private static String duration(long ms){long s=ms/1000;return s>=3600?String.format(Locale.US,"%d:%02d:%02d",s/3600,(s/60)%60,s%60):String.format(Locale.US,"%d:%02d",s/60,s%60);}
