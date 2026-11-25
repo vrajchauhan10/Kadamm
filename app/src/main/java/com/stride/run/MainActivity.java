@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="9.7";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="10.0";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -195,6 +195,7 @@ public class MainActivity extends Activity {
         drawerAction("Today","◷","Today",null);drawerAction("History","▦","History",sessions.length()+(sessions.length()==1?" session":" sessions"));drawerAction("Profile","◉","Profile",null);int nr=Insights.routes(this).length();drawerAction("Routes","↗","Routes",nr==0?null:nr+(nr==1?" route":" routes"));drawerAction("Places","place","Places",null);drawerAction("Reports","≈","Reports",null);int earned=0;for(Progress.Badge bd:Progress.badges(SessionMetrics.ready()?this:null,history(),DaySteps.allDayTotals(this),dailyGoal()))if(bd.earned())earned++;drawerAction("Achievements","★","Achievements",earned+" badges");
         drawerSection("SETTINGS");
         drawerAction("Goals & targets","◎","Goals",String.format(Locale.US,"%,d steps",goal));drawerAction("Notifications","bell","Notifications",notificationsAllowed()?"On":"Off");drawerAction("Auto","run","Auto",AutoTrack.enabled(this)?"On":"Off");drawerAction("Permissions","gear","Permissions",null);drawerAction("Storage","storage","Storage",null);drawerAction("Share Kadamm","share","ShareApp","Send the app");
+        drawerAction("Health data","♥","Body",watchData()?"Watch":"Phone");
         drawerAction("Step sources & health","＋","Health",getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false)?"Connected":"Set up");
         drawerSection("APPEARANCE");
         LinearLayout modes=row();drawerList.addView(modes,lp(-1,40));String selectedMode=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("themeMode","system");
@@ -233,8 +234,10 @@ public class MainActivity extends Activity {
     private int logoRes(){return darkTheme?R.drawable.ic_kadamm_logo_dark:R.drawable.ic_kadamm_logo;}
     private LinearLayout brandButton(){
         LinearLayout b=row();b.setPadding(dp(8),0,dp(10),0);b.setBackground(rippleOn(Color.TRANSPARENT,14));b.setFocusable(true);b.setClickable(true);b.setContentDescription("Kadamm menu");b.setOnClickListener(v->openDrawer());
-        android.widget.ImageView menu=new android.widget.ImageView(this);menu.setImageResource(logoRes());b.addView(menu,lp(36,36));TextView name=tx("KADAMM",16,ink,true);name.setLetterSpacing(.14f);LinearLayout.LayoutParams np=lp(-2,-2);np.leftMargin=dp(10);b.addView(name,np);
-        TextView version=tx("v"+APP_VERSION,9,lime,true);version.setPadding(dp(7),dp(2),dp(7),dp(2));version.setBackground(shape(blend(panel,lime,darkTheme?.22f:.12f),10));LinearLayout.LayoutParams vp=lp(-2,-2);vp.leftMargin=dp(8);b.addView(version,vp);return b;
+        android.widget.ImageView menu=new android.widget.ImageView(this);menu.setImageResource(logoRes());b.addView(menu,lp(36,36));boolean slim=getResources().getConfiguration().screenWidthDp<400;TextView name=tx("KADAMM",slim?15:16,ink,true);name.setLetterSpacing(slim?.08f:.14f);LinearLayout.LayoutParams np=lp(-2,-2);np.leftMargin=dp(10);b.addView(name,np);
+        TextView version=tx("v"+APP_VERSION,9,lime,true);version.setPadding(dp(7),dp(2),dp(7),dp(2));version.setBackground(shape(blend(panel,lime,darkTheme?.22f:.12f),10));LinearLayout.LayoutParams vp=lp(-2,-2);vp.leftMargin=dp(8);b.addView(version,vp);
+        // The version opens the update card on Profile and checks GitHub, as in Aalap.
+        version.setClickable(true);version.setFocusable(true);version.setContentDescription("Version "+APP_VERSION+": check for updates");version.setOnClickListener(v->openUpdates());return b;
     }
     private static final String[] TABS={"Today","History","Profile"};private String renderedPage="";private boolean dragging=false;
     private int tabIndex(String p){return "Today".equals(p)?0:"History".equals(p)?1:"Profile".equals(p)?2:-1;}
@@ -262,13 +265,13 @@ public class MainActivity extends Activity {
         goingBack=false;
     }
     private void goBack(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.pop();Integer y=scrollMemory.get(to);restoreScroll=y==null?-1:y;goingBack=true;page=to;closeDrawer();renderPage();}
-    private String backLabel(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.peek();return "DaySummary".equals(to)?"Day summary":"Import".equals(to)?"Import":"Detail".equals(to)?"Session":"Auto".equals(to)?"Auto tracking":"Today".equals(to)?"Home":to;}
-    private void renderPageInner(){trackBack();if(replayAnim!=null){replayAnim.cancel();replayAnim=null;}if(!page.equals(renderedPage)&&scroller!=null)scroller.scrollTo(0,0);renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else if(page.equals("Routes"))renderRoutes();else if(page.equals("Notifications"))renderNotifications();else if(page.equals("Reports"))renderReports();else if(page.equals("Achievements"))renderAchievements();else if(page.equals("Permissions"))renderPermissions();else if(page.equals("Auto"))renderAutoTracking();else if(page.equals("Storage"))renderStorage();else if(page.equals("Places"))renderPlaces();else if(page.equals("Sessions"))renderSessions();else if(page.equals("DaySummary"))renderDaySummary();else if(page.equals("Trainer"))renderTrainer();else if(page.equals("Import"))renderImport();else renderDetail(lastSession);if(content.getChildCount()>0)signatureAtEnd();}
+    private String backLabel(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.peek();return "DaySummary".equals(to)?"Day summary":"Import".equals(to)?"Import":"Detail".equals(to)?"Session":"Auto".equals(to)?"Auto tracking":"Body".equals(to)?"Health data":"Today".equals(to)?"Home":to;}
+    private void renderPageInner(){trackBack();if(replayAnim!=null){replayAnim.cancel();replayAnim=null;}if(!page.equals(renderedPage)&&scroller!=null)scroller.scrollTo(0,0);renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else if(page.equals("Routes"))renderRoutes();else if(page.equals("Notifications"))renderNotifications();else if(page.equals("Reports"))renderReports();else if(page.equals("Achievements"))renderAchievements();else if(page.equals("Permissions"))renderPermissions();else if(page.equals("Auto"))renderAutoTracking();else if(page.equals("Storage"))renderStorage();else if(page.equals("Places"))renderPlaces();else if(page.equals("Sessions"))renderSessions();else if(page.equals("DaySummary"))renderDaySummary();else if(page.equals("Trainer"))renderTrainer();else if(page.equals("Import"))renderImport();else if(page.equals("Body"))renderBody();else renderDetail(lastSession);if(content.getChildCount()>0)signatureAtEnd();}
     private void styleNavItem(LinearLayout item,boolean selected){int color=selected?lime:muted;item.setBackground(rippleOn(selected?raised:Color.TRANSPARENT,14));((android.widget.ImageView)item.getChildAt(0)).setImageTintList(android.content.res.ColorStateList.valueOf(color));((TextView)item.getChildAt(1)).setTextColor(selected?ink:muted);}
     private void brand(String eyebrow,String headline,String sub){LinearLayout brand=row();content.addView(brand,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);brand.addView(brandButton(),bbp);if(tabIndex(page)<0){brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));TextView bk=tx("‹  "+backLabel(),13,ink,true);bk.setGravity(Gravity.CENTER);bk.setPadding(dp(14),0,dp(16),0);bk.setBackground(rippleOn(raised,18));bk.setContentDescription("Back to "+backLabel());bk.setOnClickListener(v->goBack());brand.addView(bk,lp(-2,36));}TextView e=tx(eyebrow.toUpperCase(Locale.US),10,muted,true);LinearLayout.LayoutParams ep=lp(-1,25);ep.topMargin=dp(8);content.addView(e,ep);TextView h=tx(headline,29,ink,true);content.addView(h);if(sub!=null){TextView s=tx(sub,13,muted,false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(5);sp.bottomMargin=dp(16);content.addView(s,sp);}}
     private LinearLayout card(){LinearLayout c=col();c.setPadding(dp(16),dp(16),dp(16),dp(16));c.setBackground(panelShape(16));LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(12);content.addView(c,p);return c;}
     private GradientDrawable panelShape(int radius){GradientDrawable d=shape(panel,radius);d.setStroke(dp(1),line);return d;}
-    private void renderToday(){JSONArray hist=history();dayTotals=DaySteps.allDayTotals(this);loadIdleLocation();renderHeader();renderStepSetup();renderBadgeBanner(hist);renderHero(hist);renderCoach();renderStepsByHour();renderSpread();renderTrainerCard(hist);renderPlan(hist);renderMovementQuality();renderSittingBreaks();renderBento(hist);renderDistanceGoal(hist);
+    private void renderToday(){JSONArray hist=history();dayTotals=DaySteps.allDayTotals(this);loadIdleLocation();renderHeader();renderStepSetup();renderBadgeBanner(hist);renderHero(hist);renderBodyToday(hist);renderCoach();renderStepsByHour();renderSpread();renderTrainerCard(hist);renderPlan(hist);renderMovementQuality();renderSittingBreaks();renderBento(hist);renderDistanceGoal(hist);
         LinearLayout mapCard=card();trackCard=mapCard;LinearLayout head=row();TextView title=tx("Live route",16,ink,true);head.addView(title,new LinearLayout.LayoutParams(0,dp(26),1));status=tx("● READY",10,lime,true);head.addView(status);mapCard.addView(head);FrameLayout mapFrame=new FrameLayout(this);LinearLayout.LayoutParams mfp=lp(-1,190);mfp.topMargin=dp(8);mapCard.addView(mapFrame,mfp);route=new RouteView(this);route.setTheme(bg,raised,lime,darkTheme);route.setContentDescription("Map. Tap to open full screen");route.setOnClickListener(v->openMapView());mapFrame.addView(route,new FrameLayout.LayoutParams(-1,-1));android.widget.ImageView follow=icon(R.drawable.ic_my_location,ink,10);follow.setBackground(rippleOn(raised,12));FrameLayout.LayoutParams flp=new FrameLayout.LayoutParams(dp(42),dp(42),Gravity.RIGHT|Gravity.TOP);flp.setMargins(0,dp(10),dp(10),0);mapFrame.addView(follow,flp);follow.setContentDescription("Follow my location");follow.setOnClickListener(v->{route.setFollowLocation(true);if(prefs.getBoolean("gpsFix",false))route.setCurrentLocation(prefs.getFloat("latitude",0),prefs.getFloat("longitude",0),prefs.getFloat("accuracy",0));else toast("Waiting for a reliable GPS fix");});LinearLayout mapMeta=row();mapCard.addView(mapMeta,lp(-1,26));accuracyLabel=tx("GPS accuracy · waiting for signal",10,muted,false);mapMeta.addView(accuracyLabel,new LinearLayout.LayoutParams(0,dp(26),1));TextView standard=tx("Tap map to explore",10,lime,true);mapMeta.addView(standard);TextView mapHint=tx("© OpenStreetMap contributors · satellite tiles are not available from this map source",9,muted,false);mapCard.addView(mapHint);
         // Track an activity: four clear choices, one Start button; live numbers only while a session runs.
         boolean running=prefs.getBoolean("active",false);LinearLayout box=card();
@@ -577,6 +580,7 @@ public class MainActivity extends Activity {
         long steps=0;for(Long v:totals.values())steps+=v;double km=distanceAll(h);long ms=0;for(int i=0;i<h.length();i++){JSONObject o=h.optJSONObject(i);if(o!=null)ms+=o.optLong("durationMs",0);}
         TextView lh=tx("ALL TIME",10,muted,true);lh.setLetterSpacing(.08f);LinearLayout.LayoutParams lhp=lp(-1,-2);lhp.topMargin=dp(20);content.addView(lh,lhp);
         LinearLayout r1=glanceRow();glance(r1,"STEPS",steps>=100000?String.format(Locale.US,"%.0fk",steps/1000d):String.format(Locale.US,"%,d",steps),"",lime,"▶",null,totals.size()+" days counted");glance(r1,"SESSIONS",String.valueOf(h.length()),"",purple(),"◷",null,String.format(Locale.US,"%.1f km · %dh %02dm",km,ms/3600000,(ms/60000)%60));
+        renderWatchConnection(false);
         renderFitnessSnapshot(h);
         renderRecords();
         // Shortcuts.
@@ -702,6 +706,9 @@ public class MainActivity extends Activity {
         TextView e=tx(cd.allDone?"ALL DONE TODAY":"YOUR TRAINER",9,cd.allDone?positive:violet,true);e.setLetterSpacing(.08f);l.addView(e);
         l.addView(tx("Coach Kadamm",big?20:17,ink,true));l.addView(tx(cd.greeting,12,muted,false));
         TextView cnt=tx(cd.done+"/"+cd.list.size(),big?20:16,cd.allDone?positive:ink,true);cnt.setGravity(Gravity.CENTER);cnt.setPadding(dp(10),dp(4),dp(10),dp(4));cnt.setBackground(shape(cd.allDone?blend(panel,positive,.25f):raised,14));r.addView(cnt,lp(-2,-2));
+        // Recovery guidance: today's Recovery and the load that suits it (from the watch, or a morning pulse check).
+        String g=TrainerCoach.guidance(cd);if(g!=null){int col=cd.restNow||cd.recScore<34?critical:cd.recScore>=67?positive:MetricViews.ZONE_COLORS[3];
+            TextView gt=tx((cd.restNow?"🛌  ":"♥  ")+g,12,col,true);gt.setPadding(dp(12),dp(8),dp(12),dp(8));gt.setBackground(shape(blend(panel,col,darkTheme?.18f:.10f),12));LinearLayout.LayoutParams gp=lp(-1,-2);gp.topMargin=dp(12);c.addView(gt,gp);gt.setOnClickListener(x->navigate("Body"));}
     }
     private View coachBar(TrainerCoach.Challenge ch,int i){
         FrameLayout f=new FrameLayout(this);f.setBackground(shape(blend(raised,line,.5f),3));View in=new View(this);in.setBackground(shape(ch.done?positive:coachColor(i),3));
@@ -772,29 +779,14 @@ public class MainActivity extends Activity {
     }
     private String prettyDay(String key){try{return new java.text.SimpleDateFormat("EEE d MMM",Locale.getDefault()).format(new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US).parse(key));}catch(Exception e){return key;}}
     private void renderWatchFitness(JSONArray h){
-        JSONObject v=Vitals.all(this);
-        LinearLayout c=metricCard("YOUR WATCH","","Kadamm works with any Wear OS watch (Galaxy Watch, Pixel Watch and others): install Kadamm on the watch to start and finish walks from your wrist, see today's challenges, and add your watch's heart rate to sessions. Sleep, resting heart rate and VO2max come from any watch that shares into Health Connect, including Samsung Health, Fitbit, Zepp and Garmin.");
-        TextView status=tx("Looking for your watch…",13,muted,true);c.addView(status);
-        try{com.google.android.gms.wearable.Wearable.getNodeClient(this).getConnectedNodes().addOnSuccessListener(nodes->{if(nodes.isEmpty()){status.setText("No Wear OS watch connected");status.setTextColor(muted);}else{status.setText("⌚  Connected: "+nodes.get(0).getDisplayName());status.setTextColor(positive);}})
-            .addOnFailureListener(e->status.setText("No Wear OS watch paired with this phone"));}catch(Throwable t){status.setText("Wear OS isn't available on this phone");}
-        java.util.TreeMap<String,Double> sleep=Vitals.series(v,"sleep"),rhr=Vitals.series(v,"rhr"),vo2=Vitals.series(v,"vo2");
-        if(sleep.isEmpty()&&rhr.isEmpty()&&vo2.isEmpty()){TextView t=tx(DaySteps.hcSteps(this)?"No sleep, resting heart rate or VO2max shared yet. Wear your watch to sleep and allow these in Health Connect.":"Connect Health Connect to bring in your watch's sleep, resting heart rate and VO2max.",13,ink,false);t.setPadding(0,dp(8),0,0);c.addView(t);
-            TextView go=tx("Health Connect permissions  ›",13,lime,true);go.setPadding(0,dp(10),0,0);go.setOnClickListener(x->startActivity(new Intent(this,HealthConnectActivity.class)));c.addView(go);}
-        else{java.util.List<String[]> cells=new java.util.ArrayList<>();
-            if(!sleep.isEmpty()){double last=sleep.lastEntry().getValue();double avg=0;for(double x:sleep.values())avg+=x;avg/=sleep.size();cells.add(new String[]{"Last night",String.format(Locale.US,"%dh %02dm",Math.round(last)/60,Math.round(last)%60),String.format(Locale.US,"avg %dh %02dm",Math.round(avg)/60,Math.round(avg)%60)});}
-            if(!rhr.isEmpty()){double now=rhr.lastEntry().getValue();java.util.List<Double> vals=new java.util.ArrayList<>(rhr.values());double first=Vitals.median(vals.subList(0,Math.max(1,vals.size()/2)));cells.add(new String[]{"Resting HR",Math.round(now)+"",vals.size()>=6?String.format(Locale.US,"bpm (%+.0f)",now-first):"bpm"});}
-            if(!vo2.isEmpty())cells.add(new String[]{"VO₂max",String.format(Locale.US,"%.1f",vo2.lastEntry().getValue()),"ml/kg/min"});
-            statGrid(c,cells.toArray(new String[0][]),10);
-            String src=Vitals.sources(v);if(!src.isEmpty()){TextView t=tx("From "+src+" via Health Connect",11,muted,false);t.setPadding(0,dp(8),0,0);c.addView(t);}
-            double[] sv=Vitals.sleepVsSteps(this);if(sv!=null){double diff=sv[0]-sv[1];TextView t=tx(String.format(Locale.US,Math.abs(diff)<5?"Your sleep is about the same after active and quiet days (%,d+ steps or fewer).":diff>0?"After days of %,d+ steps you sleep %d minutes longer than after quieter days.":"After days of %,d+ steps you sleep %d minutes less than after quieter days.",Math.round(sv[2]),Math.round(Math.abs(diff))),13,ink,true);t.setPadding(0,dp(10),0,0);c.addView(t);
-                TextView n=tx("Based on "+Math.round(sv[3])+" nights.",11,muted,false);c.addView(n);}}
+        // Watch measurements live on the Health data page now; Trainer keeps fitness age, from the app's one VO2max.
         // Fitness age
         Vitals.FitnessAge fa=Vitals.fitnessAge(this,h);
-        LinearLayout fc=metricCard("FITNESS AGE","","The age whose average VO2max matches yours (from the HUNT fitness study). VO2max comes from your watch when it measures it; otherwise Kadamm estimates it from walks with heart rate: the oxygen cost of your walking speed, scaled by how hard your heart worked against your measured resting heart rate. Estimates are labelled.");
-        if(fa.need!=null){String msg="age".equals(fa.need)?"Add your age in Profile to see your fitness age.":"rest".equals(fa.need)?"Needs a resting heart rate from your watch (through Health Connect), or VO2max from your watch.":"Needs 2 or more walks of 10+ minutes with heart rate from a watch in the last 60 days ("+fa.sessions+" so far).";fc.addView(tx(msg,13,ink,false));}
+        LinearLayout fc=metricCard("FITNESS AGE","","The age whose average VO2max matches yours (HUNT fitness study norms). It uses the same VO2max as the Health data page: measured by your watch, a Cooper 12-minute test, your heart rate (15.3 × max ÷ resting), or walks with heart rate, in that order.");
+        if(fa.need!=null){String msg="age".equals(fa.need)?"Add your age in Profile to see your fitness age.":"rest".equals(fa.need)?"Needs a VO2max: from your watch, a Cooper test (Health data page), or a resting heart rate from a watch or a morning pulse check.":"Needs 2 or more walks of 10+ minutes with heart rate from a watch in the last 60 days ("+fa.sessions+" so far).";fc.addView(tx(msg,13,ink,false));}
         else{LinearLayout r=row();r.setGravity(Gravity.BOTTOM);fc.addView(r);r.addView(tx(String.valueOf(fa.fitAge),40,fa.fitAge<=fa.age?positive:warning,true));TextView yr=tx(" years",14,muted,false);yr.setPadding(0,0,0,dp(8));r.addView(yr);
             fc.addView(tx(fa.fitAge<fa.age?(fa.age-fa.fitAge)+" years younger than your age ("+fa.age+")":fa.fitAge==fa.age?"The same as your age":(fa.fitAge-fa.age)+" years older than your age ("+fa.age+"): brisk walks bring it down",13,ink,true));
-            fc.addView(tx(String.format(Locale.US,"VO₂max %.1f ml/kg/min · %s",fa.vo2,fa.fromWatch?"measured by your watch":"estimate from "+fa.sessions+" walks"),12,muted,false));}
+            fc.addView(tx(String.format(Locale.US,"VO₂max %.1f ml/kg/min · %s",fa.vo2,fa.method),12,muted,false));}
         String sex=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("sex","");
         TextView sx=tx(("m".equals(sex)?"Compared with men":"f".equals(sex)?"Compared with women":"Compared with everyone")+" · change  ›",12,lime,true);sx.setPadding(0,dp(10),0,0);fc.addView(sx);
         sx.setOnClickListener(x->dialog().setTitle("Compare with").setItems(new String[]{"Men","Women","Everyone"},(d,w)->{getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("sex",w==0?"m":w==1?"f":"").apply();renderPageNow();}).show());
@@ -823,7 +815,7 @@ public class MainActivity extends Activity {
             TextView ic=tx(ch.done?"✓":coachIcon(ch.id),18,ch.done?Color.WHITE:coachColor(i),true);ic.setGravity(Gravity.CENTER);GradientDrawable ig=new GradientDrawable();ig.setShape(GradientDrawable.OVAL);ig.setColor(ch.done?positive:blend(panel,coachColor(i),.22f));ic.setBackground(ig);r.addView(ic,lp(44,44));
             LinearLayout l=col();LinearLayout.LayoutParams llp=new LinearLayout.LayoutParams(0,-2,1);llp.leftMargin=dp(14);r.addView(l,llp);
             l.addView(tx(ch.title,15,ink,true));l.addView(tx(ch.progress(),12,ch.done?positive:muted,ch.done));l.addView(coachBar(ch,i),coachBarLp());}
-        TextView how=tx("A new set every day, picked from 11 kinds so none repeats from yesterday. Targets come from your own last four weeks: a good day for you, not your best. Finish all three and tomorrow's rise 5 %; miss most and they ease.",11,muted,false);how.setLineSpacing(dp(2),1f);LinearLayout.LayoutParams hwp=lp(-1,-2);hwp.topMargin=dp(14);c.addView(how,hwp);
+        TextView how=tx("A new set every day, picked from 11 kinds so none repeats from yesterday. Targets come from your own last four weeks: a good day for you, not your best. Finish all three and tomorrow's rise 5 %; miss most and they ease. With a Recovery score (watch or morning pulse check), green days raise targets 5 %, red days ease them, and the coach tells you when your load is enough and it's time to rest.",11,muted,false);how.setLineSpacing(dp(2),1f);LinearLayout.LayoutParams hwp=lp(-1,-2);hwp.topMargin=dp(14);c.addView(how,hwp);
         maybeCoachCelebrate(cd);
         // Report
         java.util.List<TrainerCoach.Finding> rep=TrainerCoach.report(this,h);
@@ -949,6 +941,295 @@ public class MainActivity extends Activity {
             if(latest!=null)in.setText(String.format(Locale.US,"%.1f",latest));FrameLayout box=new FrameLayout(this);box.setPadding(dp(20),dp(8),dp(20),0);box.addView(in);
             dialog().setTitle("Today's weight (kg)").setView(box).setPositiveButton("Save",(d,w)->{try{double kg=Double.parseDouble(in.getText().toString().replace(',','.'));if(kg<25||kg>300){toast("Enter a weight between 25 and 300 kg");return;}Trends.logWeight(this,kg);toast("Saved");renderPageNow();}catch(Exception e){toast("Enter a number, like 72.5");}}).setNegativeButton("Cancel",null).show();});
     }
+    // ---- Kadamm 10: your body (watch and phone metrics) ----
+    /** Every body metric Kadamm can show: key → name. One definition each (see Pro), so a name means one number everywhere. */
+    private static final String[][] BODY_METRICS={{"recovery","Recovery"},{"strain","Strain"},{"load","Movement load"},{"sleep","Sleep"},{"consistency","Sleep consistency"},
+        {"live","Heart rate now"},{"rhr","Resting heart rate"},{"hrv","HRV"},{"stress","Stress"},{"resp","Breathing rate"},{"spo2","Blood oxygen"},{"skin","Skin temperature"},
+        {"btemp","Body temperature"},{"bp","Blood pressure"},{"vo2","VO₂max"},{"weight","Weight"}};
+    private static String bodyName(String key){for(String[] m:BODY_METRICS)if(m[0].equals(key))return m[1];return key;}
+    private boolean watchData(){JSONObject v=Vitals.all(this);return Vitals.series(v,"hrRest").size()+Vitals.series(v,"rhr").size()+Vitals.series(v,"sleep").size()>0||WearBridge.live(this)!=null||WearBridge.minutes(this,todayKey()).length>0;}
+    private java.util.List<String> pinned(){
+        String d=watchData()?"rhr,hrv,stress,spo2":"consistency,rhr,vo2,weight";String s=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("pinnedBody",d);
+        java.util.List<String> out=new java.util.ArrayList<>();for(String k:s.split(","))if(!k.trim().isEmpty())out.add(k.trim());return out;
+    }
+    /**
+     * One metric's current state: {value, unit, note, tone} with tone 1 good, 0 neutral, -1 attention, -2 no data.
+     * The note says where it came from, or why it's missing.
+     */
+    private String[] bodyMetric(String key,JSONArray hist){
+        JSONObject v=Vitals.all(this);String today=todayKey();
+        switch(key){
+            case "recovery":{Pro.Recovery r=Pro.recovery(this);if(r.score<0)return new String[]{"—","",r.need.equals("hr")?"Needs HRV or resting HR":r.need.equals("history")?"Learning your normal: 5 days needed":"Needs last night's sleep too","-2"};
+                return new String[]{r.score+"","%",r.zone(),r.score>=67?"1":r.score>=34?"0":"-1"};}
+            case "strain":{Pro.Strain s=Pro.strain(this,today);if(s.strain<0)return new String[]{"—","",s.need.equals("age")?"Add your age in Profile":s.need.equals("rest")?"Needs a resting heart rate":"Needs heart rate from a watch","-2"};
+                return new String[]{String.format(Locale.US,"%.1f",s.strain),"of 21",s.strain>=14?"Strenuous":s.strain>=10?"Moderate":"Light","0"};}
+            case "load":{Pro.Load l=Pro.load(this,hist,today);if(l.load<0)return new String[]{"—","","No steps yet today","-2"};return new String[]{String.format(Locale.US,"%.1f",l.load),"of 21",l.load>=14?"Heavy day":l.load>=8?"Active day":"Light day","0"};}
+            case "sleep":{SleepTracker.Night n=SleepTracker.night(this,today);if(n==null)return new String[]{"—","","No sleep recorded for last night","-2"};
+                return new String[]{Pro.hm(n.asleep),"",n.source+(n.estimate?" · estimate":""),n.asleep>=420?"1":n.asleep>=360?"0":"-1"};}
+            case "consistency":{SleepTracker.Consistency cs=SleepTracker.consistency(this);if(cs.score<0)return new String[]{"—","",cs.nights+" of 5 nights so far","-2"};return new String[]{cs.score+"","%",String.format(Locale.US,"bed ±%.0f · wake ±%.0f min",cs.sdBed,cs.sdWake),cs.score>=75?"1":cs.score>=50?"0":"-1"};}
+            case "live":{long[] l=WearBridge.live(this);JSONObject hl=v.optJSONObject("hrLast");if(l!=null)return new String[]{l[0]+"","bpm",ago(l[1])+" · Kadamm on your watch","0"};
+                if(hl!=null&&System.currentTimeMillis()-hl.optLong("at")<60*60000L)return new String[]{hl.optLong("bpm")+"","bpm",ago(System.currentTimeMillis()-hl.optLong("at"))+" · "+HealthSync.label(hl.optString("src")),"0"};
+                return new String[]{"—","","No heart rate in the last hour","-2"};}
+            case "rhr":{Pro.Reading r=Pro.restingHr(this);if(!r.ok())return new String[]{"—","","Not shared yet","-2"};return new String[]{Math.round(r.value)+"","bpm",r.source,"0"};}
+            case "hrv":{Pro.Reading r=Pro.hrv(this);if(!r.ok())return new String[]{"—","",Pro.granted(v,"hrv")?"Your watch's app doesn't share HRV":"Not shared yet","-2"};return new String[]{Math.round(r.value)+"","ms",r.source,"0"};}
+            case "stress":{JSONObject s=Pro.stress(this,today);if(s==null)return new String[]{"—","",Pro.count(v,"hr")>0?"Needs an hour of still heart rate today":"Needs heart rate from a watch","-2"};int sc=s.optInt("score");return new String[]{sc+"","of 100",Pro.stressLevel(sc),sc<=50?"1":sc<=75?"0":"-1"};}
+            case "resp":{Pro.Reading r=Pro.latest(v,"resp",3);return r.ok()?new String[]{String.format(Locale.US,"%.1f",r.value),"/min",r.source,"0"}:new String[]{"—","","Not shared","-2"};}
+            case "spo2":{Pro.Reading r=Pro.latest(v,"spo2",3);if(!r.ok())return new String[]{"—","","Not shared","-2"};double low=v.optJSONObject("spo2Low")!=null?v.optJSONObject("spo2Low").optDouble(r.day,-1):-1;
+                return new String[]{String.format(Locale.US,"%.0f",r.value),"%",low>0?String.format(Locale.US,"lowest %.0f %% · %s",low,r.source):r.source,r.value>=95?"1":r.value>=92?"0":"-1"};}
+            case "skin":{Pro.Reading r=Pro.latest(v,"skin",3);return !r.day.isEmpty()?new String[]{String.format(Locale.US,"%+.1f",r.value),"°C",r.source,"0"}:new String[]{"—","",WatchHealth.skinSupported(this)?"Not shared":"Health Connect on this phone doesn't support it yet","-2"};}
+            case "btemp":{Pro.Reading r=Pro.latest(v,"btemp",7);return r.ok()?new String[]{String.format(Locale.US,"%.1f",r.value),"°C",r.source,r.value<37.5?"0":"-1"}:new String[]{"—","","Not shared","-2"};}
+            case "bp":{double[] b=bloodPressure();if(b==null)return new String[]{"—","","Not recorded · add a reading","-2"};return new String[]{Math.round(b[0])+"/"+Math.round(b[1]),"mmHg",bpCategory(b[0],b[1]),b[0]<130&&b[1]<80?"1":b[0]<140&&b[1]<90?"0":"-1"};}
+            case "vo2":{Pro.Vo2 o=Pro.vo2(this,hist);if(o.value<=0)return new String[]{"—","","Needs a watch, Cooper test or age","-2"};return new String[]{String.format(Locale.US,"%.1f",o.value),"ml/kg/min",o.method,"0"};}
+            case "weight":{java.util.TreeMap<String,Double> w=new java.util.TreeMap<>(Vitals.series(v,"weight"));w.putAll(Trends.manualWeights(this));if(w.isEmpty()){int kg=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("weightKg",0);return kg>0&&getSharedPreferences("kadamm_settings",MODE_PRIVATE).contains("weightKg")?new String[]{String.valueOf(kg),"kg","From your profile","0"}:new String[]{"—","","Not recorded","-2"};}return new String[]{String.format(Locale.US,"%.1f",w.lastEntry().getValue()),"kg",prettyDay(w.lastKey()),"0"};}
+        }
+        return new String[]{"—","","","-2"};
+    }
+    private int toneColor(String t){return "1".equals(t)?positive:"-1".equals(t)?warning:"-2".equals(t)?muted:ink;}
+    private String ago(long ms){long s=ms/1000;return s<60?s+" s ago":s<3600?(s/60)+" min ago":(s/3600)+" h ago";}
+    /** Latest blood pressure {sys, dia}: your own entry or Health Connect, whichever is newer (last 60 days). */
+    private double[] bloodPressure(){
+        JSONObject v=Vitals.all(this);java.util.TreeMap<String,Double> s=Vitals.series(v,"bpSys"),d=Vitals.series(v,"bpDia");String day=s.isEmpty()?"":s.lastKey();double[] out=s.isEmpty()?null:new double[]{s.lastEntry().getValue(),d.getOrDefault(day,0d)};
+        try{JSONObject m=new JSONObject(getSharedPreferences("kadamm_health",MODE_PRIVATE).getString("bpManual","{}"));String last=null;for(java.util.Iterator<String> it=m.keys();it.hasNext();){String k=it.next();if(last==null||k.compareTo(last)>0)last=k;}
+            if(last!=null&&last.compareTo(day)>=0){JSONArray a=m.getJSONArray(last);out=new double[]{a.getDouble(0),a.getDouble(1)};day=last;}}catch(Exception ignored){}
+        return out!=null&&day.compareTo(DaySteps.key(System.currentTimeMillis()-60L*86400000L))>=0?out:null;
+    }
+    /** AHA 2017 categories. */
+    private static String bpCategory(double s,double d){return s>=180||d>=120?"Very high: get medical advice now":s>=140||d>=90?"High (stage 2)":s>=130||d>=80?"High (stage 1)":s>=120?"Elevated":"Normal";}
+
+    // ---- Watch connection ----
+    private String btWatch;
+    /** A watch or band paired over Bluetooth (any brand), when Kadamm may see paired devices; "name|connected". */
+    private String bluetoothWatch(){
+        if(Build.VERSION.SDK_INT>=31&&checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)return null;
+        try{android.bluetooth.BluetoothManager bm=(android.bluetooth.BluetoothManager)getSystemService(BLUETOOTH_SERVICE);android.bluetooth.BluetoothAdapter a=bm==null?null:bm.getAdapter();if(a==null)return null;
+            String best=null;for(android.bluetooth.BluetoothDevice d:a.getBondedDevices()){android.bluetooth.BluetoothClass bc=d.getBluetoothClass();String n=d.getName()==null?"":d.getName();
+                boolean watch=(bc!=null&&(bc.getDeviceClass()==android.bluetooth.BluetoothClass.Device.WEARABLE_WRIST_WATCH||bc.getMajorDeviceClass()==android.bluetooth.BluetoothClass.Device.Major.WEARABLE))||n.matches("(?i).*(watch|band|fit|amazfit|garmin|forerunner|venu|fenix|versa|sense|charge|ticwatch|gt ?\\d|polar|coros|suunto|whoop).*");
+                if(!watch||n.toLowerCase(Locale.US).contains("bud"))continue;boolean on=false;try{on=(Boolean)d.getClass().getMethod("isConnected").invoke(d);}catch(Exception ignored){}
+                if(best==null||on)best=n+"|"+on;}
+            return best;}catch(Exception e){return null;}
+    }
+    private static final int BT_PERMISSION=121;
+    /** Profile, Home and Health data: which watch, how it's connected, when data last arrived, and what it shares. */
+    private void renderWatchConnection(boolean full){
+        LinearLayout c=card();JSONObject v=Vitals.all(this);JSONObject dev=WearBridge.device(this);btWatch=bluetoothWatch();
+        LinearLayout top=row();top.setGravity(Gravity.CENTER_VERTICAL);c.addView(top,lp(-1,-2));
+        TextView ic=tx("⌚",22,ink,false);ic.setGravity(Gravity.CENTER);ic.setBackground(shape(raised,14));top.addView(ic,lp(48,48));
+        LinearLayout l=col();LinearLayout.LayoutParams llp=new LinearLayout.LayoutParams(0,-2,1);llp.leftMargin=dp(14);top.addView(l,llp);
+        TextView name=tx(dev.optString("name","").isEmpty()?(btWatch!=null?btWatch.split("\\|")[0]:"Your watch"):dev.optString("name"),17,ink,true);l.addView(name);
+        TextView state=tx("Looking for your watch…",12,muted,true);l.addView(state);
+        String src=Pro.connectedSources(this);long sync=Pro.lastSync(this);
+        final boolean[] wearOs={false};
+        Runnable status=()->{long[] live=WearBridge.live(this);boolean bt=btWatch!=null&&btWatch.endsWith("|true");
+            if(wearOs[0]||live!=null){state.setText("●  Connected"+(live!=null?" · "+live[0]+" bpm, "+ago(live[1]):""));state.setTextColor(positive);}
+            else if(bt){state.setText("●  Connected over Bluetooth");state.setTextColor(positive);}
+            else if(!src.isEmpty()){state.setText("●  Sharing through Health Connect");state.setTextColor(positive);}
+            else if(btWatch!=null){state.setText("○  Paired, not connected now");state.setTextColor(warning);}
+            else{state.setText("○  No watch connected");state.setTextColor(muted);}};
+        status.run();liveStatus=status;
+        try{com.google.android.gms.wearable.Wearable.getNodeClient(this).getConnectedNodes().addOnSuccessListener(nodes->{if(!nodes.isEmpty()){wearOs[0]=true;if(dev.optString("name","").isEmpty()&&btWatch==null)name.setText(nodes.get(0).getDisplayName());status.run();}});}catch(Throwable ignored){}
+        TextView info=tx(src.isEmpty()?(getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false)?"No watch data in Health Connect yet":"Health Connect isn't connected: tap Health Connect to allow it"):"Health data from "+src+(sync>0?" · synced "+ago(System.currentTimeMillis()-sync):""),12,muted,false);info.setPadding(0,dp(12),0,0);c.addView(info);
+        if(dev.has("caps")){JSONArray caps=dev.optJSONArray("caps");StringBuilder b=new StringBuilder();for(int i=0;caps!=null&&i<caps.length();i++){if(b.length()>0)b.append(", ");b.append(caps.optString(i));}if(b.length()>0)c.addView(tx("Sensors on the watch: "+b,12,muted,false));}
+        // What it shares
+        int have=0;StringBuilder got=new StringBuilder();for(String[] m:BODY_METRICS){String[] x=bodyMetric(m[0],history());if(!"-2".equals(x[3])){have++;if(got.length()>0)got.append(" · ");got.append(m[1]);}}
+        TextView cap=tx(have+" of "+BODY_METRICS.length+" measures available"+(got.length()>0?": "+got:""),12,ink,false);cap.setLineSpacing(dp(2),1f);cap.setPadding(0,dp(8),0,0);c.addView(cap);
+        LinearLayout bs=row();LinearLayout.LayoutParams bsp=lp(-1,44);bsp.topMargin=dp(12);c.addView(bs,bsp);
+        Button sync1=button("Sync now",raised,ink);bs.addView(sync1,new LinearLayout.LayoutParams(0,-1,1));sync1.setOnClickListener(x->{toast("Syncing with your watch…");WearBridge.ping(this);refreshHealth(true);});
+        Button more=button(full?"Health Connect":"All health data",lime,accentOn);LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(0,-1,1);mp.leftMargin=dp(10);bs.addView(more,mp);
+        more.setOnClickListener(x->{if(full){try{startActivity(new Intent(this,HealthConnectActivity.class));}catch(Exception e){toast("Health Connect could not be opened");}}else navigate("Body");});
+        if(btWatch==null&&Build.VERSION.SDK_INT>=31&&checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED){TextView f=tx("Find a watch paired with this phone  ›",13,lime,true);f.setPadding(0,dp(12),0,0);c.addView(f);f.setOnClickListener(x->requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},BT_PERMISSION));}
+    }
+    private Runnable liveStatus;
+
+    /** Home and Health data: today's Recovery, Strain (or Movement load without a watch) and Sleep as rings, then your chosen measures. */
+    private void renderBodyToday(JSONArray hist){
+        boolean watch=watchData();LinearLayout c=card();
+        LinearLayout hd=row();c.addView(hd,lp(-1,-2));TextView t=tx("YOUR BODY TODAY",10,muted,true);t.setLetterSpacing(.08f);hd.addView(t,new LinearLayout.LayoutParams(0,-2,1));
+        if(!"Body".equals(page)){TextView all=tx("All data  ›",12,lime,true);all.setOnClickListener(x->navigate("Body"));hd.addView(all);}
+        LinearLayout rings=row();LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(12);c.addView(rings,rp);
+        String[] keys={"recovery",watch?"strain":"load","sleep"};int[] colors={positive,MetricViews.ZONE_COLORS[1],violet};
+        for(int i=0;i<3;i++){String[] m=bodyMetric(keys[i],hist);LinearLayout cell=col();cell.setGravity(Gravity.CENTER_HORIZONTAL);rings.addView(cell,new LinearLayout.LayoutParams(0,-2,1));
+            float f=0;try{f=keys[i].equals("sleep")?(float)(SleepTracker.night(this,todayKey()).asleep/480.0):keys[i].equals("recovery")?Float.parseFloat(m[0])/100f:Float.parseFloat(m[0])/21f;}catch(Exception ignored){}
+            int col=keys[i].equals("recovery")&&!"-2".equals(m[3])?toneColor(m[3]):colors[i];
+            cell.addView(new MetricViews.Ring(this,chartTheme(),Math.min(1,f),col,m[0]+("%".equals(m[1])?"%":""),""),lp(84,84));
+            TextView n=tx(bodyName(keys[i]),12,ink,true);n.setGravity(Gravity.CENTER);n.setPadding(0,dp(6),0,0);cell.addView(n);
+            TextView s=tx(m[2],10,"-2".equals(m[3])?muted:toneColor(m[3]),false);s.setGravity(Gravity.CENTER);s.setMaxLines(2);cell.addView(s);
+            final String k=keys[i];cell.setOnClickListener(x->navigate("Body"));cell.setContentDescription(bodyName(k)+" "+m[0]+" "+m[1]);}
+        // Chosen measures
+        // The rings already show Recovery, Strain or Movement load, and Sleep; tiles never repeat them.
+        java.util.List<String> pins=pinned();pins.removeAll(java.util.Arrays.asList(keys));LinearLayout grid=null;
+        for(int i=0;i<pins.size();i++){if(i%2==0){grid=row();LinearLayout.LayoutParams gp=lp(-1,-2);gp.topMargin=dp(10);c.addView(grid,gp);}
+            String[] m=bodyMetric(pins.get(i),hist);LinearLayout tile=col();tile.setPadding(dp(12),dp(10),dp(12),dp(10));tile.setBackground(shape(raised,14));LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,-2,1);if(i%2==1)tp.leftMargin=dp(10);grid.addView(tile,tp);
+            tile.addView(tx(bodyName(pins.get(i)),11,muted,true));TextView val=valueUnit(m[0],m[1],20,"-2".equals(m[3])?muted:ink);tile.addView(val);TextView note=tx(m[2],10,"-2".equals(m[3])?muted:toneColor(m[3]),false);note.setMaxLines(2);tile.addView(note);
+            if("live".equals(pins.get(i)))liveValue=val;tile.setOnClickListener(x->navigate("Body"));}
+        if(pins.size()%2==1&&grid!=null)grid.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
+        TextView choose=tx("Choose what shows here  ›",12,lime,true);choose.setPadding(0,dp(12),0,0);c.addView(choose);choose.setOnClickListener(x->choosePinned());
+    }
+    private TextView liveValue;
+    private void choosePinned(){
+        String[] names=new String[BODY_METRICS.length];boolean[] on=new boolean[names.length];java.util.List<String> cur=pinned();
+        for(int i=0;i<names.length;i++){names[i]=BODY_METRICS[i][1];on[i]=cur.contains(BODY_METRICS[i][0]);}
+        dialog().setTitle("Show on Home (up to 6, besides the rings)").setMultiChoiceItems(names,on,(d,w,checked)->on[w]=checked).setPositiveButton("Save",(d,w)->{StringBuilder b=new StringBuilder();int n=0;for(int i=0;i<on.length;i++)if(on[i]&&n<6){if(b.length()>0)b.append(',');b.append(BODY_METRICS[i][0]);n++;}
+            getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("pinnedBody",b.toString()).apply();renderPageNow();}).setNegativeButton("Cancel",null).show();
+    }
+
+    // ---- The Health data page ----
+    private void renderBody(){
+        JSONArray h=history();brand("YOUR BODY","Health data","Everything your watch and phone measure, in one place. Measured values come first; estimates say so.");
+        renderWatchConnection(true);renderBodyToday(h);renderRecoveryCard();renderStrainCard(h);renderSleepCard();renderHeartCard();renderStressCard();
+        // Breathing, oxygen and temperature only come from a watch: the card appears once any of them does.
+        boolean any=false;for(String k:new String[]{"resp","spo2","skin","btemp"})if(!"-2".equals(bodyMetric(k,h)[3]))any=true;if(any)renderOxygenCard();
+        renderBloodPressureCard();renderVo2Card(h);renderEcgCard();renderCatalogCard(h);
+    }
+    private void renderRecoveryCard(){
+        Pro.Recovery r=Pro.recovery(this);
+        LinearLayout c=metricCard("RECOVERY","","How ready your body is today, 0–100 %. It compares last night's HRV (45 %), resting heart rate (25 %), sleep against an 8-hour need (25 %) and breathing rate (5 %) with your own normal over the last 30 days. HRV or resting heart rate one standard deviation better than your normal adds 25 points to that part; missing parts are left out and the rest re-weighted.\n\nGreen (67–100 %): ready for a hard day. Yellow (34–66 %): normal training. Red (0–33 %): take it easy; the coach eases your challenges.\n\nHRV and resting heart rate come from your watch, or from a morning pulse check with the camera when no watch measures them.");
+        if(r.score<0){c.addView(tx(r.need.equals("hr")?"Recovery needs HRV or a resting heart rate. Wear a watch to bed, or do a pulse check with the camera after waking, before getting up.":r.need.equals("history")?"Kadamm is learning your normal: Recovery appears after 5 days of HRV or resting heart rate.":"Recovery also needs last night's sleep (from a watch, the phone, or added by you).",13,ink,false));pulseButton(c);return;}
+        LinearLayout row=row();row.setGravity(Gravity.CENTER_VERTICAL);c.addView(row,lp(-1,-2));
+        int col=r.score>=67?positive:r.score>=34?MetricViews.ZONE_COLORS[3]:critical;row.addView(new MetricViews.Ring(this,chartTheme(),r.score/100f,col,r.score+"%",r.zone()),lp(96,96));
+        LinearLayout l=col();LinearLayout.LayoutParams llp=new LinearLayout.LayoutParams(0,-2,1);llp.leftMargin=dp(16);row.addView(l,llp);
+        l.addView(tx(r.score>=67?"Ready to push":r.score>=34?"Ready for a normal day":"Take it easy today",18,ink,true));
+        l.addView(tx(r.score>=67?"Your body has recovered well. A good day for a long or brisk walk.":r.score>=34?"Keep to your usual training.":"Your body is still recovering. Walk gently and sleep early.",12,muted,false));
+        for(String[] p:r.parts){LinearLayout pr=row();pr.setPadding(0,dp(10),0,0);c.addView(pr,lp(-1,-2));pr.addView(tx(p[0],13,ink,true),new LinearLayout.LayoutParams(0,-2,1));pr.addView(tx(p[1]+"  ·  "+p[2],12,muted,false));TextView sc=tx(p[3],13,Integer.parseInt(p[3])>=60?positive:Integer.parseInt(p[3])>=40?ink:warning,true);sc.setGravity(Gravity.END);pr.addView(sc,lp(40,-2));}
+    }
+    private void renderStrainCard(JSONArray h){
+        Pro.Strain s=Pro.strain(this,todayKey());
+        if(s.strain>=0||!s.need.equals("hr")){
+            LinearLayout c=metricCard("STRAIN","today","How hard your heart worked today, 0–21, from your watch's heart rate (WHOOP-style). Every minute above 20 % of your heart-rate reserve adds training impulse (Banister's TRIMP: reserve × 0.64e^(1.92 × reserve); 0.86e^(1.67 × reserve) for women). Strain = 21 × (1 − e^(−TRIMP/120)), so each point is harder to earn: a quiet day is 4–7, an hour of brisk walking about 10, a hard run 14+.\n\nHeart-rate zones use your reserve: zone 1 is 50–60 %, up to zone 5 at 90 %+.");
+            if(s.strain<0){c.addView(tx(s.need.equals("age")?"Add your age in Profile so Kadamm knows your maximum heart rate.":"Strain needs a resting heart rate from your watch or a pulse check.",13,ink,false));}
+            else{LinearLayout row=row();row.setGravity(Gravity.CENTER_VERTICAL);c.addView(row,lp(-1,-2));row.addView(new MetricViews.Ring(this,chartTheme(),(float)(s.strain/21),MetricViews.ZONE_COLORS[1],String.format(Locale.US,"%.1f",s.strain),"of 21"),lp(92,92));
+                LinearLayout l=col();LinearLayout.LayoutParams llp=new LinearLayout.LayoutParams(0,-2,1);llp.leftMargin=dp(16);row.addView(l,llp);
+                l.addView(tx(s.strain>=18?"All out":s.strain>=14?"Strenuous":s.strain>=10?"Moderate":"Light",18,ink,true));l.addView(tx(String.format(Locale.US,"%,d minutes of heart rate · resting %d, max %d bpm",s.minutes,s.rest,s.max),12,muted,false));
+                String[][] z=new String[5][];for(int i=0;i<5;i++)z[i]=new String[]{"Zone "+(i+1),String.valueOf(s.zoneMin[i]),"min"};statGrid(c,z,12);}
+        }
+        Pro.Load l=Pro.load(this,h,todayKey());
+        LinearLayout c=metricCard("MOVEMENT LOAD","today · phone","How much you moved today, 0–21, from steps alone, for days without a watch (it never uses heart rate, so it's a separate measure from Strain). Per minute: 0.2 points for slow steps (20–59 a minute), 0.6 for walking (60–99), 1.5 for brisk walking (100–129), 2.5 for running pace (130+), from Health Connect's minute-by-minute steps. Without those, your sessions' effort points (the same scale) plus 0.3 for every 100 everyday steps. Load = 21 × (1 − e^(−points/110)): a quiet day is 2–5, 10,000 steps with a brisk walk about 11, a 20,000-step day 16+.");
+        if(l.load<0){c.addView(tx("No steps yet today.",13,muted,false));return;}
+        LinearLayout row=row();c.addView(row,lp(-1,-2));row.addView(valueUnit(String.format(Locale.US,"%.1f",l.load),"of 21",30,ink),new LinearLayout.LayoutParams(0,-2,1));row.addView(tx(l.load>=14?"Heavy day":l.load>=8?"Active day":"Light day",14,ink,true));
+        c.addView(tx(String.format(Locale.US,"%.0f points from %s",l.points,l.basis),12,muted,false));
+        double[] wk=new double[7];String[] lab=new String[7];Calendar d=Calendar.getInstance();d.add(Calendar.DAY_OF_YEAR,-6);String[] dn={"S","M","T","W","T","F","S"};
+        for(int i=0;i<7;i++){Pro.Load x=Pro.load(this,h,DaySteps.key(d.getTimeInMillis()));wk[i]=Math.max(0,x.load)/21*100;lab[i]=dn[d.get(Calendar.DAY_OF_WEEK)-1];d.add(Calendar.DAY_OF_YEAR,1);}
+        LinearLayout.LayoutParams bp=lp(-1,100);bp.topMargin=dp(10);c.addView(new MetricViews.WeekBars(this,chartTheme(),wk,lab,6,MetricViews.ZONE_COLORS[2]),bp);
+    }
+    private void renderSleepCard(){
+        SleepTracker.Night n=SleepTracker.night(this,todayKey());
+        LinearLayout c=metricCard("SLEEP","last night","Sleep comes from the best source for each night: what you add yourself; a watch or app through Health Connect (with light, deep and REM sleep when the watch measures stages); Google's Sleep API on this phone; or the longest overnight stretch your screen stayed off (needs Usage access). Phone sources give duration and timing only and are marked as estimates.\n\nAdults need 7–9 hours. In a typical night about 50–60 % is light sleep, 13–23 % deep and 20–25 % REM.\n\nSleep consistency compares your bedtimes and wake times over the last 14 nights: 100 % is the same time every night; a 30-minute spread scores 75 %.");
+        if(n==null){c.addView(tx("No sleep recorded for last night.",13,ink,false));}
+        else{LinearLayout row=row();c.addView(row,lp(-1,-2));row.addView(valueUnit(Pro.hm(n.asleep),"asleep",28,ink),new LinearLayout.LayoutParams(0,-2,1));TextView src=tx(n.source+(n.estimate?" · estimate":""),11,n.estimate?warning:muted,true);src.setGravity(Gravity.END);row.addView(src);
+            c.addView(tx(SleepTracker.clock(n.bedMin())+" → "+SleepTracker.clock(n.wakeMin())+(n.inBed>n.asleep?" · "+Pro.hm(n.inBed)+" in bed":""),12,muted,false));
+            if(n.staged&&n.stages!=null){LinearLayout.LayoutParams hp=lp(-1,130);hp.topMargin=dp(10);c.addView(new MetricViews.Hypno(this,chartTheme(),n.stages,n.inBed,n.start),hp);
+                int tot=Math.max(1,n.light+n.deep+n.rem);statGrid(c,new String[][]{{"Deep",Pro.hm(n.deep),Math.round(n.deep*100.0/tot)+"%"},{"REM",Pro.hm(n.rem),Math.round(n.rem*100.0/tot)+"%"},{"Light",Pro.hm(n.light),Math.round(n.light*100.0/tot)+"%"},{"Awake",n.awake+"","min"}},10);}
+            else if(!n.estimate&&"health".equals(n.kind))c.addView(tx("Your watch's app shared this night without stages.",11,muted,false));}
+        // Last 7 nights
+        java.util.List<SleepTracker.Night> ns=SleepTracker.nights(this,7);
+        if(ns.size()>=2){double[] v=new double[7];String[] lab=new String[7];Calendar d=Calendar.getInstance();d.add(Calendar.DAY_OF_YEAR,-6);String[] dn={"S","M","T","W","T","F","S"};
+            for(int i=0;i<7;i++){String k=DaySteps.key(d.getTimeInMillis());lab[i]=dn[d.get(Calendar.DAY_OF_WEEK)-1];for(SleepTracker.Night x:ns)if(x.day.equals(k))v[i]=Math.min(100,x.asleep/600.0*100);d.add(Calendar.DAY_OF_YEAR,1);}
+            TextView t=tx("LAST 7 NIGHTS",10,muted,true);t.setLetterSpacing(.08f);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(14);c.addView(t,tp);
+            LinearLayout.LayoutParams bp=lp(-1,100);bp.topMargin=dp(6);c.addView(new MetricViews.WeekBars(this,chartTheme(),v,lab,6,violet),bp);
+            double avg=0;for(SleepTracker.Night x:ns)avg+=x.asleep;avg/=ns.size();c.addView(tx("Average "+Pro.hm(Math.round(avg))+" over "+ns.size()+" nights · bars up to 10 h",11,muted,false));}
+        SleepTracker.Consistency cs=SleepTracker.consistency(this);
+        TextView ct=tx(cs.score>=0?String.format(Locale.US,"Sleep consistency %d %% · usually %s → %s (bedtime ±%.0f min, wake ±%.0f min)",cs.score,SleepTracker.clock(cs.avgBed),SleepTracker.clock(cs.avgWake),cs.sdBed,cs.sdWake):"Sleep consistency needs 5 nights ("+cs.nights+" so far).",13,cs.score>=75?positive:cs.score>=0?ink:muted,cs.score>=0);ct.setPadding(0,dp(12),0,0);c.addView(ct);
+        LinearLayout bs=row();LinearLayout.LayoutParams bsp=lp(-1,44);bsp.topMargin=dp(12);c.addView(bs,bsp);
+        Button add=button(n!=null&&"manual".equals(n.kind)?"Edit last night":"Add last night",raised,ink);bs.addView(add,new LinearLayout.LayoutParams(0,-1,1));add.setOnClickListener(x->addSleep());
+        if(!SleepTracker.usageAccess(this)&&(n==null||n.estimate)){Button ua=button("Estimate from phone",raised,ink);LinearLayout.LayoutParams up=new LinearLayout.LayoutParams(0,-1,1);up.leftMargin=dp(10);bs.addView(ua,up);
+            ua.setOnClickListener(x->dialog().setTitle("Estimate sleep from your phone").setMessage("Kadamm can estimate sleep from the longest stretch your screen stays off overnight. Android calls this Usage access: on the next screen, find Kadamm and turn it on. Kadamm only reads when the screen turned on and off, never which apps you used.").setNegativeButton("Not now",null).setPositiveButton("Open setting",(d,w)->{try{startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));}catch(Exception e){toast("Couldn't open the setting");}}).show());}
+    }
+    private void addSleep(){
+        Calendar bed=Calendar.getInstance();bed.add(Calendar.DAY_OF_YEAR,-1);bed.set(Calendar.HOUR_OF_DAY,23);bed.set(Calendar.MINUTE,0);Calendar wake=Calendar.getInstance();wake.set(Calendar.HOUR_OF_DAY,7);wake.set(Calendar.MINUTE,0);
+        new android.app.TimePickerDialog(this,(v1,h1,m1)->{bed.set(Calendar.HOUR_OF_DAY,h1);bed.set(Calendar.MINUTE,m1);if(h1<15){bed.add(Calendar.DAY_OF_YEAR,1);}
+            new android.app.TimePickerDialog(this,(v2,h2,m2)->{wake.set(Calendar.HOUR_OF_DAY,h2);wake.set(Calendar.MINUTE,m2);long s=bed.getTimeInMillis(),e=wake.getTimeInMillis();
+                if(e<=s||e-s>16*3600000L||e>System.currentTimeMillis()+60000L){toast("Wake time must be after bedtime, within 16 hours, and not in the future");return;}
+                SleepTracker.addManual(this,todayKey(),s,e);WatchHealth.writeSleep(this,s,e,msg->toast(msg==null?"Saved, and shared to Health Connect":msg));renderPageNow();},7,0,false){{setTitle("When did you wake up?");}}.show();
+        },23,0,false){{setTitle("When did you fall asleep?");}}.show();
+    }
+    private void renderHeartCard(){
+        JSONObject v=Vitals.all(this);
+        LinearLayout c=metricCard("HEART","","Heart rate now: the latest reading from Kadamm on your watch (every few seconds while it's open) or from Health Connect.\n\nResting heart rate: your watch's own figure; without it, the lowest 30-minute average of your heart rate that day; or a morning pulse check. Lower is usually fitter; a rise of 5+ bpm over your normal can mean illness, stress or too little recovery.\n\nHRV (heart rate variability, RMSSD): how much the time between beats varies, in milliseconds. Higher than your own normal means your nervous system is relaxed and recovered. Compare it only with yourself.\n\nThe pulse check uses the camera and flash on your fingertip for 60 seconds. It's accurate at rest for heart rate and a spot HRV, not for all-day tracking.");
+        String[] live=bodyMetric("live",history()),rhr=bodyMetric("rhr",history()),hrv=bodyMetric("hrv",history());
+        statGrid(c,new String[][]{{"Now",live[0],live[1]},{"Resting",rhr[0],rhr[1]},{"HRV",hrv[0],hrv[1]}},6);
+        TextView srcs=tx("Now: "+live[2]+"\nResting: "+rhr[2]+"\nHRV: "+hrv[2],11,muted,false);srcs.setLineSpacing(dp(2),1f);srcs.setPadding(0,dp(8),0,0);c.addView(srcs);
+        JSONArray ht=v.optJSONArray("hrToday");if(ht!=null&&todayKey().equals(v.optString("hrTodayDay"))){java.util.List<double[]> pts=new java.util.ArrayList<>();for(int i=0;i<ht.length();i++)if(ht.optInt(i)>0)pts.add(new double[]{i,ht.optInt(i),0});
+            if(pts.size()>=10){TextView t=tx("TODAY",10,muted,true);t.setLetterSpacing(.08f);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(14);c.addView(t,tp);LinearLayout.LayoutParams sp=lp(-1,140);sp.topMargin=dp(4);c.addView(new MetricViews.Series(this,chartTheme(),pts,false,critical,null,0,x->String.valueOf(Math.round(x)),x->SleepTracker.clock((int)Math.round(x))),sp);}}
+        java.util.TreeMap<String,Double> rs=Pro.restSeries(this,v);if(rs.size()>=3)trendChart(c,"RESTING HEART RATE, 30 DAYS",rs,MetricViews.ZONE_COLORS[4],"bpm");
+        java.util.TreeMap<String,Double> hs=Pro.hrvSeries(this,v);if(hs.size()>=3)trendChart(c,"HRV, 30 DAYS",hs,MetricViews.ZONE_COLORS[2],"ms");
+        pulseButton(c);
+    }
+    private void trendChart(LinearLayout c,String title,java.util.TreeMap<String,Double> s,int color,String unit){
+        TextView t=tx(title,10,muted,true);t.setLetterSpacing(.08f);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(14);c.addView(t,tp);
+        java.util.List<double[]> pts=new java.util.ArrayList<>();double d0=Trends.dayNum(s.firstKey());java.util.List<Double> vals=new java.util.ArrayList<>();for(java.util.Map.Entry<String,Double> e:s.entrySet()){pts.add(new double[]{Trends.dayNum(e.getKey())-d0,e.getValue(),0});vals.add(e.getValue());}
+        LinearLayout.LayoutParams sp=lp(-1,120);sp.topMargin=dp(4);c.addView(new MetricViews.Series(this,chartTheme(),pts,true,color,null,Vitals.median(vals),x->String.valueOf(Math.round(x)),x->""),sp);
+        c.addView(tx(String.format(Locale.US,"Median %.0f %s · latest %.0f on %s",Vitals.median(vals),unit,s.lastEntry().getValue(),prettyDay(s.lastKey())),11,muted,false));
+    }
+    private void pulseButton(LinearLayout c){Button b=button("♥  Pulse check with the camera",raised,ink);LinearLayout.LayoutParams bp=lp(-1,46);bp.topMargin=dp(12);c.addView(b,bp);b.setOnClickListener(x->startActivity(new Intent(this,PulseActivity.class)));
+        JSONArray sp=Pro.spots(this);if(sp.length()>0){JSONObject o=sp.optJSONObject(sp.length()-1);TextView t=tx(String.format(Locale.US,"Last check %s: %d bpm%s",ago(System.currentTimeMillis()-o.optLong("at")),o.optInt("hr"),o.optDouble("rmssd",-1)>0?String.format(Locale.US," · HRV %.0f ms",o.optDouble("rmssd")):""),11,muted,false);t.setPadding(0,dp(6),0,0);c.addView(t);}}
+    private void renderStressCard(){
+        JSONObject s=Pro.stress(this,todayKey());JSONObject v=Vitals.all(this);if(s==null&&Pro.count(v,"hr")==0)return;
+        LinearLayout c=metricCard("STRESS","today","Stress from your heart rate while you're still, 0–100: for minutes between 7 am and 11 pm when you weren't moving (heart rate under 40 % of your reserve, and not in the 5 minutes after activity), how far heart rate sits above resting, as a share of your heart-rate reserve; 25 % of reserve counts as 100. Rest 0–25, low 26–50, medium 51–75, high 76–100.\n\nWatches that measure HRV all day (Garmin, Samsung's own app) score stress differently; Kadamm uses only what's shared with it.");
+        if(s==null){c.addView(tx("Needs an hour of heart rate while you're still today, and your age for your maximum heart rate.",13,muted,false));return;}
+        int sc=s.optInt("score");LinearLayout row=row();c.addView(row,lp(-1,-2));row.addView(valueUnit(sc+"","of 100",30,ink),new LinearLayout.LayoutParams(0,-2,1));row.addView(tx(Pro.stressLevel(sc),16,sc<=50?positive:sc<=75?MetricViews.ZONE_COLORS[3]:critical,true));
+        statGrid(c,new String[][]{{"Rest",s.optInt("rest")+"","min"},{"Low",s.optInt("low")+"","min"},{"Medium",s.optInt("med")+"","min"},{"High",s.optInt("high")+"","min"}},10);
+    }
+    private void renderOxygenCard(){
+        String[] r=bodyMetric("resp",history()),o=bodyMetric("spo2",history()),sk=bodyMetric("skin",history()),bt=bodyMetric("btemp",history());
+        LinearLayout c=metricCard("BREATHING, OXYGEN AND TEMPERATURE","","Breathing rate: breaths a minute during sleep (12–20 is typical); a rise of 1+ over your normal often comes before illness.\n\nBlood oxygen (SpO₂): 95–100 % is normal; repeated lows under 90 % at night are worth discussing with a doctor.\n\nSkin temperature: the change from your own baseline overnight, in °C; body temperature: a thermometer reading. Readings are shown only when a watch or app shares them through Health Connect.");
+        statGrid(c,new String[][]{{"Breathing",r[0],r[1]},{"Blood oxygen",o[0],o[1]},{"Skin temp",sk[0],sk[1]},{"Body temp",bt[0],bt[1]}},6);
+        TextView t=tx("Breathing: "+r[2]+"\nBlood oxygen: "+o[2]+"\nSkin temperature: "+sk[2]+"\nBody temperature: "+bt[2],11,muted,false);t.setLineSpacing(dp(2),1f);t.setPadding(0,dp(8),0,0);c.addView(t);
+    }
+    private void renderBloodPressureCard(){
+        String[] b=bodyMetric("bp",history());
+        LinearLayout c=metricCard("BLOOD PRESSURE","","From a cuff or watch that shares through Health Connect (Samsung's watch measures it after calibration with a cuff), or readings you add. Categories follow the American Heart Association (2017): normal under 120/80, elevated 120–129, high stage 1 130–139 or 80–89, stage 2 140+/90+. One reading isn't a diagnosis.");
+        LinearLayout row=row();c.addView(row,lp(-1,-2));row.addView(valueUnit(b[0],b[1],28,"-2".equals(b[3])?muted:ink),new LinearLayout.LayoutParams(0,-2,1));TextView cat=tx(b[2],12,toneColor(b[3]),true);cat.setGravity(Gravity.END);row.addView(cat);
+        Button add=button("Add a reading",raised,ink);LinearLayout.LayoutParams ap=lp(-1,44);ap.topMargin=dp(12);c.addView(add,ap);add.setOnClickListener(x->addBloodPressure());
+    }
+    private void addBloodPressure(){
+        LinearLayout box=col();box.setPadding(dp(20),dp(8),dp(20),0);android.widget.EditText s=new android.widget.EditText(this),d=new android.widget.EditText(this);s.setHint("Systolic (top), e.g. 120");d.setHint("Diastolic (bottom), e.g. 80");
+        for(android.widget.EditText e:new android.widget.EditText[]{s,d}){e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);e.setSingleLine(true);box.addView(e);}
+        dialog().setTitle("Blood pressure (mmHg)").setView(box).setPositiveButton("Save",(x,w)->{try{double sy=Double.parseDouble(s.getText().toString()),di=Double.parseDouble(d.getText().toString());if(sy<60||sy>250||di<30||di>150||di>=sy){toast("Check the numbers: top 60–250, bottom 30–150");return;}
+            SharedPreferences hp=getSharedPreferences("kadamm_health",MODE_PRIVATE);JSONObject m=new JSONObject(hp.getString("bpManual","{}"));m.put(todayKey(),new JSONArray().put(sy).put(di));hp.edit().putString("bpManual",m.toString()).apply();
+            WatchHealth.writeBloodPressure(this,sy,di,msg->toast(msg==null?"Saved, and shared to Health Connect":msg));renderPageNow();}catch(Exception e){toast("Enter both numbers");}}).setNegativeButton("Cancel",null).show();
+    }
+    private void renderVo2Card(JSONArray h){
+        Pro.Vo2 o=Pro.vo2(this,h);Pro.Cooper best=Pro.cooper(this,h,120,false);
+        LinearLayout c=metricCard("VO₂MAX","","The most oxygen your body can use, in ml per kg per minute: the best single measure of fitness. Kadamm shows one VO₂max everywhere (here, fitness age, reports), from the best evidence it has:\n\n1. Measured by your watch (last 90 days).\n2. Cooper test: run as far as you can in 12 minutes; VO₂max = (metres − 504.9) ÷ 44.73 (Cooper 1968).\n3. From your heart rate: 15.3 × maximum ÷ resting heart rate (Uth–Sørensen 2004).\n4. From walks with heart rate (ACSM walking cost and heart-rate reserve).\n\nThe test needs a real all-out 12 minutes; a walk understates it.");
+        LinearLayout row=row();c.addView(row,lp(-1,-2));row.addView(valueUnit(o.value>0?String.format(Locale.US,"%.1f",o.value):"—","ml/kg/min",28,o.value>0?ink:muted),new LinearLayout.LayoutParams(0,-2,1));
+        c.addView(tx(o.value>0?o.method+(o.detail.isEmpty()?"":" · "+o.detail):"Needs a watch that measures it, a Cooper test, or your age with a resting heart rate.",12,muted,false));
+        if(best!=null&&!best.run)c.addView(tx(String.format(Locale.US,"Your fastest 12 minutes on foot: %,d m (%s, a walk). Walking isn't all-out, so it isn't used.",Math.round(best.metres),prettyDay(best.day)),11,muted,false));
+        Button t=button("Start the 12-minute test",raised,ink);LinearLayout.LayoutParams tp=lp(-1,44);tp.topMargin=dp(12);c.addView(t,tp);
+        t.setOnClickListener(x->dialog().setTitle("Cooper 12-minute test").setMessage("Warm up first. Then run (or walk as fast as you can) for 12 minutes on a flat route with a clear GPS signal. Kadamm records it as a run and stops by itself at 12:00, then works out your VO₂max from the distance.\n\nStop if you feel unwell. It's a maximal test: skip it if you have a heart condition, without your doctor's OK.").setNegativeButton("Cancel",null)
+            .setPositiveButton("Start",(d,w)->{prefs.edit().putBoolean("cooperTest",true).putString("activityMode","outdoor").apply();activityType="Run";beginRecord();}).show());
+    }
+    private void renderEcgCard(){
+        LinearLayout c=metricCard("ECG","","An ECG (electrocardiogram) records your heart's electrical rhythm for 30 seconds to check for atrial fibrillation. Watches with an ECG sensor (Galaxy Watch, Pixel Watch, Fitbit Sense, Apple Watch) keep these recordings inside their own medical apps, because they are regulated medical devices; Health Connect has no ECG data type, so no other app, Kadamm included, can read them.");
+        c.addView(tx("Not available to Kadamm: ECG recordings stay in your watch's own app (Samsung Health Monitor, Fitbit or Pixel Watch). Kadamm doesn't estimate them.",13,ink,false));
+        if(pkgInstalled("com.samsung.android.shealthmonitor")){Button b=button("Open Samsung Health Monitor",raised,ink);LinearLayout.LayoutParams bp=lp(-1,44);bp.topMargin=dp(12);c.addView(b,bp);b.setOnClickListener(x->{Intent i=getPackageManager().getLaunchIntentForPackage("com.samsung.android.shealthmonitor");if(i!=null)startActivity(i);});}
+    }
+    private boolean pkgInstalled(String p){try{getPackageManager().getPackageInfo(p,0);return true;}catch(Exception e){return false;}}
+    /** What Kadamm reads and from where, with how to turn on what's missing. */
+    private void renderCatalogCard(JSONArray h){
+        JSONObject v=Vitals.all(this);boolean hc=getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false)||v.optJSONArray("granted")!=null&&v.optJSONArray("granted").length()>0;
+        LinearLayout c=metricCard("WHAT KADAMM CAPTURES","","Each measure, where today's value comes from, and how many readings Health Connect shared in the last 30 days. A measure is missing when your watch's app doesn't share it into Health Connect, or when Kadamm isn't allowed to read it: open Health Connect › App permissions › Kadamm, and in your watch's app (for Samsung: Samsung Health › Settings › Health Connect) allow sharing.");
+        if(!hc){LinearLayout b=col();b.setPadding(dp(14),dp(12),dp(14),dp(12));b.setBackground(shape(blend(panel,lime,darkTheme?.16f:.08f),14));LinearLayout.LayoutParams bp=lp(-1,-2);bp.topMargin=dp(10);c.addView(b,bp);
+            b.addView(tx("Connect Health Connect",14,ink,true));b.addView(tx("Your watch's sleep, heart rate, HRV, blood oxygen and more reach Kadamm through Health Connect. Until then, Kadamm uses the phone alone.",12,muted,false));}
+        String[][] hk={{"sleep","sleep"},{"rhr","rhr"},{"hrv","hrv"},{"resp","resp"},{"spo2","spo2"},{"skin","skin"},{"btemp","btemp"},{"bp","bp"},{"vo2","vo2"},{"weight","weight"},{"strain","hr"},{"stress","hr"}};
+        for(int pass=0;pass<2;pass++){boolean header=false;
+            for(String[] m:BODY_METRICS){String[] x=bodyMetric(m[0],h);boolean ok=!"-2".equals(x[3]);if(ok!=(pass==0))continue;
+                if(!header){TextView t=tx(pass==0?"AVAILABLE NOW":"NOT AVAILABLE YET",10,muted,true);t.setLetterSpacing(.08f);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(pass==0?14:18);c.addView(t,tp);header=true;}
+                String key=null;for(String[] p:hk)if(p[0].equals(m[0]))key=p[1];
+                LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);r.setPadding(0,dp(8),0,dp(8));c.addView(r,lp(-1,-2));
+                TextView mark=tx(ok?"✓":"",11,Color.WHITE,true);mark.setGravity(Gravity.CENTER);GradientDrawable dot=new GradientDrawable();dot.setShape(GradientDrawable.OVAL);if(ok)dot.setColor(positive);else{dot.setColor(Color.TRANSPARENT);dot.setStroke(dp(1.5f),line);}mark.setBackground(dot);r.addView(mark,lp(20,20));
+                LinearLayout l=col();LinearLayout.LayoutParams llp=new LinearLayout.LayoutParams(0,-2,1);llp.leftMargin=dp(12);r.addView(l,llp);l.addView(tx(m[1],14,ok?ink:muted,true));
+                String note=x[2];if(key!=null&&hc){int n=Pro.count(v,key);if(n>0)note+=String.format(Locale.US," · %,d readings",n);else if(!Pro.granted(v,key)&&!ok)note=java.util.Arrays.asList("resp","spo2","skin","btemp","stress","strain").contains(m[0])?"Allow it in Health Connect":x[2]+" · or allow it in Health Connect";}
+                TextView nt=tx(note,11,muted,false);nt.setMaxLines(2);l.addView(nt);
+                if(ok){TextView val=valueUnit(m[0].equals("recovery")?x[0]+"%":x[0],m[0].equals("recovery")?"":x[1],14,ink);val.setGravity(Gravity.END);r.addView(val);}}}
+        Button perms=button(hc?"Health Connect permissions":"Connect Health Connect",hc?raised:lime,hc?ink:accentOn);LinearLayout.LayoutParams pp=lp(-1,44);pp.topMargin=dp(12);c.addView(perms,pp);perms.setOnClickListener(x->{try{startActivity(new Intent(this,HealthConnectActivity.class));}catch(Exception e){toast("Health Connect could not be opened");}});
+        Button w=button("Add weight",raised,ink);LinearLayout.LayoutParams wp=lp(-1,44);wp.topMargin=dp(8);c.addView(w,wp);w.setOnClickListener(x->{android.widget.EditText in=new android.widget.EditText(this);in.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);in.setHint("kg");FrameLayout box=new FrameLayout(this);box.setPadding(dp(20),dp(8),dp(20),0);box.addView(in);
+            dialog().setTitle("Today's weight (kg)").setView(box).setPositiveButton("Save",(d,k)->{try{double kg=Double.parseDouble(in.getText().toString().replace(',','.'));if(kg<25||kg>300){toast("Enter a weight between 25 and 300 kg");return;}Trends.logWeight(this,kg);WatchHealth.writeWeight(this,kg,msg->toast(msg==null?"Saved, and shared to Health Connect":msg));renderPageNow();}catch(Exception e){toast("Enter a number, like 72.5");}}).setNegativeButton("Cancel",null).show();});
+    }
+    /** While Home, Profile or Health data is open: live heart rate every 2 s, Health Connect every minute. */
+    private final Runnable bodyTick=new Runnable(){public void run(){
+        if(!resumed)return;boolean on="Today".equals(page)||"Body".equals(page)||"Profile".equals(page);
+        if(on){if(liveStatus!=null)liveStatus.run();if(liveValue!=null){long[] l=WearBridge.live(MainActivity.this);if(l!=null)liveValue.setText(l[0]+" bpm");}
+            if(android.os.SystemClock.elapsedRealtime()-lastHealthRefresh>60000){WearBridge.ping(MainActivity.this);refreshHealth(true);}}
+        handler.postDelayed(this,2000);}};
     private void renderTrainer(){
         JSONArray h=history();brand("KADAMM TRAINER","Your training","A plan built from your own walks, steps and pace.");
         if(!SessionMetrics.ready()){LinearLayout w=card();w.addView(tx("Analysing your sessions…",13,muted,false));handler.postDelayed(()->{if("Trainer".equals(page))renderPageNow();},800);return;}
@@ -978,7 +1259,7 @@ public class MainActivity extends Activity {
             r.addView(tx(d.done?"✓":d.today?"today":d.past?"missed":"○",12,d.done?positive:d.today?teal:d.past?warning:muted,true));
         }
         // Forecast
-        if(st.history!=null&&st.history.length>=2){LinearLayout fc=metricCard("FORECAST","4 weeks","Fitness (the 42-day average of your daily effort, as in Reports) for the last four weeks, then run forward four weeks: teal if you follow this plan, coral if you stop.");
+        if(st.history!=null&&st.history.length>=2){LinearLayout fc=metricCard("FITNESS FORECAST","4 weeks","Fitness (the 42-day average of your daily effort, as in Reports) for the last four weeks, then run forward four weeks: teal if you follow this plan, coral if you stop.");
             double pEnd=st.plan[st.plan.length-1],sEnd=st.stop[st.stop.length-1];
             fc.addView(tx(String.format(Locale.US,"Fitness %.0f → %.0f with the plan, %.0f if you stop",st.fitness,pEnd,sEnd),13,ink,true));
             LinearLayout.LayoutParams fp=lp(-1,150);fp.topMargin=dp(8);fc.addView(new MetricViews.Forecast(this,th,st.history,st.plan,st.stop),fp);
@@ -1036,10 +1317,10 @@ public class MainActivity extends Activity {
     }
     private void showUpdate(AppUpdate.Release r){
         String notes=AppUpdate.notesPreview(r);
-        dialog().setTitle("Kadamm "+r.version+" is available").setMessage("You have "+AppUpdate.current(this)+". Updating keeps all your sessions, steps and settings."+(notes.isEmpty()?"":"\n\nWhat's new\n"+notes)).setNegativeButton("Later",null).setPositiveButton("Update now",(d,w)->startUpdate(r)).show();
+        dialog().setTitle("Kadamm "+r.version+" is available").setMessage("You have "+AppUpdate.current(this)+". Updating keeps all your sessions, steps and settings."+(notes.isEmpty()?"":"\n\nWhat's new\n"+notes)).setNegativeButton("Later",null).setPositiveButton("Update",(d,w)->startUpdate(r)).show();
     }
     private void startUpdate(AppUpdate.Release r){
-        if(!AppUpdate.canInstall(this)){dialog().setTitle("Allow Kadamm to install updates").setMessage("Android asks once: turn on \"Allow from this source\" for Kadamm on the next screen, then come back and tap Update now again.").setNegativeButton("Cancel",null).setPositiveButton("Open setting",(d,w)->AppUpdate.askInstallPermission(this)).show();return;}
+        if(!AppUpdate.canInstall(this)){dialog().setTitle("Allow Kadamm to install updates").setMessage("Android asks once: turn on \"Allow from this source\" for Kadamm on the next screen, then come back and tap Update again.").setNegativeButton("Cancel",null).setPositiveButton("Open setting",(d,w)->AppUpdate.askInstallPermission(this)).show();return;}
         LinearLayout box=col();box.setPadding(dp(22),dp(14),dp(22),dp(6));TextView msg=tx("Downloading… 0%",14,ink,false);box.addView(msg);
         ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(100);bar.setProgressTintList(android.content.res.ColorStateList.valueOf(lime));LinearLayout.LayoutParams bp=lp(-1,10);bp.topMargin=dp(12);box.addView(bar,bp);
         AlertDialog wait=dialog().setTitle("Updating to "+r.version).setView(box).setCancelable(false).create();wait.show();
@@ -1055,8 +1336,23 @@ public class MainActivity extends Activity {
         LinearLayout l=col();LinearLayout.LayoutParams lp2=new LinearLayout.LayoutParams(0,-2,1);lp2.leftMargin=dp(12);row.addView(l,lp2);
         l.addView(tx(r!=null?"Kadamm "+r.version+" is available":"Kadamm "+AppUpdate.current(this),15,ink,true));
         l.addView(tx(r!=null?"You have "+AppUpdate.current(this)+" · your data stays":AppUpdate.fresh(this)?"Up to date":"Checking for updates…",11,r!=null?lime:muted,false));
-        if(r!=null){Button b=button("Update now",lime,accentOn);LinearLayout.LayoutParams bp=lp(-1,46);bp.topMargin=dp(12);c.addView(b,bp);b.setOnClickListener(v->startUpdate(r));}
+        updateCard=c;
+        if(r!=null){String notes=AppUpdate.notesPreview(r);if(!notes.isEmpty()){TextView wn=tx("What's new\n"+notes,12,ink,false);wn.setLineSpacing(dp(3),1f);wn.setPadding(0,dp(12),0,0);c.addView(wn);}
+            LinearLayout bs=row();LinearLayout.LayoutParams bsp=lp(-1,46);bsp.topMargin=dp(12);c.addView(bs,bsp);
+            Button later=button("Later",raised,ink);bs.addView(later,new LinearLayout.LayoutParams(0,-1,1));later.setOnClickListener(v->{AppUpdate.offerOnLaunch(this,r.version);toast("We'll remind you later");});
+            Button b=button("Update",lime,accentOn);LinearLayout.LayoutParams ub=new LinearLayout.LayoutParams(0,-1,1);ub.leftMargin=dp(10);bs.addView(b,ub);b.setOnClickListener(v->startUpdate(r));}
         else{TextView chk=tx("Check now",12,lime,true);chk.setPadding(dp(10),dp(6),0,dp(6));row.addView(chk);chk.setOnClickListener(v->{toast("Checking…");AppUpdate.check(this,true,(x,ok)->{if(!ok)toast("Couldn't reach GitHub");else if(x==null)toast("You're on the latest version");renderPageNow();if(x!=null)showUpdate(x);});});}
+    }
+    private View updateCard;
+    /** The version chip: Profile's update card, scrolled into view, with a fresh check and the offer if there's one. */
+    private void openUpdates(){
+        if(drawerLayer!=null&&drawerLayer.getVisibility()==View.VISIBLE)return;
+        if(!"Profile".equals(page))navigate("Profile");
+        handler.postDelayed(()->{if(updateCard!=null&&"Profile".equals(page))scroller.smoothScrollTo(0,Math.max(0,updateCard.getTop()-dp(12)));},450);
+        toast("Checking for updates…");
+        AppUpdate.check(this,true,(x,ok)->{if(!ok){toast("Couldn't reach GitHub");return;}if("Profile".equals(page))renderPageNow();
+            handler.postDelayed(()->{if(updateCard!=null&&"Profile".equals(page))scroller.smoothScrollTo(0,Math.max(0,updateCard.getTop()-dp(12)));},200);
+            if(x==null)toast("You're on the latest version, "+AppUpdate.current(this));else showUpdate(x);});
     }
     private String summaryDay;
     /** All of a day's routes as one route, each session starting after a gap. */
@@ -1309,7 +1605,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         o.setOnClickListener(v->{d.dismiss();prefs.edit().putString("activityMode",mode).apply();activityType="Walk";beginRecord();});
     }
     private void beginRecord(){prefs.edit().putString("activityType",activityType).apply();ArrayList<String> r=new ArrayList<>();boolean indoor="indoor".equals(prefs.getString("activityMode","outdoor"));if(!indoor){boolean gpsOn=false;try{gpsOn=((LocationManager)getSystemService(LOCATION_SERVICE)).isProviderEnabled(LocationManager.GPS_PROVIDER);}catch(Exception ignored){}if(!gpsOn){dialog().setTitle("Turn on location").setMessage("Outdoor tracking needs GPS to draw your route. Turn on Location, then start again, or switch to Indoor / treadmill.").setNegativeButton("Not now",null).setPositiveButton("Open settings",(d,w)->{try{startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));}catch(Exception ignored){}}).show();return;}}if(!indoor&&checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)r.add(Manifest.permission.ACCESS_FINE_LOCATION);if(!indoor&&checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED)r.add(Manifest.permission.ACCESS_COARSE_LOCATION);if(Build.VERSION.SDK_INT>=29&&checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)!=PackageManager.PERMISSION_GRANTED)r.add(Manifest.permission.ACTIVITY_RECOGNITION);if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)r.add(Manifest.permission.POST_NOTIFICATIONS);if(!r.isEmpty()){requestPermissions(r.toArray(new String[0]),PERMISSIONS);return;}command(RecorderService.ACTION_START);openLive();askBackground();}
-    @Override public void onRequestPermissionsResult(int q,String[] ps,int[] rs){super.onRequestPermissionsResult(q,ps,rs);if(q==NOTIFY_PERMISSION||q==LOCATION_PERMISSION||q==BG_LOCATION_PERMISSION){renderPageNow();return;}if(q==STEP_PERMISSION){if(DaySteps.permitted(this)){startStepCounting();toast("Step counting is on");}else if(Build.VERSION.SDK_INT>=29)getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putBoolean("stepPermDenied",true).apply();renderPage();return;}startStepCounting();if(q==PERMISSIONS&&"indoor".equals(prefs.getString("activityMode","outdoor"))&&!DaySteps.permitted(this)){toast("Indoor tracking needs Physical activity access to count steps");return;}if(q==PERMISSIONS&&("indoor".equals(prefs.getString("activityMode","outdoor"))||checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED||checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED)){command(RecorderService.ACTION_START);openLive();askBackground();}}
+    @Override public void onRequestPermissionsResult(int q,String[] ps,int[] rs){super.onRequestPermissionsResult(q,ps,rs);if(q==BT_PERMISSION){renderPageNow();return;}if(q==NOTIFY_PERMISSION||q==LOCATION_PERMISSION||q==BG_LOCATION_PERMISSION){renderPageNow();return;}if(q==STEP_PERMISSION){if(DaySteps.permitted(this)){startStepCounting();toast("Step counting is on");}else if(Build.VERSION.SDK_INT>=29)getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putBoolean("stepPermDenied",true).apply();renderPage();return;}startStepCounting();if(q==PERMISSIONS&&"indoor".equals(prefs.getString("activityMode","outdoor"))&&!DaySteps.permitted(this)){toast("Indoor tracking needs Physical activity access to count steps");return;}if(q==PERMISSIONS&&("indoor".equals(prefs.getString("activityMode","outdoor"))||checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED||checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED)){command(RecorderService.ACTION_START);openLive();askBackground();}}
     private void command(String action){Intent i=new Intent(this,RecorderService.class);i.setAction(action);if(ACTION_START.equals(action)){if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);}else startService(i);}
     private static final String ACTION_START=RecorderService.ACTION_START;
     private void updateLive(){if(prefs==null)return;StepsWidget.refresh(this);if(resumed)refreshHealth(false);maybeCelebrate();updateMiniBar();updateLiveOverlay();boolean active=prefs.getBoolean("active",false),paused=prefs.getBoolean("paused",false);JSONArray all=history();if(timer!=null){long ms=prefs.getLong("elapsed",0);timer.setText(formatDuration(ms));double km=prefs.getFloat("distance",0);distance.setText(String.format(Locale.US,"%.2f km",km));long ps=km>0?Math.round(ms/1000d/km):0;pace.setText(km>0?String.format(Locale.US,"%d:%02d /km",ps/60,ps%60):"— /km");steps.setText(String.format(Locale.US,"%,d",prefs.getInt("steps",0)));if(liveSpeed!=null){float kmh=active&&!paused?prefs.getFloat("speedKmh",0):0;liveSpeed.setText(kmh>0?String.format(Locale.US,"%.1f km/h",kmh):"— km/h");liveElev.setText(active&&prefs.getBoolean("hasElevation",false)?String.format(Locale.US,"%.0f m",prefs.getFloat("elevGainM",0)):"— m");liveKcal.setText(String.format(Locale.US,"~%d kcal",Calories.live(this)));}boolean moving=prefs.getBoolean("moving",false);long fixAge=android.os.SystemClock.elapsedRealtime()-prefs.getLong("lastFixElapsed",0);boolean indoor="indoor".equals(prefs.getString("activityMode","outdoor"));boolean gps=indoor||(prefs.getBoolean("gpsFix",false)&&fixAge<12000);boolean indoorSel="indoor".equals(prefs.getString("activityMode","outdoor"));start.setText(active?(paused?"▶  Resume":"Ⅱ  Pause"):"▶  Start activity");if(trackStats!=null){trackStats.setVisibility(active?View.VISIBLE:View.GONE);trackEnd.setVisibility(active?View.VISIBLE:View.GONE);}String type=prefs.getString("currentType",activityType);status.setText(active?(paused?"● PAUSED":!indoor&&!gps?"● GPS SIGNAL WEAK":!moving?(indoor?"● WAITING FOR STEPS":"● YOU’RE NOT WALKING"):"● YOU’RE "+(type.equals("Run")?"RUNNING":"WALKING")):"● READY");status.setTextColor(active&&paused?muted:active&&!gps&&!indoor?warning:active&&!moving?warning:active?positive:lime);if(active&&!paused&&moving!=previousMoving){toast(moving?"You're moving · Kadamm is recording your activity":"You're not moving · pause or start moving to continue");}previousMoving=moving;route.setRoute(prefs.getString("route","[]"));route.setEmptyMessage(indoor?"Indoor session · distance comes from your steps":"Your route draws here once GPS locks on");if(gps&&!indoor)route.setCurrentLocation(prefs.getFloat("latitude",0),prefs.getFloat("longitude",0),prefs.getFloat("accuracy",0));else if(!active&&!indoor&&hasIdle)route.setCurrentLocation(idleLat,idleLon,idleAcc);else route.clearCurrentLocation();if(accuracyLabel!=null)accuracyLabel.setText(indoor?"Indoor mode · distance estimated from phone steps":gps?String.format(Locale.US,"GPS accuracy · ±%.0f m",prefs.getFloat("accuracy",0)):!active?(hasIdle?"Last known location · GPS locks on when you start":"Location appears here when you start"):"GPS signal weak or unavailable · last route point kept");if(activityModeLabel!=null)activityModeLabel.setText(!active?"Outdoor or indoor · walk or run detected":prefs.getBoolean("manualType",false)?(indoor?"Indoor · ":"Outdoor · ")+type+" (set by you)":(indoor?"Indoor · detected ":"Outdoor · detected ")+type.toLowerCase(Locale.US)+(" · tap to correct"));}updateHero(all);if(dailyDistanceProgress!=null){int target=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("distanceGoalM",5000);double meters=totalDistanceOn(all,todayKey())*1000;dailyDistanceProgress.setMax(target);dailyDistanceProgress.setProgress((int)Math.min(target,meters));dailyDistanceProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(meters>=target?positive:violet));dailyDistanceValue.setText(String.format(Locale.US,"%.2f / %.1f km",meters/1000f,target/1000f));}if(todayCount!=null){todayCount.setText(String.valueOf(countOn(all,todayKey(),"Walk")+(active&&"Walk".equals(prefs.getString("currentType","Walk"))?1:0)));todayDistance.setText(String.format(Locale.US,"%.2f",totalDistanceOn(all,todayKey())));}}
@@ -1326,8 +1622,11 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         LinearLayout top=row();content.addView(top,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);top.addView(brandButton(),bbp);
         top.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
         String source=DaySteps.todaySource(this);boolean live="phone".equals(source)||"health".equals(source);
-        TextView chip=tx(live?"●  Steps live":"○  Set up steps",10,live?positive:warning,true);chip.setPadding(dp(11),0,dp(11),0);chip.setGravity(Gravity.CENTER);chip.setBackground(rippleOn(raised,14));chip.setFocusable(true);chip.setContentDescription("Step sources");chip.setOnClickListener(v->navigate("Health"));top.addView(chip,lp(-2,28));
-        android.widget.ImageView gear=icon(R.drawable.ic_settings,muted,12);gear.setContentDescription("Goals and targets");gear.setFocusable(true);gear.setBackground(rippleOn(Color.TRANSPARENT,24));gear.setOnClickListener(v->navigate("Goals"));LinearLayout.LayoutParams gp=lp(48,48);gp.leftMargin=dp(4);top.addView(gear,gp);View me=avatarView(LocalAccount.current(this),34);me.setFocusable(true);me.setContentDescription("Your profile");me.setOnClickListener(v->navigate("Profile"));LinearLayout.LayoutParams mep=lp(34,34);mep.leftMargin=dp(2);top.addView(me,mep);
+        // Narrow phones (under 400 dp, e.g. 360 dp at a large display size) get a dot instead of the words, so the
+        // profile picture always fits at the right.
+        boolean narrow=getResources().getConfiguration().screenWidthDp<400;
+        TextView chip=tx(narrow?(live?"●":"○"):live?"●  Steps live":"○  Set up steps",narrow?12:10,live?positive:warning,true);chip.setPadding(dp(narrow?9:11),0,dp(narrow?9:11),0);chip.setGravity(Gravity.CENTER);chip.setBackground(rippleOn(raised,14));chip.setFocusable(true);chip.setContentDescription("Step sources");chip.setOnClickListener(v->navigate("Health"));top.addView(chip,lp(-2,28));
+        android.widget.ImageView gear=icon(R.drawable.ic_settings,muted,12);gear.setContentDescription("Goals and targets");gear.setFocusable(true);gear.setBackground(rippleOn(Color.TRANSPARENT,24));gear.setOnClickListener(v->navigate("Goals"));LinearLayout.LayoutParams gp=lp(narrow?42:48,48);gp.leftMargin=dp(narrow?0:4);top.addView(gear,gp);View me=avatarView(LocalAccount.current(this),34);me.setFocusable(true);me.setContentDescription("Your profile");me.setOnClickListener(v->navigate("Profile"));LinearLayout.LayoutParams mep=lp(34,34);mep.leftMargin=dp(2);top.addView(me,mep);
         int hour=Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         TextView e=tx(("Today's insights  ·  "+new SimpleDateFormat("EEEE, d MMMM",Locale.getDefault()).format(new Date())).toUpperCase(Locale.getDefault()),10,muted,true);e.setLetterSpacing(.08f);LinearLayout.LayoutParams ep=lp(-1,-2);ep.topMargin=dp(6);content.addView(e,ep);
         content.addView(tx(hour<12?"Good morning":hour<17?"Good afternoon":"Good evening",28,ink,true));
@@ -1408,7 +1707,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     /** Vector icon for each symbol used across the app. */
     private int iconRes(String g){
         switch(g){
-            case "Goals":return R.drawable.ic_flag;case "Routes":return R.drawable.ic_place;case "Notifications":return R.drawable.ic_bell;case "Permissions":return R.drawable.ic_settings;case "Auto":return R.drawable.ic_run;case "Storage":return R.drawable.ic_storage;case "Reports":return R.drawable.ic_chart;case "Achievements":return R.drawable.ic_trophy;case "Health":return R.drawable.ic_heart;case "ShareApp":return R.drawable.ic_share;case "Places":return R.drawable.ic_my_location;
+            case "Goals":return R.drawable.ic_flag;case "Routes":return R.drawable.ic_place;case "Notifications":return R.drawable.ic_bell;case "Permissions":return R.drawable.ic_settings;case "Auto":return R.drawable.ic_run;case "Storage":return R.drawable.ic_storage;case "Reports":return R.drawable.ic_chart;case "Body":return R.drawable.ic_heart;case "Achievements":return R.drawable.ic_trophy;case "Health":return R.drawable.ic_heart;case "ShareApp":return R.drawable.ic_share;case "Places":return R.drawable.ic_my_location;
             case "Today":case "◷home":return R.drawable.ic_home;case "History":case "▦":return R.drawable.ic_calendar;case "Profile":case "◉p":return R.drawable.ic_person;
             case "↗":return R.drawable.ic_place;case "⚡\uFE0E":return R.drawable.ic_flame;case "◷":return R.drawable.ic_timer;case "▶":return R.drawable.ic_walk;case "◉":return R.drawable.ic_walk;
             case "»":return R.drawable.ic_run;case "★":return R.drawable.ic_bolt;case "≈":return R.drawable.ic_chart;case "◎":return R.drawable.ic_flag;case "＋":return R.drawable.ic_heart;case "⇅":return R.drawable.ic_ruler;
@@ -1525,10 +1824,10 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     }
     private void refreshHealth(boolean force){
         long now=android.os.SystemClock.elapsedRealtime();if(!force&&now-lastHealthRefresh<120000)return;lastHealthRefresh=now;
-        try{HealthSync.refresh(this,()->{StepsWidget.refresh(this);if(resumed&&!dragging&&("Health".equals(page)||"Today".equals(page))){int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));}syncing=false;});}catch(Throwable ignored){}
+        try{HealthSync.refresh(this,()->{StepsWidget.refresh(this);if(resumed&&!dragging&&("Health".equals(page)||"Today".equals(page)||"Body".equals(page)||"Profile".equals(page))){int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));}syncing=false;});}catch(Throwable ignored){}
     }
     @Override protected void onResume(){
-        super.onResume();resumed=true;checkForUpdateOnce();WidgetTick.schedule(this);handler.removeCallbacks(refresh);handler.post(refresh);startStepCounting();refreshHealth(true);handler.postDelayed(()->SessionMetrics.warm(this,history()),1500);handler.postDelayed(()->{WearBridge.pushToday(this);WearBridge.pushLive(this);},4000);
+        super.onResume();resumed=true;checkForUpdateOnce();WidgetTick.schedule(this);handler.removeCallbacks(refresh);handler.post(refresh);startStepCounting();refreshHealth(true);handler.postDelayed(()->SessionMetrics.warm(this,history()),1500);handler.postDelayed(()->{WearBridge.pushToday(this);WearBridge.pushLive(this);WearBridge.ping(this);},4000);SleepTracker.register(this);handler.removeCallbacks(bodyTick);handler.postDelayed(bodyTick,2000);
         if(content!=null&&(("Today".equals(page)&&stepSetupShown&&DaySteps.permitted(this))||"Health".equals(page)||"Notifications".equals(page)||"Permissions".equals(page)||"Auto".equals(page)||"Storage".equals(page)))renderPageNow();
     }
     @Override protected void onPause(){
@@ -2266,9 +2565,9 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         }
         // Running fitness estimate
         if(m.vdot>0){
-            LinearLayout vc=metricCard("RUNNING FITNESS","","An estimate of VO₂max from your best running effort of 1.5 km or more in this session, using Jack Daniels' VDOT formula. Race predictions use Riegel's formula (time grows with distance to the power 1.06). Estimates, not lab measurements.");
+            LinearLayout vc=metricCard("RUNNING FITNESS","","VDOT: Jack Daniels' running-performance score from your best running effort of 1.5 km or more in this session. It's on the same scale as VO₂max but measures this run only, so it's kept separate from your VO₂max on the Health data page. Race predictions use Riegel's formula (time grows with distance to the power 1.06). Estimates, not lab measurements.");
             double bestD=0,bestT=0;for(java.util.Map.Entry<Integer,Double> e:m.best.entrySet())if(e.getKey()>=1500&&e.getKey()>bestD){bestD=e.getKey();bestT=e.getValue();}
-            statGrid(vc,new String[][]{{"Est. VO₂max",String.format(Locale.US,"%.0f",m.vdot),"ml/kg/min"},{"5 km",MetricViews.mmss(bestT*Math.pow(5000/bestD,1.06)),""},{"10 km",MetricViews.mmss(bestT*Math.pow(10000/bestD,1.06)),""}},10);
+            statGrid(vc,new String[][]{{"VDOT",String.format(Locale.US,"%.0f",m.vdot),""},{"5 km",MetricViews.mmss(bestT*Math.pow(5000/bestD,1.06)),""},{"10 km",MetricViews.mmss(bestT*Math.pow(10000/bestD,1.06)),""}},10);
         }
     }
     private static java.util.List<double[]> thinPace(java.util.List<double[]> d,int n){if(d.size()<=n)return d;java.util.List<double[]> out=new java.util.ArrayList<>();double step=d.size()/(double)n;for(double i=0;i<d.size();i+=step)out.add(d.get((int)i));return out;}
@@ -2363,6 +2662,9 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         TextView key=tx("● = "+dd.unit()+" steps",10,muted,false);LinearLayout.LayoutParams kp=lp(-1,-2);kp.topMargin=dp(4);c.addView(key,kp);
         Trends.Forecast fc=Trends.forecast(this,dailyGoal());
         if(fc.todayChance>=0&&fc.todaySoFar<fc.goal&&Calendar.getInstance().get(Calendar.HOUR_OF_DAY)<Trends.SLEEP){TextView ft=tx(String.format(Locale.US,"By bedtime ≈ %,d steps (%,d–%,d) · %d %% chance of your goal",fc.todayMid,fc.todayLo,fc.todayHi,fc.todayChance),12,fc.todayChance>=50?positive:warning,true);LinearLayout.LayoutParams fp=lp(-1,-2);fp.topMargin=dp(8);c.addView(ft,fp);ft.setOnClickListener(v->navigate("Trainer"));}
+        // Steps from a gap in readings (Android paused Kadamm): real, but their hours are placed, not measured.
+        long[] gs=hours==own?DaySteps.gapSteps(this,today):null;
+        if(gs!=null&&gs[0]>=50){TextView gn=tx(String.format(Locale.US,gs[1]==1?"%,d steps were counted while Android paused Kadamm; their hours come from Health Connect's record.":"%,d steps were counted while Android paused Kadamm, so their exact hours aren't known; they're spread over the waking hours of that gap. Allow Kadamm to run in the background to avoid this.",gs[0]),10,muted,false);gn.setPadding(0,dp(4),0,0);c.addView(gn);}
         long gap=Math.round(total-placed);
         if(Math.abs(gap)>Math.max(50,total*.01)){TextView n=tx(gap>0?String.format(Locale.US,"%,d steps don't have an hour yet (Health Connect sends them later)",gap):String.format(Locale.US,"The hours add up to %,d; small differences come from readings around midnight",Math.round(placed)),10,muted,false);c.addView(n);}
     }

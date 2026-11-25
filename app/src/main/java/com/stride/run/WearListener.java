@@ -17,6 +17,13 @@ public class WearListener extends WearableListenerService {
         switch(path){
             case "/kadamm/hr":try{WearBridge.addHeartRate(this,Integer.parseInt(data.trim()));}catch(Exception ignored){}break;
             case "/kadamm/sync":WearBridge.pushToday(this);WearBridge.pushLive(this);break;
+            case "/kadamm/hello":WearBridge.saveDevice(this,data);break;
+            case "/kadamm/passive":
+                // A batch of all-day heart rate from the watch: {"hr":[[epoch ms, bpm], …]}.
+                try{org.json.JSONArray a=new org.json.JSONObject(data).optJSONArray("hr");if(a!=null){long[][] r=new long[a.length()][];long last=0;int bpm=0;
+                    for(int i=0;i<a.length();i++){org.json.JSONArray x=a.getJSONArray(i);r[i]=new long[]{x.getLong(0),x.getLong(1)};if(r[i][0]>last){last=r[i][0];bpm=(int)r[i][1];}}
+                    WearBridge.addMinutes(this,r);if(last>getSharedPreferences("kadamm_health",MODE_PRIVATE).getLong("liveHrAt",0))getSharedPreferences("kadamm_health",MODE_PRIVATE).edit().putInt("liveHr",bpm).putLong("liveHrAt",last).apply();}}catch(Exception ignored){}
+                break;
             case "/kadamm/start":
                 if(getSharedPreferences("stride_state",MODE_PRIVATE).getBoolean("active",false)){WearBridge.pushLive(this);break;}
                 String type="Run".equals(data)?"Run":"Walk";

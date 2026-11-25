@@ -1,5 +1,21 @@
 # Changelog
 
+## 10.0 (versionCode 51)
+
+- Your watch, any brand: Profile and Home show which watch is connected (Wear OS, Bluetooth or through Health Connect), when its data last arrived, and which measures it shares. The new Health data page lists every measure with where it came from, how many readings arrived in the last 30 days, and how to turn on what's missing.
+- Near-real-time sync: while Home, Profile or Health data is open, Kadamm re-reads Health Connect every minute and shows live heart rate from Kadamm on the watch every 2 seconds. Kadamm on a Wear OS watch streams heart rate while it's open and, with all-day heart rate switched on, takes a reading every 15 minutes in the background.
+- Read from Health Connect: sleep with light, deep and REM stages, all-day heart rate, resting heart rate, HRV, breathing rate, blood oxygen (average and lowest), skin and body temperature, blood pressure, VO₂max and weight. These are read whatever the step source.
+- New watch measures: Recovery (0–100 % from HRV, resting heart rate, sleep and breathing against your own 30-day normal), Strain (0–21 from heart rate, Banister TRIMP), Stress (heart rate while still), heart-rate zones, a sleep stage chart, and VO₂max from heart rate (Uth–Sørensen).
+- Without a watch: Movement load (0–21 from steps), sleep from Google's Sleep API or the longest screen-off stretch overnight (labelled as an estimate), sleep consistency over 14 nights, the Cooper 12-minute test (stops itself at 12:00), and a 60-second pulse check with the camera and flash for heart rate and HRV. A morning pulse check feeds Recovery when no watch measures HRV.
+- Your own entries: add last night's sleep, blood pressure and weight. They're also saved to Health Connect when allowed, so other apps see them.
+- ECG isn't available: Health Connect has no ECG type, so recordings stay in the watch's own app. Kadamm says so instead of estimating.
+- One name, one number: VO₂max is one figure everywhere (watch, Cooper test, heart rate, then walks, in that order). Fitness age uses it, a session's running score is now called VDOT, the coach's "recovery day" is now an "easy day" (and comes after a red Recovery too), and the Trainer's fitness chart is "Fitness forecast".
+- Choose which measures show on Home (up to 6).
+- Coach Kadamm follows your Recovery: green days raise targets 5 %, red days ease them and keep the challenges gentle. The coach card shows today's Recovery and the load that suits it (WHOOP's ranges on the 0–21 Strain or Movement load scale: green 14–18, yellow 10–14, red 5–9), says "rest now" once you're past it, and after all three challenges either sends you to rest or, on a green day with room left, suggests an easy walk.
+- Steps on the right day: when Android pauses Kadamm for hours (some phones do this overnight), the steps counted in that gap used to land in the hour of the next reading, so yesterday evening's steps could show up as this morning's. They're now placed using Health Connect's hour-by-hour record, or spread over the gap's waking hours and marked as approximate. A one-time repair moves wrongly placed steps from the last four days, only where Health Connect's hours show when they were really taken. Totals never change; only the day and hour.
+- Narrow screens: on phones under 400 dp wide, the top bar shows a dot instead of "Steps live", so the profile picture always fits.
+- Updates: the update dialog shows plain "What's new" bullets instead of release-page code, with Update and Later. Tapping the version next to the Kadamm logo opens the update card on Profile and checks for a new version.
+
 ## 9.7 (versionCode 50)
 
 - Pace consistency score: every walk of 1 km or more gets a score out of 100 for how evenly you held your pace, measured over each 250 m. It shows your pacing pattern (even, negative split, slowed towards the end, or fast start then faded), first and last thirds, surges, a bar per 250 m, and your usual score. The Trainer page tracks the score over your last 20 walks.

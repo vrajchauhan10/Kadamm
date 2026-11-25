@@ -156,5 +156,25 @@ final class AppUpdate {
     /** Android's "Install unknown apps" switch for Kadamm, needed once. */
     static boolean canInstall(Context c){return Build.VERSION.SDK_INT<26||c.getPackageManager().canRequestPackageInstalls();}
     static void askInstallPermission(Context c){c.startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+c.getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}
-    static String notesPreview(Release r){if(r.notes==null)return "";String n=r.notes.trim();String[] lines=n.split("\n");StringBuilder b=new StringBuilder();for(String l:lines){if(b.length()>360)break;if(l.trim().isEmpty())continue;b.append(l.trim().replaceFirst("^[-*]\\s*","• ")).append('\n');}return b.toString().trim();}
+    /**
+     * The release's "What's new" as plain bullets: GitHub's notes also carry HTML (screenshots) and Markdown, which
+     * would show as code in a dialog. Tags, images, links, headings and emphasis are removed; each bullet is cut to
+     * its first sentence, at most 6.
+     */
+    static String notesPreview(Release r){
+        if(r.notes==null)return "";String n=r.notes.replace("\r","");
+        int w=n.toLowerCase(Locale.US).indexOf("what's new");if(w>=0){int nl=n.indexOf('\n',w);n=nl>0?n.substring(nl+1):"";}
+        StringBuilder b=new StringBuilder();int count=0;
+        for(String raw:n.split("\n")){
+            String l=raw.trim();if(l.startsWith("#")&&count>0)break;if(!(l.startsWith("- ")||l.startsWith("* ")))continue;
+            l=plain(l.substring(2));if(l.isEmpty())continue;
+            int dot=l.indexOf(". ");if(dot>20&&dot<170)l=l.substring(0,dot+1);else if(l.length()>170)l=l.substring(0,167).replaceFirst("\\s+\\S*$","")+"…";
+            b.append("• ").append(l).append('\n');if(++count>=6)break;}
+        return b.toString().trim();
+    }
+    /** Markdown and HTML to plain text: tags, images, links (their text kept), bold, italics and code marks. */
+    static String plain(String s){
+        return s.replaceAll("<[^>]*>","").replaceAll("!\\[[^\\]]*\\]\\([^)]*\\)","").replaceAll("\\[([^\\]]*)\\]\\([^)]*\\)","$1")
+            .replaceAll("[*_`]{1,3}([^*_`]+)[*_`]{1,3}","$1").replace("`","").replaceAll("\\s+"," ").trim();
+    }
 }

@@ -1,0 +1,195 @@
+package com.stride.run;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
+
+/**
+ * The body metrics of Kadamm 10: recovery, strain, stress, movement load, one VO2max for the whole app, resting
+ * heart rate and HRV with their sources. Each metric has exactly one definition here, so the same name shows the same
+ * number on every screen. Measured values (from a watch or your own entry) always win over estimates, and estimates
+ * say so.
+ */
+final class Pro {
+    private Pro() {}
+
+    // ---- Sources ----
+    static final class Reading { double value=-1;String day="",source="";boolean estimate;long at; boolean ok(){return value>0;} }
+    private static String yesterday(){return DaySteps.key(System.currentTimeMillis()-86400000L);}
+    /** The newest value of a daily series no older than {@code maxDays}, with the app it came from. */
+    static Reading latest(JSONObject v,String key,int maxDays){
+        Reading r=new Reading();TreeMap<String,Double> s=Vitals.series(v,key);if(s.isEmpty())return r;
+        Map.Entry<String,Double> e=s.lastEntry();if(e.getKey().compareTo(DaySteps.key(System.currentTimeMillis()-maxDays*86400000L))<0)return r;
+        r.value=e.getValue();r.day=e.getKey();r.source=sourceOf(v,key);return r;
+    }
+    static String sourceOf(JSONObject v,String key){
+        JSONObject by=v.optJSONObject("by");JSONArray a=by==null?null:by.optJSONArray(key);if(a==null||a.length()==0)return "Health Connect";
+        List<String> n=new ArrayList<>();for(int i=0;i<a.length();i++){String l=HealthSync.label(a.optString(i));if(!n.contains(l))n.add(l);}return String.join(", ",n);
+    }
+    /** Median and spread of a series over the 30 days before {@code beforeDay}; null with fewer than {@code min} days. */
+    static double[] baseline(TreeMap<String,Double> s,String beforeDay,int min,boolean log){
+        List<Double> v=new ArrayList<>();String from=DaySteps.key(System.currentTimeMillis()-31L*86400000L);
+        for(Map.Entry<String,Double> e:s.entrySet())if(e.getKey().compareTo(beforeDay)<0&&e.getKey().compareTo(from)>=0)v.add(log?Math.log(e.getValue()):e.getValue());
+        if(v.size()<min)return null;double m=0;for(double x:v)m+=x;m/=v.size();double sd=0;for(double x:v)sd+=(x-m)*(x-m);sd=Math.sqrt(sd/v.size());return new double[]{m,sd,v.size()};
+    }
+
+    // ---- Spot checks (fingertip camera) ----
+    /** The camera pulse checks, newest last: {at, hr, rmssd}. */
+    static JSONArray spots(Context c){try{return new JSONArray(c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getString("spots","[]"));}catch(Exception e){return new JSONArray();}}
+    static void addSpot(Context c,double hr,double rmssd,int quality){
+        JSONArray a=spots(c);try{a.put(new JSONObject().put("at",System.currentTimeMillis()).put("hr",Math.round(hr)).put("rmssd",Math.round(rmssd*10)/10.0).put("q",quality));}catch(Exception ignored){}
+        JSONArray keep=new JSONArray();for(int i=Math.max(0,a.length()-120);i<a.length();i++)keep.put(a.opt(i));
+        c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).edit().putString("spots",keep.toString()).apply();
+    }
+    /** Morning checks (before 11 am, at rest) by day: {day → hr} or {day → rmssd}. */
+    static TreeMap<String,Double> morningSpots(Context c,String field){
+        TreeMap<String,Double> t=new TreeMap<>();JSONArray a=spots(c);
+        for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;Calendar d=Calendar.getInstance();d.setTimeInMillis(o.optLong("at"));if(d.get(Calendar.HOUR_OF_DAY)>=11)continue;String k=DaySteps.key(o.optLong("at"));if(!t.containsKey(k))t.put(k,o.optDouble(field));}
+        return t;
+    }
+
+    // ---- Resting heart rate and HRV ----
+    /** Resting heart rate series: the watch's own figure, else the lowest 30-minute average of your heart rate, else a morning pulse check. */
+    static TreeMap<String,Double> restSeries(Context c,JSONObject v){
+        TreeMap<String,Double> t=new TreeMap<>(morningSpots(c,"hr"));t.putAll(Vitals.series(v,"hrRest"));t.putAll(Vitals.series(v,"rhr"));return t;
+    }
+    static Reading restingHr(Context c){
+        JSONObject v=Vitals.all(c);Reading r=latest(v,"rhr",2);if(r.ok())return r;
+        Reading low=latest(v,"hrRest",2);if(low.ok()){low.source="Lowest 30 min of your watch's heart rate";return low;}
+        TreeMap<String,Double> m=morningSpots(c,"hr");if(!m.isEmpty()&&m.lastKey().compareTo(yesterday())>=0){Reading s=new Reading();s.value=m.lastEntry().getValue();s.day=m.lastKey();s.source="Morning pulse check (camera)";return s;}
+        return r;
+    }
+    static TreeMap<String,Double> hrvSeries(Context c,JSONObject v){TreeMap<String,Double> t=new TreeMap<>(morningSpots(c,"rmssd"));t.putAll(Vitals.series(v,"hrv"));return t;}
+    static Reading hrv(Context c){
+        JSONObject v=Vitals.all(c);Reading r=latest(v,"hrv",2);if(r.ok())return r;
+        TreeMap<String,Double> m=morningSpots(c,"rmssd");if(!m.isEmpty()&&m.lastKey().compareTo(yesterday())>=0){Reading s=new Reading();s.value=m.lastEntry().getValue();s.day=m.lastKey();s.source="Morning pulse check (camera)";return s;}
+        return r;
+    }
+
+    // ---- Recovery ----
+    static final class Recovery { int score=-1;String need="";final List<String[]> parts=new ArrayList<>(); String zone(){return score>=67?"Green":score>=34?"Yellow":"Red";} }
+    /**
+     * Recovery (0–100 %), WHOOP-style but from open data: last night's HRV against your 30-day normal (45 %), resting
+     * heart rate against normal (25 %), sleep against an 8-hour need (25 %) and breathing rate against normal (5 %).
+     * HRV and resting heart rate count by how many standard deviations they sit from your own normal: one SD better
+     * than usual adds 25 points to that part. Parts with no data are left out and the rest re-weighted; it needs HRV or
+     * resting heart rate with 5+ days of history, plus one more part.
+     */
+    static Recovery recovery(Context c){
+        Recovery r=new Recovery();JSONObject v=Vitals.all(c);String today=DaySteps.todayKey();double wsum=0,sum=0;int core=0;
+        Reading h=hrv(c);double[] hb=baseline(hrvSeries(c,v),h.day.isEmpty()?today:h.day,5,true);
+        if(h.ok()&&hb!=null){double z=(Math.log(h.value)-hb[0])/Math.max(.05,hb[1]);double p=clamp(50+25*z);sum+=.45*p;wsum+=.45;core++;
+            r.parts.add(new String[]{"HRV",String.format(Locale.US,"%.0f ms",h.value),String.format(Locale.US,"normal %.0f ms",Math.exp(hb[0])),String.valueOf(Math.round(p))});}
+        Reading rh=restingHr(c);double[] rb=baseline(restSeries(c,v),rh.day.isEmpty()?today:rh.day,5,false);
+        if(rh.ok()&&rb!=null){double z=(rh.value-rb[0])/Math.max(1.5,rb[1]);double p=clamp(50-25*z);sum+=.25*p;wsum+=.25;core++;
+            r.parts.add(new String[]{"Resting heart rate",Math.round(rh.value)+" bpm",String.format(Locale.US,"normal %.0f bpm",rb[0]),String.valueOf(Math.round(p))});}
+        SleepTracker.Night n=SleepTracker.night(c,today);
+        if(n!=null){double p=clamp(n.asleep/480.0*100);sum+=.25*p;wsum+=.25;r.parts.add(new String[]{"Sleep",hm(n.asleep),"need 8h 00m",String.valueOf(Math.round(p))});}
+        Reading rs=latest(v,"resp",1);double[] rsb=baseline(Vitals.series(v,"resp"),rs.day.isEmpty()?today:rs.day,5,false);
+        if(rs.ok()&&rsb!=null){double d=rs.value-rsb[0];double p=d<.5?100:clamp(100-(d-.5)*40);sum+=.05*p;wsum+=.05;r.parts.add(new String[]{"Breathing rate",String.format(Locale.US,"%.1f /min",rs.value),String.format(Locale.US,"normal %.1f",rsb[0]),String.valueOf(Math.round(p))});}
+        if(core==0){r.need=h.ok()||rh.ok()?"history":"hr";return r;}
+        if(r.parts.size()<2){r.need="more";return r;}
+        r.score=(int)Math.round(sum/wsum);return r;
+    }
+    static double clamp(double x){return Math.max(0,Math.min(100,x));}
+    static String hm(long min){return String.format(Locale.US,"%dh %02dm",min/60,min%60);}
+
+    // ---- Heart rate: strain and zones ----
+    static final class Strain { double strain=-1,trimp;int minutes;long[] zoneMin=new long[5];String need="";int rest,max; }
+    /** Minutes at each heart rate (5-bpm bins from 30) for a day: Health Connect's, else Kadamm's own watch readings. */
+    static int[] histogram(Context c,JSONObject v,String day){
+        JSONObject h=v.optJSONObject("hrHist");JSONArray a=h==null?null:h.optJSONArray(day);
+        int[] out=new int[WatchHealth.BINS];int n=0;if(a!=null)for(int i=0;i<Math.min(a.length(),out.length);i++){out[i]=a.optInt(i);n+=out[i];}
+        if(n>0)return out;
+        for(int bpm:WearBridge.minutes(c,day)){out[Math.max(0,Math.min(WatchHealth.BINS-1,(bpm-WatchHealth.BIN0)/WatchHealth.BIN))]++;n++;}
+        return n>0?out:null;
+    }
+    /**
+     * Strain (0–21) from heart rate, like WHOOP's: Banister's training impulse (TRIMP) summed over every minute of the
+     * day above 20 % of your heart-rate reserve (each minute weighted by reserve × 0.64e^(1.92 × reserve), 0.86e^(1.67 ×
+     * reserve) for women), then 21 × (1 − e^(−TRIMP/120)) so it grows ever more slowly: a quiet day is 4–7, an hour's
+     * brisk walking about 10, a hard run 14+. Needs a resting heart rate and your age (or a set maximum heart rate).
+     */
+    static Strain strain(Context c,String day){
+        Strain s=new Strain();JSONObject v=Vitals.all(c);int max=SessionMetrics.maxHeartRate(c);
+        TreeMap<String,Double> rs=restSeries(c,v);double rest=-1;
+        for(Map.Entry<String,Double> e:rs.descendingMap().entrySet())if(e.getKey().compareTo(day)<=0){rest=e.getValue();break;}
+        int[] h=histogram(c,v,day);if(h==null){s.need="hr";return s;}if(max<=0){s.need="age";return s;}if(rest<=0){s.need="rest";return s;}
+        s.rest=(int)Math.round(rest);s.max=max;boolean f="f".equals(c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getString("sex",""));
+        for(int i=0;i<h.length;i++){if(h[i]==0)continue;double bpm=WatchHealth.BIN0+i*WatchHealth.BIN+WatchHealth.BIN/2.0;double x=(bpm-rest)/(max-rest);s.minutes+=h[i];
+            if(x>=.5)s.zoneMin[Math.min(4,(int)((x-.5)/.1))]+=h[i];
+            if(x<.2)continue;x=Math.min(1,x);s.trimp+=h[i]*x*(f?.86*Math.exp(1.67*x):.64*Math.exp(1.92*x));}
+        s.strain=Math.round(21*(1-Math.exp(-s.trimp/120))*10)/10.0;return s;
+    }
+
+    // ---- Stress ----
+    /** Stress (0–100) from heart rate while still, worked out in WatchHealth.stressDay; null without enough readings. */
+    static JSONObject stress(Context c,String day){JSONObject s=Vitals.all(c).optJSONObject("stress");return s==null?null:s.optJSONObject(day);}
+    static String stressLevel(int s){return s<=25?"Rest":s<=50?"Low":s<=75?"Medium":"High";}
+
+    // ---- Movement load (phone only) ----
+    static final class Load { double load=-1,points;String basis="";int brisk,easy; }
+    /**
+     * Movement load (0–21) from your steps alone, for days without a watch. Points: per minute, 0.2 for slow steps
+     * (20–59 a minute), 0.6 for walking (60–99), 1.5 for brisk walking (100–129) and 2.5 for running pace (130+), from
+     * Health Connect's minute-by-minute steps; without those, your sessions' effort points (the same scale) plus 0.3 for
+     * every 100 everyday steps. Load = 21 × (1 − e^(−points/110)): a quiet day is 2–5, 10,000 steps with a brisk walk
+     * about 11, a 20,000-step day 16+.
+     */
+    static Load load(Context c,JSONArray hist,String day){
+        Load l=new Load();JSONObject md=DaySteps.minuteDays(c).optJSONObject(day);JSONArray b=md==null?null:md.optJSONArray("b");
+        if(b!=null&&b.length()>=4){l.points=b.optInt(0)*.2+b.optInt(1)*.6+b.optInt(2)*1.5+b.optInt(3)*2.5;l.brisk=b.optInt(2)+b.optInt(3);l.easy=b.optInt(1);l.basis="minute-by-minute steps";}
+        else{long inSessions=0;for(int i=0;i<hist.length();i++){JSONObject o=hist.optJSONObject(i);if(o==null||!day.equals(o.optString("day",""))||!DaySummary.counts(o))continue;SessionMetrics m=SessionMetrics.of(c,o);l.points+=m.effort;l.brisk+=(int)Math.round(m.intensityMin);if(o.optBoolean("stepsAvailable",false))inSessions+=o.optLong("steps",0);}
+            Long all=DaySteps.allDayTotals(c).get(day);long outside=Math.max(0,(all==null?0:all)-inSessions);l.points+=outside/100.0*.3;l.basis="sessions and everyday steps";
+            if(all==null&&l.points==0)return l;}
+        l.load=Math.round(21*(1-Math.exp(-l.points/110))*10)/10.0;return l;
+    }
+
+    // ---- VO2max: one figure for the whole app ----
+    static final class Vo2 { double value=-1;String method="",detail="",day="";boolean measured; }
+    /**
+     * VO2max from the best evidence available, in this order: measured by your watch (last 90 days); a Cooper test
+     * (12-minute run, last 120 days: (metres − 504.9) / 44.73); from heart rate (Uth–Sørensen: 15.3 × max HR / resting
+     * HR); from walks with heart rate (ACSM walking cost scaled by heart-rate reserve). Fitness age uses this same value.
+     */
+    static Vo2 vo2(Context c,JSONArray hist){
+        Vo2 r=new Vo2();JSONObject v=Vitals.all(c);
+        Reading w=latest(v,"vo2",90);if(w.ok()){r.value=w.value;r.day=w.day;r.measured=true;r.method="Measured by your watch";r.detail=w.source;return r;}
+        Cooper ct=cooper(c,hist,120,true);if(ct!=null){r.value=ct.vo2;r.day=ct.day;r.method="Cooper 12-minute test";r.detail=String.format(Locale.US,"%,d m in 12 minutes",Math.round(ct.metres));return r;}
+        int max=SessionMetrics.maxHeartRate(c);TreeMap<String,Double> rs=restSeries(c,v);
+        if(max>0&&rs.size()>=3){List<Double> last=new ArrayList<>(rs.descendingMap().values()).subList(0,Math.min(7,rs.size()));double rest=Vitals.median(last);
+            if(rest>=35&&rest<=100){r.value=Math.round(15.3*max/rest*10)/10.0;r.day=rs.lastKey();r.method="From your heart rate";r.detail=String.format(Locale.US,"15.3 × max %d ÷ resting %.0f bpm",max,rest);return r;}}
+        Vitals.FitnessAge fa=Vitals.walkingEstimate(c,hist);if(fa!=null&&fa.vo2>0){r.value=Math.round(fa.vo2*10)/10.0;r.method="Estimated from walks with heart rate";r.detail=fa.sessions+" walks";return r;}
+        return r;
+    }
+    static final class Cooper { double metres,vo2;String day;boolean run;long id; }
+    /** Your best 12 minutes in the last {@code days} days; {@code testOnly} keeps runs and sessions started as a test. */
+    static Cooper cooper(Context c,JSONArray hist,int days,boolean testOnly){
+        Cooper best=null;String from=DaySteps.key(System.currentTimeMillis()-days*86400000L);
+        for(int i=0;i<hist.length();i++){JSONObject o=hist.optJSONObject(i);if(o==null||o.optString("day","").compareTo(from)<0)continue;boolean test=o.optBoolean("cooperTest",false);
+            // Only GPS sessions of 12+ minutes can hold a Cooper distance; skip the rest before the (cached but costly) analysis.
+            if(o.optLong("durationMs",0)<720000||"indoor".equals(o.optString("activityMode"))||o.optString("route","").length()<200)continue;
+            if(testOnly&&!test&&!"Run".equals(o.optString("type")))continue;if(!SessionMetrics.ready()&&!test)continue;SessionMetrics m=SessionMetrics.of(c,o);
+            if(m.cooperM<=0||(testOnly&&!test&&!m.run))continue;if(best==null||m.cooperM>best.metres){best=new Cooper();best.metres=m.cooperM;best.day=o.optString("day");best.run=m.run||test;best.id=o.optLong("id");}}
+        if(best!=null)best.vo2=Math.round((best.metres-504.9)/44.73*10)/10.0;
+        return best!=null&&best.vo2>=10?best:null;
+    }
+
+    // ---- Which watch ----
+    /** The apps and watches Health Connect data came from, and when it last synced. */
+    static String connectedSources(Context c){return Vitals.sources(Vitals.all(c));}
+    static long lastSync(Context c){SharedPreferences p=c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE);return Math.max(p.getLong("vitalsCheckedAt",0),p.getLong("healthSyncedAt",0));}
+    static int count(JSONObject v,String key){JSONObject cn=v.optJSONObject("counts");return cn==null?0:cn.optInt(key);}
+    static boolean granted(JSONObject v,String key){JSONArray g=v.optJSONArray("granted");if(g==null)return false;for(int i=0;i<g.length();i++)if(key.equals(g.optString(i)))return true;return false;}
+    static Iterator<String> keys(JSONObject o){return o==null?new ArrayList<String>().iterator():o.keys();}
+}

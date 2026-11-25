@@ -76,8 +76,20 @@ final class DaySteps {
                 if(delta>0){
                     try{
                         JSONObject days=new JSONObject(p.getString("days","{}"));
+                        long gapFrom=rebooted?Math.max(lastAt,now-elapsed):lastAt;
+                        if(lastAt>0&&now-gapFrom>GAP_MS){
+                            // A long gap: Android didn't let Kadamm read the sensor (phone asleep, battery saver). The
+                            // steps are real but their time isn't known: they're placed over the gap's waking hours
+                            // for now, and re-placed by Health Connect's hour-by-hour record once it syncs.
+                            JSONObject hours=new JSONObject(p.getString("hours","{}"));java.util.LinkedHashMap<String,Long> a=allocate(wakingWeights(gapFrom,now),delta);
+                            apply(days,hours,a,1);e.putString("hours",hours.toString());
+                            JSONArray gaps=new JSONArray(p.getString("gaps","[]"));JSONObject alloc=new JSONObject();for(java.util.Map.Entry<String,Long> x:a.entrySet())alloc.put(x.getKey(),x.getValue());
+                            gaps.put(new JSONObject().put("f",gapFrom).put("t",now).put("d",delta).put("a",alloc).put("hc",false));
+                            JSONArray keep=new JSONArray();for(int i=0;i<gaps.length();i++){JSONObject g=gaps.optJSONObject(i);if(g!=null&&g.optLong("t")>now-8L*86400000L)keep.put(g);}e.putString("gaps",keep.toString());
+                        }else{
                         distribute(days,lastAt,now,delta);
                         try{JSONObject hours=new JSONObject(p.getString("hours","{}"));spreadHours(hours,lastAt,now,delta);e.putString("hours",hours.toString());}catch(Exception ignored){}
+                        }
                         prune(days);
                         e.putString("days",days.toString()).putLong("lastMoveAt",now);
                         // Sitting: 10+ steps after 30+ minutes without walking counts as getting up from a sit.
@@ -89,6 +101,73 @@ final class DaySteps {
             e.putLong("lastCounter",counter).putLong("lastAt",now).putLong("lastElapsed",elapsed).apply();
         }
         if(changed){checkGoal(c);StepsWidget.refresh(c);}
+    }
+
+    /** Readings further apart than this are a gap: the steps' times aren't known. */
+    static final long GAP_MS=2*3600000L;
+    /** Weight of each hour slot ("yyyy-MM-dd|h") in [from, to]: minutes inside it, a tenth as much between 11 pm and 7 am. */
+    static java.util.LinkedHashMap<String,Double> wakingWeights(long from,long to){
+        java.util.LinkedHashMap<String,Double> w=new java.util.LinkedHashMap<>();Calendar c=Calendar.getInstance();long cur=from;
+        while(cur<to){c.setTimeInMillis(cur);int hr=c.get(Calendar.HOUR_OF_DAY);String k=key(cur)+"|"+hr;c.set(Calendar.MINUTE,0);c.set(Calendar.SECOND,0);c.set(Calendar.MILLISECOND,0);c.add(Calendar.HOUR_OF_DAY,1);
+            long end=Math.min(c.getTimeInMillis(),to);w.put(k,w.getOrDefault(k,0d)+(end-cur)/60000.0*(hr>=7&&hr<23?1:.1));cur=end;}
+        return w;
+    }
+    /** Whole steps in proportion to the weights, the remainders going to the largest fractions. */
+    static java.util.LinkedHashMap<String,Long> allocate(java.util.LinkedHashMap<String,Double> w,long n){
+        double tot=0;for(double v:w.values())tot+=v;java.util.LinkedHashMap<String,Long> out=new java.util.LinkedHashMap<>();if(tot<=0||w.isEmpty()){return out;}
+        long given=0;java.util.List<Object[]> frac=new java.util.ArrayList<>();
+        for(java.util.Map.Entry<String,Double> e:w.entrySet()){double x=n*e.getValue()/tot;long f=(long)Math.floor(x);out.put(e.getKey(),f);given+=f;frac.add(new Object[]{e.getKey(),x-f});}
+        frac.sort((a,b)->Double.compare((double)b[1],(double)a[1]));for(int i=0;given<n&&i<frac.size();i++){String k=(String)frac.get(i)[0];out.put(k,out.get(k)+1);given++;}
+        return out;
+    }
+    /** Adds (sign 1) or takes back (sign −1) an allocation in the day totals and the hourly record. */
+    private static void apply(JSONObject days,JSONObject hours,java.util.Map<String,Long> a,int sign)throws Exception{
+        for(java.util.Map.Entry<String,Long> x:a.entrySet()){String[] k=x.getKey().split("\\|");long n=sign*x.getValue();days.put(k[0],Math.max(0,days.optLong(k[0],0)+n));
+            JSONArray h=hours.optJSONArray(k[0]);if(h==null){h=new JSONArray();for(int i=0;i<24;i++)h.put(0);hours.put(k[0],h);}int hr=Integer.parseInt(k[1]);h.put(hr,Math.max(0,h.optDouble(hr)+n));}
+    }
+    /**
+     * Re-places gap steps by Health Connect's record of when you walked (its steps per hour, 100+ in the gap needed),
+     * once it has synced. The phone's own count is kept; only its days and hours move.
+     */
+    static void rebalance(Context context){
+        Context c=context.getApplicationContext();JSONObject md=minuteDays(c);if(md.length()==0)return;boolean changed=false;
+        synchronized(LOCK){
+            SharedPreferences p=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
+            try{JSONArray gaps=new JSONArray(p.getString("gaps","[]"));JSONObject days=new JSONObject(p.getString("days","{}")),hours=new JSONObject(p.getString("hours","{}"));
+                for(int i=0;i<gaps.length();i++){JSONObject g=gaps.getJSONObject(i);if(g.optBoolean("hc"))continue;long f=g.getLong("f"),t=g.getLong("t");
+                    // Only once Health Connect has caught up past the gap's end (its record for that day exists).
+                    if(md.optJSONObject(key(t))==null)continue;
+                    java.util.LinkedHashMap<String,Double> w=new java.util.LinkedHashMap<>();double tot=0;
+                    for(String k:wakingWeights(f,t).keySet()){String[] kk=k.split("\\|");JSONObject d=md.optJSONObject(kk[0]);JSONArray hh=d==null?null:d.optJSONArray("h");double v=hh==null?0:hh.optDouble(Integer.parseInt(kk[1]),0);
+                        // Part-hours at the gap's ends count in proportion to the minutes inside the gap.
+                        Calendar st=Calendar.getInstance();st.setTimeInMillis(f);Calendar en=Calendar.getInstance();en.setTimeInMillis(t);double frac=1;
+                        if(k.equals(key(f)+"|"+st.get(Calendar.HOUR_OF_DAY)))frac=Math.min(frac,(60-st.get(Calendar.MINUTE))/60.0);if(k.equals(key(t)+"|"+en.get(Calendar.HOUR_OF_DAY)))frac=Math.min(frac,en.get(Calendar.MINUTE)/60.0);
+                        w.put(k,v*frac);tot+=v*frac;}
+                    if(tot<100)continue;
+                    JSONObject old=g.getJSONObject("a");java.util.Map<String,Long> o=new java.util.HashMap<>();for(Iterator<String> it=old.keys();it.hasNext();){String k=it.next();o.put(k,old.getLong(k));}
+                    java.util.LinkedHashMap<String,Long> a=allocate(w,g.getLong("d"));apply(days,hours,o,-1);apply(days,hours,a,1);
+                    JSONObject na=new JSONObject();for(java.util.Map.Entry<String,Long> x:a.entrySet())na.put(x.getKey(),x.getValue());g.put("a",na).put("hc",true);changed=true;}
+                // Before 10.0 a gap's steps all went into the hour of the next reading. Where Health Connect's hours show
+                // the steps were really taken earlier (in hours Kadamm has as empty), they're moved there, once.
+                for(int back=0;back<4;back++){String d=key(System.currentTimeMillis()-back*86400000L);JSONArray own=hours.optJSONArray(d);JSONObject hd=md.optJSONObject(d);if(own==null||hd==null||hd.optJSONArray("h")==null)continue;
+                    for(int H=0;H<24;H++){double block=own.optDouble(H);String fk="fixed_"+d+"|"+H;if(block<800||p.getBoolean(fk,false))continue;
+                        // The empty hours before it (back to Kadamm's previous reading), possibly into the day before.
+                        java.util.List<String> span=new java.util.ArrayList<>();Calendar cc=Calendar.getInstance();cc.setTime(new java.text.SimpleDateFormat("yyyy-MM-dd",java.util.Locale.US).parse(d));cc.set(Calendar.HOUR_OF_DAY,H);
+                        for(int k=0;k<30;k++){cc.add(Calendar.HOUR_OF_DAY,-1);String dk=key(cc.getTimeInMillis());JSONArray oh=hours.optJSONArray(dk);double ov=oh==null?-1:oh.optDouble(cc.get(Calendar.HOUR_OF_DAY));if(ov!=0)break;span.add(dk+"|"+cc.get(Calendar.HOUR_OF_DAY));}
+                        if(span.size()<3)continue;span.add(d+"|"+H);
+                        java.util.LinkedHashMap<String,Double> w=new java.util.LinkedHashMap<>();double tot=0,before=0;
+                        for(String k:span){String[] kk=k.split("\\|");JSONObject x=md.optJSONObject(kk[0]);JSONArray hh=x==null?null:x.optJSONArray("h");double v=hh==null?0:hh.optDouble(Integer.parseInt(kk[1]),0);w.put(k,v);tot+=v;if(!k.equals(d+"|"+H))before+=v;}
+                        if(tot<100||before<.25*tot){p.edit().putBoolean(fk,true).apply();continue;}
+                        java.util.Map<String,Long> o=new java.util.HashMap<>();o.put(d+"|"+H,Math.round(block));apply(days,hours,o,-1);apply(days,hours,allocate(w,Math.round(block)),1);p.edit().putBoolean(fk,true).apply();changed=true;}}
+                if(changed)p.edit().putString("gaps",gaps.toString()).putString("days",days.toString()).putString("hours",hours.toString()).apply();}catch(Exception ignored){}
+        }
+        if(changed)StepsWidget.refresh(c);
+    }
+    /** Steps on a day that came from a gap in readings: {steps, placed by Health Connect ? 1 : 0}; null when none. */
+    static long[] gapSteps(Context c,String day){
+        try{JSONArray gaps=new JSONArray(c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getString("gaps","[]"));long n=0;boolean all=true;
+            for(int i=0;i<gaps.length();i++){JSONObject g=gaps.getJSONObject(i);JSONObject a=g.getJSONObject("a");for(Iterator<String> it=a.keys();it.hasNext();){String k=it.next();if(k.startsWith(day+"|")){n+=a.getLong(k);if(!g.optBoolean("hc"))all=false;}}}
+            return n>0?new long[]{n,all?1:0}:null;}catch(Exception e){return null;}
     }
 
     /** Splits a delta across local days in proportion to the time spent in each. */

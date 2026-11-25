@@ -403,6 +403,26 @@ final class MetricViews {
         }
     }
 
+    /**
+     * A night's sleep stages over time (hypnogram): awake at the top, then REM, light and deep at the bottom, each a
+     * coloured block. Stages are {minutes from bedtime, minutes, Health Connect stage type}.
+     */
+    static final class Hypno extends Base {
+        private final org.json.JSONArray st;private final int total;private final long start;
+        Hypno(Context c,KadammTheme t,org.json.JSONArray stages,int totalMin,long startMs){super(c,t);st=stages;total=Math.max(1,totalMin);start=startMs;setContentDescription("Sleep stages through the night");}
+        static int row(int stage){switch(stage){case 1:case 3:case 7:return 0;case 6:return 1;case 5:return 3;default:return 2;}}
+        static final int[] COLORS={Color.rgb(242,139,130),Color.rgb(130,177,255),Color.rgb(66,133,244),Color.rgb(98,42,190)};
+        @Override protected void onDraw(Canvas c){
+            float w=getWidth(),h=getHeight(),left=dp(44),bottom=h-dp(16),rowH=(bottom-dp(4))/4f;String[] names={"Awake","REM","Light","Deep"};
+            p.setTextSize(dp(10));p.setTextAlign(Paint.Align.RIGHT);
+            for(int r=0;r<4;r++){float y=dp(4)+rowH*r;p.setColor(t.textMuted);c.drawText(names[r],left-dp(6),y+rowH/2+dp(3.5f),p);p.setColor(alpha(t.border,160));c.drawLine(left,y+rowH,w,y+rowH,p);}
+            for(int i=0;i<st.length();i++){org.json.JSONArray s=st.optJSONArray(i);if(s==null)continue;int r=row(s.optInt(2));float x0=left+(w-left)*s.optInt(0)/(float)total,x1=left+(w-left)*(s.optInt(0)+s.optInt(1))/(float)total;float y=dp(4)+rowH*r;
+                p.setColor(COLORS[r]);c.drawRoundRect(new RectF(x0,y+dp(3),Math.max(x0+dp(1.5f),x1),y+rowH-dp(3)),dp(2),dp(2),p);}
+            p.setColor(t.textMuted);p.setTextAlign(Paint.Align.LEFT);java.text.SimpleDateFormat f=new java.text.SimpleDateFormat("h:mm a",Locale.getDefault());
+            c.drawText(f.format(new java.util.Date(start)),left,h-dp(3),p);p.setTextAlign(Paint.Align.RIGHT);c.drawText(f.format(new java.util.Date(start+total*60000L)),w,h-dp(3),p);p.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+
     /** Tier colours for badges: bronze (easy), silver (medium), gold (hard), amethyst (extreme). */
     static final int[][] TIER={{Color.rgb(214,140,86),Color.rgb(140,78,40)},{Color.rgb(214,222,232),Color.rgb(120,132,148)},{Color.rgb(255,214,92),Color.rgb(196,128,8)},{Color.rgb(196,140,255),Color.rgb(98,42,190)}};
     static final String[] TIER_NAMES={"Easy","Medium","Hard","Extreme"};

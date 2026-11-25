@@ -47,7 +47,7 @@ object HealthSync {
         HealthPermission.getReadPermission(RestingHeartRateRecord::class),
         HealthPermission.getReadPermission(Vo2MaxRecord::class),
         HealthPermission.getReadPermission(WeightRecord::class)
-    ) + HealthImport.wanted()
+    ) + WatchHealth.readPermissions + WatchHealth.writePermissions + HealthImport.wanted()
     @JvmStatic fun isRunning() = running
     /** Lets Kadamm read while closed, so the widget and reminders stay current. Only offered where Health Connect supports it. */
     const val BACKGROUND = HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
@@ -55,7 +55,11 @@ object HealthSync {
         HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE &&
             HealthConnectClient.getOrCreate(context).features.getFeatureStatus(HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND) == HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
     } catch (_: Throwable) { false }
-    @JvmStatic fun requested(context: Context): Set<String> = if (backgroundSupported(context)) allPermissions + BACKGROUND else allPermissions
+    /** Skin temperature is only asked for where this phone's Health Connect supports it. */
+    @JvmStatic fun requested(context: Context): Set<String> {
+        val base = if (WatchHealth.skinSupported(context)) allPermissions else allPermissions - (WatchHealth.permissionFor("skin") ?: "")
+        return if (backgroundSupported(context)) base + BACKGROUND else base
+    }
     @JvmStatic fun backgroundGranted(context: Context) = context.getSharedPreferences("kadamm_health", Context.MODE_PRIVATE).getBoolean("hcBackground", false)
     private const val SAMSUNG = "com.sec.android.app.shealth"
     @JvmStatic fun label(pkg: String) = when {
@@ -84,8 +88,11 @@ object HealthSync {
                 val settings = app.getSharedPreferences("kadamm_settings", Context.MODE_PRIVATE)
                 val granted = client.permissionController.getGrantedPermissions()
                 // Step sources switched off: Kadamm counts on its own; only a watch's heart rate is still read.
+                // Watch measurements are read whatever the step source: they don't depend on steps.
+                if (WatchHealth.readPermissions.any { granted.contains(it) }) try { WatchHealth.read(app, client, granted) } catch (_: Exception) { }
+                app.getSharedPreferences("kadamm_health", Context.MODE_PRIVATE).edit().putLong("vitalsCheckedAt", System.currentTimeMillis()).putBoolean("hcAvailable", true).apply()
                 if (!settings.getBoolean("hcSteps", true)) { if (settings.getBoolean("hcHeart", true)) heartOnly(app, client, granted) }
-                else if (granted.containsAll(readSteps)) sync(app, client)
+                else if (granted.containsAll(readSteps)) { sync(app, client); DaySteps.rebalance(app) }
                 else app.getSharedPreferences("kadamm_health", Context.MODE_PRIVATE).edit()
                     .putBoolean("healthConnected", false).apply()
             } catch (_: Exception) {
@@ -242,7 +249,6 @@ object HealthSync {
         } catch (_: Exception) {
         }
         try { dailyMinutes(hc, prefs, today, zone, filter) } catch (_: Exception) { }
-        try { vitals(hc, prefs, granted, today, zone) } catch (_: Exception) { }
         edit.putBoolean("hcBackground", granted.contains(BACKGROUND))
         edit.putLong("healthDayTotal", dayTotal)
             .putString("healthOrigin", preferred ?: "")
@@ -381,7 +387,7 @@ object HealthSync {
         val days = try { JSONObject(prefs.getString("minuteDays", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
         for (back in 0..29) {
             val day = today.minusDays(back.toLong()); val key = day.toString()
-            if (back > 0 && days.has(key)) continue
+            if (back > 0 && days.has(key) && (days.optJSONObject(key)?.let { it.has("b") || it.has("empty") } == true)) continue
             val start = day.atStartOfDay(zone).toInstant(); val end = if (back == 0) Instant.now() else day.plusDays(1).atStartOfDay(zone).toInstant()
             val rows = try { hc.aggregateGroupByDuration(AggregateGroupByDurationRequest(setOf(StepsRecord.COUNT_TOTAL), TimeRangeFilter.between(start, end), Duration.ofMinutes(1), filter)) } catch (_: Exception) { continue }
             val perMinute = LongArray(1440); val hours = LongArray(24)
@@ -396,7 +402,9 @@ object HealthSync {
                 else { if (run >= 30) sits.put(JSONArray().put(m - run).put(run)); run = 0 }
             }
             val h = JSONArray(); for (v in hours) h.put(v)
-            days.put(key, JSONObject().put("p30", Math.round(top.average())).put("brisk", brisk).put("sit", sit).put("sits", sits).put("h", h))
+            // Minutes by step rate, for movement load: 20–59, 60–99, 100–129 and 130+ steps a minute.
+            val bands = JSONArray().put(perMinute.count { it in 20L..59L }).put(perMinute.count { it in 60L..99L }).put(perMinute.count { it in 100L..129L }).put(perMinute.count { it >= 130L })
+            days.put(key, JSONObject().put("p30", Math.round(top.average())).put("brisk", brisk).put("sit", sit).put("sits", sits).put("h", h).put("b", bands))
         }
         prefs.edit().putString("minuteDays", days.toString()).apply()
     }

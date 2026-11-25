@@ -63,7 +63,9 @@ public class WatchActivity extends Activity implements DataClient.OnDataChangedL
         super.onResume();Wearable.getDataClient(this).addListener(this);
         Wearable.getDataClient(this).getDataItems(Uri.parse("wear://*/kadamm/")).addOnSuccessListener(items->{for(DataItem it:items)read(it);items.release();render();});
         Wearable.getDataClient(this).getDataItems(Uri.parse("wear://*/kadamm/"),DataClient.FILTER_PREFIX).addOnSuccessListener(items->{for(DataItem it:items)read(it);items.release();render();});
-        message("/kadamm/sync","");handler.post(tick);
+        message("/kadamm/sync","");handler.post(tick);HrJob.hello(this);HrJob.send(this);if(HrJob.allowed(this))HrJob.schedule(this);
+        // While Kadamm is open on the watch, heart rate streams to the phone every 5 seconds.
+        startHr();
     }
     @Override protected void onPause(){Wearable.getDataClient(this).removeListener(this);handler.removeCallbacks(tick);stopHr();super.onPause();}
 
@@ -79,7 +81,7 @@ public class WatchActivity extends Activity implements DataClient.OnDataChangedL
 
     private void render(){
         content.removeAllViews();boolean act=active();
-        if(act){getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);startHr();}else{getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);stopHr();}
+        if(act)getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         TextView brand=tx("KADAMM",11,TEAL,true);brand.setLetterSpacing(.2f);content.addView(brand);
         if(act)renderLive();else renderToday();
     }
@@ -115,6 +117,15 @@ public class WatchActivity extends Activity implements DataClient.OnDataChangedL
             card.addView(tx((done?"✓ ":"")+c.optString("title"),13,done?GREEN:Color.WHITE,true));card.addView(tx(c.optString("progress"),11,MUTED,false));
             View bar=new Bar(this,(float)c.optDouble("f"),done?GREEN:cols[i%3]);LinearLayout.LayoutParams bl=new LinearLayout.LayoutParams(-1,dp(4));bl.topMargin=dp(5);card.addView(bar,bl);}
         TextView m=tx(today.optString("message"),12,Color.rgb(220,222,226),false);m.setGravity(Gravity.CENTER);LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(-1,-2);mp.topMargin=dp(10);content.addView(m,mp);
+        heartRow();
+    }
+    /** Heart rate now, and the switch for all-day heart rate on the phone. */
+    private void heartRow(){
+        if(hrSensor==null)return;
+        TextView now=tx(bpm>0?"♥ "+bpm+" bpm · on your phone too":"♥ Measuring…",13,CORAL,true);LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-2,-2);np.topMargin=dp(14);content.addView(now,np);
+        if(!HrJob.allowed(this)){TextView on=button("All-day heart rate",Color.rgb(48,48,52));LinearLayout.LayoutParams op=new LinearLayout.LayoutParams(-1,dp(44));op.topMargin=dp(8);content.addView(on,op);on.setOnClickListener(v->allDay());
+            note("Every 15 min, for recovery, strain and stress on your phone");}
+        else note("All-day heart rate is on: every 15 minutes");
     }
     private void startButtons(){
         LinearLayout btns=row();LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,dp(46));bp.topMargin=dp(12);content.addView(btns,bp);
@@ -131,9 +142,15 @@ public class WatchActivity extends Activity implements DataClient.OnDataChangedL
         hrOn=sensors.registerListener(this,hrSensor,SensorManager.SENSOR_DELAY_NORMAL);
     }
     private void stopHr(){if(hrOn&&sensors!=null)sensors.unregisterListener(this);hrOn=false;bpm=0;}
-    @Override public void onRequestPermissionsResult(int q,String[] p,int[] r){super.onRequestPermissionsResult(q,p,r);render();}
+    @Override public void onRequestPermissionsResult(int q,String[] p,int[] r){super.onRequestPermissionsResult(q,p,r);if(HrJob.allowed(this)){HrJob.schedule(this);HrJob.now(this);}HrJob.hello(this);if(q==1)startHr();render();}
+    /** All-day heart rate needs "all the time" body-sensor access on Wear OS 4+, asked for after the normal one. */
+    private void allDay(){
+        if(checkSelfPermission(Manifest.permission.BODY_SENSORS)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.BODY_SENSORS},1);return;}
+        if(android.os.Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.BODY_SENSORS_BACKGROUND")!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{"android.permission.BODY_SENSORS_BACKGROUND"},2);return;}
+        HrJob.schedule(this);HrJob.now(this);render();
+    }
     @Override public void onSensorChanged(SensorEvent e){
-        if(e.accuracy<SensorManager.SENSOR_STATUS_ACCURACY_LOW||e.values.length==0)return;int v=Math.round(e.values[0]);if(v<30||v>230)return;bpm=v;
+        if(e.accuracy<SensorManager.SENSOR_STATUS_ACCURACY_LOW||e.values.length==0)return;int v=Math.round(e.values[0]);if(v<30||v>230)return;boolean first=bpm==0;bpm=v;if(first&&!active())render();
         long now=SystemClock.elapsedRealtime();if(now-lastHrSent>=5000){lastHrSent=now;message("/kadamm/hr",String.valueOf(v));}
     }
     @Override public void onAccuracyChanged(Sensor s,int a){}

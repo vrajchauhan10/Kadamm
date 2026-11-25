@@ -151,6 +151,7 @@ class HealthConnectActivity : ComponentActivity() {
         lifecycleScope.launch {
             try {
                 statusText.text = HealthSync.sync(applicationContext, hc)
+                try { WatchHealth.read(applicationContext, hc, hc.permissionController.getGrantedPermissions()) } catch (_: Exception) { }
                 setResult(RESULT_OK)
             } catch (error: Exception) {
                 showStatus("Sync failed. Check Health Connect permissions and try again. ${error.message ?: ""}")

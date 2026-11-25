@@ -37,7 +37,7 @@ final class TrainerCoach {
             return unit;
         }
     }
-    static final class Day { final List<Challenge> list=new ArrayList<>();int done;String greeting,message,signoff;boolean allDone,recovery;double level,yEffort,usualEffort; }
+    static final class Day { final List<Challenge> list=new ArrayList<>();int done;String greeting,message,signoff;boolean allDone,recovery,restNow;int recScore=-1;double strainNow=-1,strainLo=-1,strainHi=-1;String strainName="";double level,yEffort,usualEffort; }
 
     private static SharedPreferences prefs(Context c){return c.getSharedPreferences("kadamm_coach",Context.MODE_PRIVATE);}
     private static String name(Context c){LocalAccount.Account a=LocalAccount.current(c);if(a==null||a.name==null)return "";String n=a.name.trim();int sp=n.indexOf(' ');return sp>0?n.substring(0,sp):n;}
@@ -74,6 +74,14 @@ final class TrainerCoach {
         SharedPreferences cp=prefs(c);Calendar y=Calendar.getInstance();y.add(Calendar.DAY_OF_YEAR,-1);String yKey=DaySteps.key(y.getTimeInMillis());
         // Recovery: after a day with more than twice your usual effort, today is eased and kept gentle.
         double[] eff=efforts(c,hist);day.yEffort=eff[0];day.usualEffort=eff[1];day.recovery=eff[0]>=60&&eff[1]>0&&eff[0]>2*eff[1];
+        // A red Recovery score (watch HRV, resting heart rate and sleep) also makes today an easy day.
+        try{Pro.Recovery rec=Pro.recovery(c);day.recScore=rec.score;if(rec.score>=0&&rec.score<34)day.recovery=true;}catch(Exception ignored){}
+        // Green Recovery: ready to push, so targets rise 5 %.
+        if(!day.recovery&&day.recScore>=67){day.level=Math.min(1.25,day.level*1.05);stepTarget=Math.min(goal*1.8,Math.max(goal,Math.round(base*day.level/500.0)*500.0));briskTarget+=5;}
+        // How much load suits today's recovery (WHOOP's guidance): green 14–18, yellow 10–14, red 5–9, on the 0–21 scale
+        // of Strain (heart rate) or, without a watch, Movement load (steps).
+        try{Pro.Strain stn=Pro.strain(c,today);if(stn.strain>=0){day.strainNow=stn.strain;day.strainName="Strain";}else{Pro.Load ld=Pro.load(c,hist,today);if(ld.load>=0){day.strainNow=ld.load;day.strainName="Movement load";}}
+            if(day.recScore>=0){day.strainLo=day.recScore>=67?14:day.recScore>=34?10:5;day.strainHi=day.recScore>=67?18:day.recScore>=34?14:9;day.restNow=day.strainNow>=day.strainHi;}}catch(Exception ignored){}
         if(day.recovery){day.level=Math.min(day.level,.9);stepTarget=Math.max(goal,Math.round(base*day.level/500.0)*500.0);briskTarget=Math.max(20,Math.round((brMed)*.8/5.0)*5.0);}
         String picked=cp.getString("set_"+today,"");
         if(picked.isEmpty()){
@@ -109,6 +117,12 @@ final class TrainerCoach {
         return day;
     }
 
+    /** One line for the coach card: today's Recovery and how much load suits it, or null without a Recovery score. */
+    static String guidance(Day d){
+        if(d.recScore<0)return null;String zone=d.recScore>=67?"green":d.recScore>=34?"yellow":"red";
+        String load=d.strainNow>=0?String.format(Locale.US," · %s %.1f, best today %.0f–%.0f",d.strainName,d.strainNow,d.strainLo,d.strainHi):String.format(Locale.US," · best load today %.0f–%.0f",d.strainLo,d.strainHi);
+        return String.format(Locale.US,"Recovery %d %% (%s)%s%s",d.recScore,zone,load,d.restNow?" · rest now":"");
+    }
     /** The coach's words, built from the numbers. */
     private static void words(Context c,Day day,Map<String,Long> totals,double steps,double brisk,int minute){
         String n=name(c);String hi=minute<12*60?"Good morning":minute<17*60?"Good afternoon":"Good evening";
@@ -120,8 +134,14 @@ final class TrainerCoach {
             m.append("I'm really happy with today's effort. All three challenges are done");
             m.append(String.format(Locale.US,", with %,d steps on the day. That's exactly how fitness is built, one good day at a time.",Math.round(steps)));
             day.signoff="Rest well. Tomorrow I'll raise the bar a little, because you've earned it.";
+            if(day.recScore>=0&&(day.restNow||day.recScore<34))day.signoff=String.format(Locale.US,"Now rest. Your Recovery is %d %% and your %s is %.1f, %s. Skip extra walks today, drink water and get to bed early so tomorrow starts green.",day.recScore,day.strainName.toLowerCase(Locale.US),day.strainNow,day.restNow?String.format(Locale.US,"already past the %.0f–%.0f that suits it",day.strainLo,day.strainHi):"so your body needs the time to recover");
+            else if(day.recScore>=67&&day.strainNow>=0&&day.strainNow<day.strainLo)day.signoff=String.format(Locale.US,"You're well recovered (%d %%). If you feel good, an easy 20–30 minute walk would bring your %s from %.1f into today's %.0f–%.0f range. Otherwise, rest well.",day.recScore,day.strainName.toLowerCase(Locale.US),day.strainNow,day.strainLo,day.strainHi);
         }else{
-            if(day.recovery)m.append(String.format(Locale.US,"Yesterday was a big day: effort %d, about %.1f× your usual. Today is a recovery day, so I've eased your targets. Keep the pace comfortable. ",Math.round(day.yEffort),day.yEffort/day.usualEffort));
+            if(day.restNow&&!(day.recScore<34))m.append(String.format(Locale.US,"Your %s is already %.1f, above the %.0f–%.0f that suits today's Recovery of %d %%. Finish the challenges gently, with no extra pace. ",day.strainName.toLowerCase(Locale.US),day.strainNow,day.strainLo,day.strainHi,day.recScore));
+            else if(day.recScore>=67&&!day.recovery&&minute<14*60)m.append(String.format(Locale.US,"Your Recovery is %d %% (green): you're ready to push today, so I've added 5 % to your targets. ",day.recScore));
+            else if(day.recScore>=34&&day.recScore<67&&minute<14*60)m.append(String.format(Locale.US,"Your Recovery is %d %% (yellow): a normal day. Steady pace, nothing all-out. ",day.recScore));
+            if(day.recovery&&day.recScore>=0&&day.recScore<34)m.append(String.format(Locale.US,"Your Recovery is %d %% (red): your body hasn't bounced back yet. Today is an easy day, so I've eased your targets. Keep the pace comfortable. ",day.recScore));
+            else if(day.recovery)m.append(String.format(Locale.US,"Yesterday was a big day: effort %d, about %.1f× your usual. Today is an easy day, so I've eased your targets. Keep the pace comfortable. ",Math.round(day.yEffort),day.yEffort/day.usualEffort));
             else if(yv!=null&&yv>0&&minute<12*60)m.append(String.format(Locale.US,"Yesterday you walked %,d steps%s. ",yv,yDone>=3?" and finished every challenge, brilliant":yDone==2?" and finished two of three challenges":""));
             Challenge next=null;for(Challenge ch:day.list)if(!ch.done&&(next==null||ch.fraction()>next.fraction()))next=ch;
             if(day.done==0)m.append("Here are today's three challenges, set from your last four weeks. ");
@@ -141,7 +161,7 @@ final class TrainerCoach {
             }
             int[] stk=DaySteps.streaks(totals,c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getInt("stepGoal",10000));int g0=c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getInt("stepGoal",10000);
             if(minute>=19*60&&stk[0]>=2&&steps<g0)m.append(String.format(Locale.US," Your %d-day streak needs %,d more steps tonight, about %d minutes of walking.",stk[0],Math.round(g0-steps),Math.max(5,Math.round((g0-steps)/100.0))));
-            day.signoff=day.recovery?"Easy movement today helps your body absorb yesterday's work.":day.level>1.02?String.format(Locale.US,"Your targets are %d%% above your usual, because you've been on a roll.",Math.round((day.level-1)*100)):day.level<.98?"I've eased today's targets a little; a steady day gets you back on track.":"You've got this.";
+            day.signoff=day.recovery&&day.recScore>=0&&day.recScore<34?"Gentle walking only today, and an early night: that's what turns Recovery green again.":day.recovery?"Easy movement today helps your body absorb yesterday's work.":day.recScore>=67&&day.level<1?"Your targets were eased after a quieter run of days; your green Recovery puts 5 % back, so today is a good day to catch up.":day.level>1.02?String.format(Locale.US,"Your targets are %d%% above your usual, because you've been on a roll.",Math.round((day.level-1)*100)):day.level<.98?"I've eased today's targets a little; a steady day gets you back on track.":"You've got this.";
         }
         day.message=m.toString().trim();
     }

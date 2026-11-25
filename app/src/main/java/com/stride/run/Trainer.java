@@ -88,7 +88,7 @@ final class Trainer {
             else if(!w.rest&&fresh){w.minutes=Math.round(w.minutes*1.1f/5f)*5;w.why="You're fresh (form "+String.format(Locale.US,"%+d",Math.round(st.form))+") and this week is light (load "+String.format(Locale.US,"%.2f",st.load)+"), so a little extra.";}
             else if(!w.rest)w.why=w.zone>=4?"A harder day builds speed; easier days around it let you recover.":w.zone==3?"Brisk walking at moderate intensity counts double toward your heart health.":"Easy minutes build the base everything else stands on.";
             else w.why=w.title.startsWith("Steps")?"No workout today; just reach your step goal.":"Rest is when fitness grows. A relaxed stroll is fine.";
-            w.detail=w.rest?(w.title.startsWith("Steps")?String.format(Locale.US,"Reach %,d steps",goal):"Recovery day"):w.minutes+" min"+(st.threshold>0&&w.zone>0?" · "+range(st.threshold,w.zone)+" (Z"+w.zone+")":"");
+            w.detail=w.rest?(w.title.startsWith("Steps")?String.format(Locale.US,"Reach %,d steps",goal):"Easy day"):w.minutes+" min"+(st.threshold>0&&w.zone>0?" · "+range(st.threshold,w.zone)+" (Z"+w.zone+")":"");
             w.effort=w.minutes*ZONE_EFFORT[Math.min(6,w.zone)];
             // Done when that day's sessions add up to 70 % of the minutes (rest days: done once the day has passed or the step goal is met).
             long mins=0;for(int k=0;k<hist.length();k++){JSONObject o=hist.optJSONObject(k);if(o!=null&&key.equals(o.optString("day",""))&&!Insights.vehicle(o))mins+=o.optLong("movingMs",o.optLong("durationMs"))/60000;}

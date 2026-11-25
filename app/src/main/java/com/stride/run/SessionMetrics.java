@@ -60,6 +60,8 @@ final class SessionMetrics {
     /** Fastest pace held for 1, 5, 10, 20, 30 and 60 minutes (GPS): duration seconds → seconds per km. */
     final Map<Integer,Double> bestByTime=new LinkedHashMap<>();
     static final int[] CURVE={60,300,600,1200,1800,3600};
+    /** The most metres covered in any 12 minutes (GPS), for the Cooper test; -1 under 12 minutes. */
+    double cooperM=-1;
     /** Stride variability: spread of the 30-second stride over the walk, as a % of the average. */
     double strideCv=-1;
     /** Grade-adjusted pace along the route {km, seconds per km, 0}, with the barometer only. */
@@ -380,6 +382,10 @@ final class SessionMetrics {
             for(int i=1;i<pts.size();i++){while(j<i&&pts.get(i).s-pts.get(j+1).s>=dur)j++;if(pts.get(i).s-pts.get(j).s>=dur)bestM=Math.max(bestM,pts.get(i).m-pts.get(j).m);}
             if(bestM>dur/1800d*1000*.1&&dur/(bestM/1000d)>=150)x.bestByTime.put(dur,dur/(bestM/1000d));
         }
+        // Cooper: the most distance in any 12 minutes, scaled to exactly 720 s (GPS points are a few seconds apart).
+        if(pts.get(pts.size()-1).s-pts.get(0).s>=720&&!x.vehicle){double best=0;int j=0;
+            for(int i=1;i<pts.size();i++){while(j+1<i&&pts.get(i).s-pts.get(j+1).s>=720)j++;double dt=pts.get(i).s-pts.get(j).s;if(dt>=720&&dt<=780)best=Math.max(best,(pts.get(i).m-pts.get(j).m)*720/dt);}
+            if(best>=400)x.cooperM=best;}
     }
     /**
      * Route overlays. Pace: each stretch coloured by its 30-second speed, from this session's slowest (green)

@@ -50,11 +50,41 @@ final class WearBridge {
         }catch(Throwable ignored){}
     }
 
-    /** The watch's heart-rate readings during the current session, as [seconds from start, bpm] every 5 s. */
+    /** The watch's heart-rate readings during the current session, as [seconds from start, bpm] every 5 s; every
+     *  reading is also the live heart rate and goes into the day's minutes. */
     static void addHeartRate(Context c,int bpm){
-        if(bpm<30||bpm>230)return;SharedPreferences p=c.getSharedPreferences("stride_state",Context.MODE_PRIVATE);if(!p.getBoolean("active",false))return;
+        if(bpm<30||bpm>230)return;long now=System.currentTimeMillis();
+        c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).edit().putInt("liveHr",bpm).putLong("liveHrAt",now).apply();addMinutes(c,new long[][]{{now,bpm}});
+        SharedPreferences p=c.getSharedPreferences("stride_state",Context.MODE_PRIVATE);if(!p.getBoolean("active",false))return;
         long sec=(System.currentTimeMillis()-p.getLong("sessionStartTimeMs",System.currentTimeMillis()))/1000/5*5;
         try{JSONArray a=new JSONArray(p.getString("wearHr","[]"));if(a.length()>0&&a.getJSONArray(a.length()-1).getLong(0)==sec)return;if(a.length()>8000)return;
             a.put(new JSONArray().put(sec).put(bpm));p.edit().putString("wearHr",a.toString()).putInt("wearHrNow",bpm).putLong("wearHrAt",System.currentTimeMillis()).apply();}catch(Exception ignored){}
+    }
+    // ---- All-day heart rate and the watch itself ----
+    private static final Object LOCK=new Object();
+    /** Heart-rate readings from Kadamm on the watch {epoch ms, bpm}, kept as one value per minute per day for 7 days. */
+    static void addMinutes(Context c,long[][] readings){
+        synchronized(LOCK){
+            SharedPreferences p=c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE);
+            try{JSONObject days=new JSONObject(p.getString("wearHrDays","{}"));
+                for(long[] r:readings){if(r[1]<30||r[1]>230)continue;java.util.Calendar d=java.util.Calendar.getInstance();d.setTimeInMillis(r[0]);String k=DaySteps.key(r[0]);
+                    JSONObject day=days.optJSONObject(k);if(day==null){day=new JSONObject();days.put(k,day);}day.put(String.valueOf(d.get(java.util.Calendar.HOUR_OF_DAY)*60+d.get(java.util.Calendar.MINUTE)),r[1]);}
+                String cut=DaySteps.key(System.currentTimeMillis()-7L*86400000L);java.util.List<String> old=new java.util.ArrayList<>();for(java.util.Iterator<String> it=days.keys();it.hasNext();){String k=it.next();if(k.compareTo(cut)<0)old.add(k);}for(String k:old)days.remove(k);
+                p.edit().putString("wearHrDays",days.toString()).apply();}catch(Exception ignored){}
+        }
+    }
+    /** The day's minute heart rates from Kadamm on the watch. */
+    static int[] minutes(Context c,String day){
+        try{JSONObject d=new JSONObject(c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getString("wearHrDays","{}")).optJSONObject(day);if(d==null)return new int[0];
+            int[] out=new int[d.length()];int i=0;for(java.util.Iterator<String> it=d.keys();it.hasNext();)out[i++]=d.optInt(it.next());return out;}catch(Exception e){return new int[0];}
+    }
+    /** The latest heart rate from the watch {bpm, ms ago}, or null when older than 15 minutes. */
+    static long[] live(Context c){SharedPreferences p=c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE);long at=p.getLong("liveHrAt",0),age=System.currentTimeMillis()-at;return at>0&&age<15*60000L?new long[]{p.getInt("liveHr",0),age}:null;}
+    /** What the watch said about itself: {name, model, caps:[…], at}. */
+    static JSONObject device(Context c){try{return new JSONObject(c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getString("wearDevice","{}"));}catch(Exception e){return new JSONObject();}}
+    static void saveDevice(Context c,String json){try{JSONObject o=new JSONObject(json);o.put("at",System.currentTimeMillis());c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).edit().putString("wearDevice",o.toString()).apply();}catch(Exception ignored){}}
+    /** Asks Kadamm on every connected watch for its details and a fresh heart rate (when it can measure one). */
+    static void ping(Context c){
+        try{Wearable.getNodeClient(c).getConnectedNodes().addOnSuccessListener(nodes->{for(com.google.android.gms.wearable.Node n:nodes)Wearable.getMessageClient(c).sendMessage(n.getId(),"/kadamm/ping",new byte[0]);});}catch(Throwable ignored){}
     }
 }
