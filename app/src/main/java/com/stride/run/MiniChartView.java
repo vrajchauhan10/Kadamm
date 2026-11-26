@@ -61,7 +61,7 @@ final class MiniChartView extends View {
                     p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(2));p.setColor(t.accentOn);float s=rad*.42f;c.drawLine(cx-s,cy,cx-s*.25f,cy+s*.7f,p);c.drawLine(cx-s*.25f,cy+s*.7f,cx+s,cy-s*.6f,p);}
                 else{p.setStyle(Paint.Style.FILL);p.setColor(t.surfaceRaised);c.drawCircle(cx,cy,rad,p);
                     if(today){p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(2));p.setColor(color);p.setPathEffect(new DashPathEffect(new float[]{dp(3),dp(3)},0));c.drawCircle(cx,cy,rad-dp(1),p);p.setPathEffect(null);}}
-                p.setStyle(Paint.Style.FILL);p.setTextSize(dp(10));p.setColor(today?t.text:t.textMuted);if(i<labels.length)c.drawText(labels[i],cx,cy+rad+dp(14),p);
+                p.setStyle(Paint.Style.FILL);p.setTextSize(dp(10));p.setColor(today?t.text:t.textMuted);if(i<labels.length){String[] l=labels[i].split("\n");c.drawText(l[0],cx,cy+rad+dp(14),p);if(l.length>1){p.setTextSize(dp(9.5f));p.setTypeface(android.graphics.Typeface.create("sans-serif-medium",android.graphics.Typeface.NORMAL));c.drawText(l[1],cx,cy+rad+dp(27),p);p.setTypeface(null);}}
             }
             p.setTextAlign(Paint.Align.LEFT);
         }

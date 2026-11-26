@@ -43,7 +43,7 @@ final class ReplayVideo {
             MediaCodec enc=null;MediaMuxer mux=null;Surface surface=null;boolean ok=false;
             try{
                 RouteView map=new RouteView(c);int bg=dark?ShareCard.BLACK:Color.WHITE;
-                map.setThemeExact(bg,dark?Color.rgb(42,42,46):Color.rgb(227,227,230),dark?ShareCard.ROUTE:ShareCard.BLUE,dark);map.setRunColor(ShareCard.RUN);map.setLineScale(1.45f);map.setFollowLocation(false);map.setLegend(true);map.setRoute(o.optString("route","[]"));
+                map.setThemeExact(bg,dark?Color.rgb(42,42,46):Color.rgb(227,227,230),dark?ShareCard.ROUTE:ShareCard.BLUE,dark);map.setRunColor(ShareCard.RUN);map.setLineScale(1.25f);map.setMaxFit(1.6,19.0);map.setFollowLocation(false);map.setLegend(true);map.setRoute(o.optString("route","[]"));
                 map.measure(View.MeasureSpec.makeMeasureSpec(W,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(MAP_H,View.MeasureSpec.EXACTLY));map.layout(0,0,W,MAP_H);
                 // First passes ask for any map tiles that are missing; wait for them before recording.
                 Bitmap warm=Bitmap.createBitmap(W,MAP_H,Bitmap.Config.ARGB_8888);map.setReplay(1f);map.draw(new Canvas(warm));map.setReplay(-1);map.draw(new Canvas(warm));

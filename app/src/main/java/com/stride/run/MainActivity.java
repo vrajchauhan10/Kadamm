@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="10.2.0";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="10.2.1";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -102,7 +102,7 @@ public class MainActivity extends Activity {
         Button share=button("Share",raised,ink),ok=button("Keep going",positive,darkTheme?Color.rgb(11,11,13):Color.WHITE);ok.setTextSize(15);share.setTextSize(15);
         btns.addView(share,new LinearLayout.LayoutParams(0,-1,1));LinearLayout.LayoutParams okp=new LinearLayout.LayoutParams(0,-1,1);okp.leftMargin=dp(10);btns.addView(ok,okp);
         Runnable close=()->{FrameLayout l=celebrateLayer;celebrateLayer=null;if(l!=null)l.animate().alpha(0f).setDuration(200).withEndAction(()->root.removeView(l)).start();};
-        ok.setOnClickListener(v->close.run());celebrateLayer.setOnClickListener(v->close.run());share.setOnClickListener(v->{close.run();shareSheet("Share your goal",todayShareText(),null,null);});
+        ok.setOnClickListener(v->close.run());celebrateLayer.setOnClickListener(v->close.run());share.setOnClickListener(v->{close.run();if(heroShare!=null&&heroShare.isAttachedToWindow())heroShare.postDelayed(heroShare::performClick,350);else shareSheet("Share your goal",todayShareText(),null,null);});
         ConfettiView shower=ConfettiView.shower(this);celebrateLayer.addView(shower,new FrameLayout.LayoutParams(-1,-1));
         celebrateLayer.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
         if(reducedMotion()){shower.setVisibility(View.GONE);return;}
@@ -310,7 +310,7 @@ public class MainActivity extends Activity {
     private void renderDailyInsights(JSONArray all){
         Map<String,Long> totals=dayTotals==null?DaySteps.allDayTotals(this):dayTotals;int goal=dailyGoal();long sum=0;int hit=0;
         for(int i=0;i<7;i++){Calendar d=Calendar.getInstance();d.add(Calendar.DAY_OF_YEAR,-i);Long v=totals.get(dateKey(d));if(v!=null){sum+=v;if(v>=goal)hit++;}}
-        LinearLayout weekly=card();LinearLayout wh=row();wh.addView(tx("This week",16,ink,true),new LinearLayout.LayoutParams(0,dp(26),1));wh.addView(tx(hit+" of 7 goals",11,hit>0?positive:muted,true));weekly.addView(wh);
+        LinearLayout weekly=card();LinearLayout wh=row();wh.addView(tx("This week",16,ink,true),new LinearLayout.LayoutParams(0,dp(26),1));wh.setGravity(Gravity.CENTER_VERTICAL);wh.addView(tx(hit+" of 7 goals",11,hit>0?positive:muted,true));LinearLayout.LayoutParams wsp=lp(36,36);wsp.leftMargin=dp(4);wh.addView(shareCardIcon("this week","Share your week",String.format(Locale.US,"My week on Kadamm: %,d steps in 7 days, goal reached on %d of 7 days.",sum,hit)),wsp);weekly.addView(wh);
         weekly.addView(tx(String.format(Locale.US,"%,d steps in the last 7 days · dashed line is your %,d goal",sum,goal),11,muted,false));
         WeeklyActivityView chart=new WeeklyActivityView(this,totals,goal,chartTheme());LinearLayout.LayoutParams cp=lp(-1,150);cp.topMargin=dp(8);weekly.addView(chart,cp);
         renderStreakCard(totals,goal);
@@ -320,15 +320,15 @@ public class MainActivity extends Activity {
     private void renderStreakCard(Map<String,Long> totals,int goal){
         int[] st=DaySteps.streaks(totals,goal);long todayN=DaySteps.todayTotal(this);boolean todayDone=todayN>=goal;
         LinearLayout c=card();c.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(panel,flame(),darkTheme?.16f:.09f),panel}){{setCornerRadius(dp(16));setStroke(dp(1),blend(line,flame(),.25f));}});
-        LinearLayout head=row();c.addView(head);
+        c.setOnClickListener(v->{scrollToCalendar=true;shownMonth=Calendar.getInstance();navigate("History");});c.setContentDescription("Goal streak. Opens the calendar in History");LinearLayout head=row();c.addView(head);
         android.widget.ImageView ic=icon(R.drawable.ic_flame,darkTheme?Color.rgb(11,11,13):Color.WHITE,8);ic.setBackground(shape(flame(),14));head.addView(ic,lp(44,44));
         LinearLayout ht=col();LinearLayout.LayoutParams htp=new LinearLayout.LayoutParams(0,-2,1);htp.leftMargin=dp(12);head.addView(ht,htp);
         ht.addView(tx("GOAL STREAK",10,muted,true));
         LinearLayout big=row();big.setGravity(Gravity.BOTTOM);ht.addView(big);big.addView(tx(String.valueOf(st[0]),32,st[0]>0?ink:muted,true));TextView unit=tx(st[0]==1?" day":" days",14,muted,true);unit.setPadding(0,0,0,dp(6));big.addView(unit);
-        TextView status=tx(todayDone?"● Today counts":"○ Today open",11,todayDone?positive:flame(),true);status.setPadding(dp(10),dp(5),dp(10),dp(5));status.setBackground(shape(blend(panel,todayDone?positive:flame(),.16f),12));head.addView(status);head.addView(shareIcon("streak",()->shareSheet("Share your streak",st[0]>0?String.format(Locale.US,"I'm on a %d-day goal streak on Kadamm, %,d steps a day.%s",st[0],goal,st[1]>st[0]?String.format(Locale.US," Best so far: %d days.",st[1]):" That's my best ever."):String.format(Locale.US,"Starting a new step streak on Kadamm: %,d steps a day. Longest so far: %d days.",goal,st[1]),null,null)),lp(40,40));
+        TextView status=tx(todayDone?"● Today counts":"○ Today open",11,todayDone?positive:flame(),true);status.setPadding(dp(10),dp(5),dp(10),dp(5));status.setBackground(shape(blend(panel,todayDone?positive:flame(),.16f),12));head.addView(status);head.addView(shareCardIcon("streak","Share your streak",st[0]>0?String.format(Locale.US,"I'm on a %d-day goal streak on Kadamm, %,d steps a day.%s",st[0],goal,st[1]>st[0]?String.format(Locale.US," Best so far: %d days.",st[1]):" That's my best ever."):String.format(Locale.US,"Starting a new step streak on Kadamm: %,d steps a day. Longest so far: %d days.",goal,st[1])),lp(40,40));
         String[] letters=new String[14];boolean[] hit=new boolean[14];
-        for(int i=0;i<14;i++){Calendar d=Calendar.getInstance();d.add(Calendar.DAY_OF_YEAR,i-13);Long v=totals.get(dateKey(d));hit[i]=v!=null&&v>=goal;letters[i]=new SimpleDateFormat("EEEEE",Locale.getDefault()).format(d.getTime());}
-        LinearLayout.LayoutParams chp=lp(-1,52);chp.topMargin=dp(14);c.addView(new MiniChartView(this,chartTheme(),MiniChartView.CHAIN,flame(),0).chain(hit,letters,13),chp);
+        for(int i=0;i<14;i++){Calendar d=Calendar.getInstance();d.add(Calendar.DAY_OF_YEAR,i-13);Long v=totals.get(dateKey(d));hit[i]=v!=null&&v>=goal;letters[i]=new SimpleDateFormat("EEEEE",Locale.getDefault()).format(d.getTime())+"\n"+d.get(Calendar.DAY_OF_MONTH);}
+        LinearLayout.LayoutParams chp=lp(-1,66);chp.topMargin=dp(14);c.addView(new MiniChartView(this,chartTheme(),MiniChartView.CHAIN,flame(),0).chain(hit,letters,13),chp);
         int[] marks={3,7,14,21,30,50,75,100,150,200,365};int next=0;for(int m:marks)if(m>st[0]){next=m;break;}
         LinearLayout stats=row();LinearLayout.LayoutParams stp=lp(-1,-2);stp.topMargin=dp(10);c.addView(stats,stp);
         streakStat(stats,"LONGEST",st[1]+(st[1]==1?" day":" days"));streakStat(stats,"GOAL DAYS",String.valueOf(st[2]));streakStat(stats,"NEXT BADGE",next==0?"—":next+" days");
@@ -397,7 +397,12 @@ public class MainActivity extends Activity {
             long best=0,sum=0;int counted=0;for(int i=0;i<=lastDay;i++){sum+=mv[i];if(mv[i]>0)counted++;best=Math.max(best,mv[i]);}
             LinearLayout ls=row();LinearLayout.LayoutParams lsp=lp(-1,-2);lsp.topMargin=dp(10);land.addView(ls,lsp);
             chartStat(ls,"DAILY AVERAGE",String.format(Locale.US,"%,d",counted>0?sum/counted:0));chartStat(ls,"GOAL DAYS",goalDays+" of "+(lastDay+1));chartStat(ls,"BEST DAY",String.format(Locale.US,"%,d",best));}
-        LinearLayout cal=card();LinearLayout dr=row();cal.addView(dr);
+        LinearLayout cal=card();
+        // Month name and share: the calendar goes out as a picture, goal days and streaks as they look here.
+        LinearLayout chd=row();chd.setGravity(Gravity.CENTER_VERTICAL);cal.addView(chd,lp(-1,-2));TextView cm=tx(new SimpleDateFormat("MMMM yyyy",Locale.getDefault()).format(shownMonth.getTime()).toUpperCase(Locale.getDefault()),10,muted,true);cm.setLetterSpacing(.08f);chd.addView(cm,new LinearLayout.LayoutParams(0,-2,1));
+        chd.addView(shareCardIcon("calendar","Share your month",String.format(Locale.US,"%s on Kadamm: goal reached on %d days, %,d steps.",new SimpleDateFormat("MMMM yyyy",Locale.US).format(shownMonth.getTime()),goalDays,monthSteps)),lp(36,36));
+        LinearLayout dr=row();cal.addView(dr);
+        if(scrollToCalendar){scrollToCalendar=false;cal.post(()->scroller.smoothScrollTo(0,Math.max(0,cal.getTop()-dp(12))));}
         for(String d:new String[]{"M","T","W","T","F","S","S"}){TextView t=tx(d,11,muted,true);t.setGravity(Gravity.CENTER);dr.addView(t,new LinearLayout.LayoutParams(0,dp(28),1));}
         int offset=(first.get(Calendar.DAY_OF_WEEK)+5)%7,weeks=(offset+days+6)/7;KadammTheme theme=chartTheme();
         for(int wk=0;wk<weeks;wk++){
@@ -763,7 +768,7 @@ public class MainActivity extends Activity {
             for(String line:r.lines){TextView t=tx("•  "+line,14,ink,false);t.setPadding(0,dp(6),0,0);rc.addView(t);}
             TextView f=tx(r.focus,13,violet,true);f.setPadding(0,dp(12),0,0);f.setLineSpacing(dp(2),1f);rc.addView(f);
             Button sh=button("Share my week",raised,ink);LinearLayout.LayoutParams sp=lp(-1,44);sp.topMargin=dp(12);rc.addView(sh,sp);
-            sh.setOnClickListener(v->{StringBuilder b=new StringBuilder("Kadamm · "+r.title+"\n");for(String line:r.lines)b.append("• ").append(line).append('\n');shareSheet("Share your week",b.toString().trim(),null,null);});}
+            sh.setOnClickListener(v->{StringBuilder b=new StringBuilder("Kadamm · "+r.title+"\n");for(String line:r.lines)b.append("• ").append(line).append('\n');shareViews("Share your week",b.toString().trim(),java.util.Collections.singletonList(rc),v);});}
     }
     private void renderFriends(JSONArray h){
         LinearLayout c=metricCard("CHALLENGE A FRIEND","","Make a challenge code and send it any way you like. Your friend enters it in their Kadamm and the clock starts for them that day. Codes hold only the challenge and your first name; nothing goes to a server.");
@@ -777,7 +782,7 @@ public class MainActivity extends Activity {
             TrainerCoach.Challenge pr=new TrainerCoach.Challenge("f","",f.target,f.value,"",f.done);r.addView(coachBar(pr,0),coachBarLp());
             LinearLayout acts=row();LinearLayout.LayoutParams ap=lp(-1,-2);ap.topMargin=dp(8);r.addView(acts,ap);
             TextView share=tx("Send my result  ›",12,lime,true);acts.addView(share,new LinearLayout.LayoutParams(0,-2,1));TextView rm=tx("Remove",12,muted,true);acts.addView(rm);
-            share.setOnClickListener(v->shareSheet("Send your result","Kadamm challenge "+f.code+": I "+(f.done?"finished it with ":"have ")+val+" of "+tgt+".",null,null));
+            share.setOnClickListener(v->shareViews("Send your result","Kadamm challenge "+f.code+": I "+(f.done?"finished it with ":"have ")+val+" of "+tgt+".",java.util.Collections.singletonList(cardOf(v)),v));
             rm.setOnClickListener(v->{TrainerCoach.removeFriend(this,f.code);renderPageNow();});}
         LinearLayout btns=row();LinearLayout.LayoutParams bp=lp(-1,46);bp.topMargin=dp(12);c.addView(btns,bp);
         Button make=button("Create a code",lime,darkTheme?Color.rgb(11,11,13):Color.WHITE),enter=button("Enter a code",raised,ink);
@@ -1067,6 +1072,7 @@ public class MainActivity extends Activity {
         boolean watch=watchData();LinearLayout c=card();
         LinearLayout hd=row();c.addView(hd,lp(-1,-2));TextView t=tx("YOUR BODY TODAY",10,muted,true);t.setLetterSpacing(.08f);hd.addView(t,new LinearLayout.LayoutParams(0,-2,1));
         if(!"Body".equals(page)){TextView all=tx("All data  ›",12,lime,true);all.setOnClickListener(x->navigate("Body"));hd.addView(all);}
+        hd.setGravity(Gravity.CENTER_VERTICAL);LinearLayout.LayoutParams shp=lp(36,36);shp.leftMargin=dp(6);hd.addView(shareCardIcon("your body today","Share your body today",bodyCaption(hist)),shp);
         LinearLayout rings=row();LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(12);c.addView(rings,rp);
         String[] keys=topRings().toArray(new String[0]);
         for(int i=0;i<keys.length;i++){String[] m=bodyMetric(keys[i],hist);LinearLayout cell=col();cell.setGravity(Gravity.CENTER_HORIZONTAL);rings.addView(cell,new LinearLayout.LayoutParams(0,-2,1));
@@ -1095,7 +1101,7 @@ public class MainActivity extends Activity {
         TextView choose=tx("Choose what shows here  ›",12,lime,true);foot.addView(choose,new LinearLayout.LayoutParams(0,-2,1));
         choose.setOnClickListener(x->dialog().setTitle("Choose what shows here").setItems(new String[]{"The 3 big circles at the top","Measures below them"},(d,w)->{if(w==0)chooseTopRings();else choosePinned();}).show());
         // Tiles or circles: one tap switches, the choice is kept.
-        LinearLayout seg=row();seg.setBackground(shape(raised,14));seg.setPadding(dp(3),dp(3),dp(3),dp(3));foot.addView(seg);
+        LinearLayout seg=row();seg.setBackground(shape(raised,14));seg.setPadding(dp(3),dp(3),dp(3),dp(3));seg.setTag("noshare");foot.addView(seg);
         for(String[] o:new String[][]{{"tiles","Tiles"},{"rings","Circles"}}){boolean sel=o[0].equals(circles?"rings":"tiles");TextView b=tx(o[1],11,sel?accentOn:ink,true);b.setGravity(Gravity.CENTER);b.setPadding(dp(10),0,dp(10),0);b.setBackground(shape(sel?lime:Color.TRANSPARENT,11));seg.addView(b,lp(-2,28));
             b.setOnClickListener(x->{if(sel)return;getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("bodyStyle",o[0]).apply();renderPageNow();});b.setContentDescription("Show as "+o[1].toLowerCase(Locale.US));}
     }
@@ -1113,7 +1119,7 @@ public class MainActivity extends Activity {
         LinearLayout holder=col();content.addView(holder,lp(-1,-2));String forPage=renderedPage;
         holder.post(()->{if(!"Today".equals(page)||!forPage.equals(renderedPage)||holder.getParent()!=content)return;LinearLayout real=content;content=holder;try{renderBodyToday(hist);}catch(Exception ignored){}finally{content=real;}});
     }
-    private boolean catalogOpen,scrollToCatalog;private View catalogCard;
+    private boolean catalogOpen,scrollToCatalog,scrollToCalendar;private View catalogCard;
     private TextView liveValue;
     private void choosePinned(){
         // The rings already show Recovery, Strain (Movement load without a watch) and Sleep, so they aren't offered as tiles.
@@ -1125,6 +1131,11 @@ public class MainActivity extends Activity {
             int picked=0;for(boolean x:on)if(x)picked++;if(picked>6)toast("Home shows 6: the first 6 you picked");getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("pinnedBody",b.toString()).apply();renderPageNow();}).setNegativeButton("Cancel",null).show();
     }
 
+    private String bodyCaption(JSONArray hist){
+        StringBuilder b=new StringBuilder("My body today on Kadamm");String sep=": ";
+        for(String k:topRings()){String[] m=bodyMetric(k,hist);if("-2".equals(m[3]))continue;b.append(sep).append(bodyName(k)).append(' ').append(m[0]).append("%".equals(m[1])?" %":m[1].isEmpty()?"":" "+m[1]);sep=" · ";}
+        return b.toString();
+    }
     /** The 3 big circles at the top of Your body today: Recovery, Strain (Movement load without a watch) and Sleep unless you pick others. */
     private java.util.List<String> topRings(){
         String d="recovery,"+(watchData()?"strain":"load")+",sleep";java.util.List<String> out=new java.util.ArrayList<>();
@@ -1750,7 +1761,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     }
     private void renderHero(JSONArray hist){
         LinearLayout c=card();dailyGoalCard=c;c.setBackground(panelShape(20));
-        LinearLayout head=row();head.addView(tx("DAILY GOALS",10,muted,true),new LinearLayout.LayoutParams(0,-2,1));heroSource=tx("",10,positive,true);head.addView(heroSource);head.addView(shareIcon("today",()->shareSheet("Share today",todayShareText(),null,null)),lp(40,40));c.addView(head);
+        LinearLayout head=row();head.addView(tx("DAILY GOALS",10,muted,true),new LinearLayout.LayoutParams(0,-2,1));heroSource=tx("",10,positive,true);head.addView(heroSource);heroShare=shareCardIcon("today","Share today",todayShareText());head.addView(heroShare,lp(40,40));c.addView(head);
         LinearLayout body=row();LinearLayout.LayoutParams bp=lp(-1,-2);bp.topMargin=dp(10);c.addView(body,bp);
         // The goals capsule: steps, brisk minutes and distance layered into one day's %.
         capsule=new GoalCapsule.CapsuleView(this,darkTheme);body.addView(capsule,lp(96,214));
@@ -1948,18 +1959,20 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     private String sessionLabel(JSONObject o){String name=o.optString("name","").trim();return name.isEmpty()?o.optString("type","Walk"):name;}
     private String sessionTitle(JSONObject o){String name=o.optString("name","").trim();return name.isEmpty()?o.optString("type","Walk")+" complete":name;}
     // ---- Route replay ----
-    private android.animation.ValueAnimator replayAnim;
+    private android.widget.ImageView heroShare;private android.animation.ValueAnimator replayAnim;private Runnable replayExit;
     /** Play, scrub and speed controls under the session map, and a live caption on the map while it plays. */
     private void replayControls(FrameLayout mapBox,RouteView rv,JSONObject o){
         TextView hud=tx("",12,Color.WHITE,true);hud.setPadding(dp(10),dp(6),dp(10),dp(6));hud.setBackground(shape(Color.argb(225,22,22,26),12));hud.setVisibility(View.GONE);
-        FrameLayout.LayoutParams hp=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.START);hp.setMargins(dp(10),0,0,dp(10));mapBox.addView(hud,hp);
+        FrameLayout.LayoutParams hp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.END);hp.setMargins(0,dp(10),dp(10),0);mapBox.addView(hud,hp);
         LinearLayout bar=row();bar.setPadding(dp(6),dp(6),dp(10),dp(6));bar.setBackground(panelShape(16));LinearLayout.LayoutParams bp=lp(-1,-2);bp.topMargin=dp(8);content.addView(bar,bp);
         TextView play=tx("▶",16,accentOn,true);play.setGravity(Gravity.CENTER);GradientDrawable pg=new GradientDrawable();pg.setShape(GradientDrawable.OVAL);pg.setColor(lime);play.setBackground(ripple(pg));play.setContentDescription("Replay this route");bar.addView(play,lp(44,44));
         android.widget.SeekBar seek=new android.widget.SeekBar(this);seek.setMax(1000);seek.setProgress(1000);seek.setProgressTintList(android.content.res.ColorStateList.valueOf(lime));seek.setThumbTintList(android.content.res.ColorStateList.valueOf(lime));seek.setContentDescription("Replay position");bar.addView(seek,new LinearLayout.LayoutParams(0,-2,1));
         TextView speed=tx("1×",13,ink,true);speed.setGravity(Gravity.CENTER);speed.setBackground(rippleOn(raised,12));speed.setContentDescription("Replay speed");bar.addView(speed,lp(44,34));
         float[] sp={1f};boolean[] user={false};
         Runnable caption=()->{double[] st=rv.replayState();long sec=Math.round(st[2]);hud.setText((rv.replay()>=1?"Finished":st[1]>0?"Running":"Walking")+String.format(Locale.US,"  ·  %.2f km  ·  %d:%02d",st[0]/1000,sec/60,sec%60));};
-        Runnable stop=()->{if(replayAnim!=null){replayAnim.cancel();replayAnim=null;}play.setText("▶");play.setContentDescription("Replay this route");};
+        Runnable stop=()->{if(replayAnim!=null){android.animation.ValueAnimator a=replayAnim;replayAnim=null;a.cancel();}play.setText("▶");play.setContentDescription("Replay this route");};
+        // Leaving the replay (picking Route, Pace or Grade) shows the whole route again in that view.
+        replayExit=()->{stop.run();rv.setReplay(-1);seek.setProgress(1000);hud.setVisibility(View.GONE);};
         seek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener(){
             public void onProgressChanged(android.widget.SeekBar b,int v,boolean fromUser){if(!fromUser)return;stop.run();rv.setReplay(v/1000f);hud.setVisibility(View.VISIBLE);caption.run();}
             public void onStartTrackingTouch(android.widget.SeekBar b){RouteView.gestureActive=true;}
@@ -1969,7 +1982,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             float from=rv.replay()<0||rv.replay()>=1?0:rv.replay();rv.resetView();hud.setVisibility(View.VISIBLE);
             replayAnim=android.animation.ValueAnimator.ofFloat(from,1f);replayAnim.setDuration((long)(13500*(1-from)/sp[0]));replayAnim.setInterpolator(new android.view.animation.LinearInterpolator());
             replayAnim.addUpdateListener(a->{float f=(float)a.getAnimatedValue();rv.setReplay(f);seek.setProgress(Math.round(f*1000));caption.run();});
-            replayAnim.addListener(new android.animation.AnimatorListenerAdapter(){@Override public void onAnimationEnd(android.animation.Animator a){if(replayAnim==a){replayAnim=null;play.setText("↺");play.setContentDescription("Replay again");}}});
+            replayAnim.addListener(new android.animation.AnimatorListenerAdapter(){@Override public void onAnimationEnd(android.animation.Animator a){if(replayAnim==a){replayAnim=null;play.setText("↺");play.setContentDescription("Replay again");rv.setReplay(-1);}}});
             play.setText("Ⅱ");play.setContentDescription("Pause replay");replayAnim.start();
         });
         speed.setOnClickListener(v->{sp[0]=sp[0]==1?2:sp[0]==2?4:1;speed.setText((int)sp[0]+"×");if(replayAnim!=null){float f=rv.replay();stop.run();rv.setReplay(f);play.performClick();}});
@@ -2061,7 +2074,9 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         sheet.setPadding(dp(20),dp(10),dp(20),dp(20));GradientDrawable sb=new GradientDrawable();sb.setColor(panel);sb.setCornerRadii(new float[]{dp(26),dp(26),dp(26),dp(26),0,0,0,0});sheet.setBackground(sb);
         View grip=new View(this);grip.setBackground(shape(line,3));LinearLayout.LayoutParams gp=lp(40,5);gp.gravity=Gravity.CENTER_HORIZONTAL;gp.bottomMargin=dp(14);sheet.addView(grip,gp);
         sheet.addView(tx(title,20,ink,true));
-        TextView msg=tx(text,13,ink,false);msg.setPadding(dp(14),dp(12),dp(14),dp(12));msg.setBackground(shape(raised,14));msg.setMaxLines(9);msg.setEllipsize(android.text.TextUtils.TruncateAt.END);LinearLayout.LayoutParams mp=lp(-1,-2);mp.topMargin=dp(10);sheet.addView(msg,mp);
+        // A picture is previewed as it will be sent; text is shown as the message.
+        if(file!=null&&"image/png".equals(mime)){android.widget.ImageView pv=new android.widget.ImageView(this);pv.setAdjustViewBounds(true);pv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);pv.setMaxHeight((int)(getResources().getDisplayMetrics().heightPixels*.5f));pv.setImageURI(file);pv.setClipToOutline(true);pv.setBackground(shape(raised,14));LinearLayout.LayoutParams pvp=lp(-1,-2);pvp.topMargin=dp(12);sheet.addView(pv,pvp);}
+        else{TextView msg=tx(text,13,ink,false);msg.setPadding(dp(14),dp(12),dp(14),dp(12));msg.setBackground(shape(raised,14));msg.setMaxLines(9);msg.setEllipsize(android.text.TextUtils.TruncateAt.END);LinearLayout.LayoutParams mp=lp(-1,-2);mp.topMargin=dp(10);sheet.addView(msg,mp);}
         LinearLayout targets=row();targets.setGravity(Gravity.TOP);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(16);sheet.addView(targets,tp);
         int wa=Color.rgb(37,211,102);
         if(installed("com.whatsapp"))shareTarget(targets,"WhatsApp",R.drawable.ic_chat,wa,()->{d.dismiss();send(text,file,mime,"com.whatsapp");});
@@ -2105,10 +2120,57 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         if(st[0]>0)b.append(String.format(Locale.US,"\n%d-day goal streak",st[0]));
         return b.append(n>=goal?"\nGoal done for today ✓":"").toString();
     }
+    /** The card (a direct child of the page) that holds this view. */
+    private View cardOf(View v){while(v.getParent() instanceof View&&v.getParent()!=content)v=(View)v.getParent();return v;}
+    private void collectControls(View v,java.util.List<View> out){
+        if(v.getVisibility()!=View.VISIBLE)return;
+        if(v instanceof Button||"noshare".equals(v.getTag())||v instanceof TextView&&v.hasOnClickListeners()&&((TextView)v).getText().toString().trim().endsWith("›")){out.add(v);return;}
+        if(v instanceof android.view.ViewGroup){android.view.ViewGroup g=(android.view.ViewGroup)v;for(int i=0;i<g.getChildCount();i++)collectControls(g.getChildAt(i),out);}
+    }
+    /** A share icon that sends its own card as a picture, drawn exactly as it looks on screen. */
+    private android.widget.ImageView shareCardIcon(String what,String title,String caption){
+        android.widget.ImageView[] me=new android.widget.ImageView[1];me[0]=shareIcon(what,()->shareViews(title,caption,java.util.Collections.singletonList(cardOf(me[0])),me[0]));return me[0];
+    }
+    /**
+     * Shares views as a picture: drawn as they look on screen, on the page background, with the Kadamm logo and the
+     * maker's mark below. {@code hide} (the share button) is left out of the picture.
+     */
+    private void shareViews(String title,String caption,java.util.List<View> views,View hide){
+        try{android.graphics.Bitmap b=snapshot(views,hide);
+            java.io.File dir=new java.io.File(getCacheDir(),"share");dir.mkdirs();java.io.File file=new java.io.File(dir,"kadamm-card.png");
+            try(java.io.FileOutputStream out=new java.io.FileOutputStream(file)){b.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}
+            shareSheet(title,caption,androidx.core.content.FileProvider.getUriForFile(this,getPackageName()+".files",file),"image/png");
+        }catch(Exception e){shareSheet(title,caption,null,null);}
+    }
+    private android.graphics.Bitmap snapshot(java.util.List<View> views,View hide){
+        // Controls (buttons, "›" links, switches) are left out of the picture: each view is laid out again without them.
+        java.util.List<View> off=new java.util.ArrayList<>();if(hide!=null)off.add(hide);for(View v:views)collectControls(v,off);
+        java.util.List<View> shown=new java.util.ArrayList<>();for(View v:views)if(v.getWidth()>0&&v.getVisibility()==View.VISIBLE)shown.add(v);
+        if(shown.isEmpty())throw new IllegalStateException("nothing drawn");
+        int[] was=new int[off.size()];for(int i=0;i<off.size();i++){was[i]=off.get(i).getVisibility();off.get(i).setVisibility(View.GONE);}
+        int[][] box=new int[shown.size()][];for(int i=0;i<shown.size();i++){View v=shown.get(i);box[i]=new int[]{v.getLeft(),v.getTop(),v.getRight(),v.getBottom()};
+            v.measure(View.MeasureSpec.makeMeasureSpec(v.getWidth(),View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));v.layout(box[i][0],box[i][1],box[i][2],box[i][1]+v.getMeasuredHeight());}
+        int gap=dp(12),pad=dp(18),foot=dp(46),w=0,h=0;for(View v:shown){w=Math.max(w,v.getWidth());h+=(h>0?gap:0)+v.getHeight();}
+        android.graphics.Bitmap b=android.graphics.Bitmap.createBitmap(w+2*pad,h+2*pad+foot,android.graphics.Bitmap.Config.ARGB_8888);android.graphics.Canvas c=new android.graphics.Canvas(b);c.drawColor(bg);
+        try{float y=pad;for(View v:shown){c.save();c.translate(pad+(w-v.getWidth())/2f,y);v.draw(c);c.restore();y+=v.getHeight()+gap;}}
+        finally{for(int i=0;i<off.size();i++)off.get(i).setVisibility(was[i]);
+            for(int i=0;i<shown.size();i++){View v=shown.get(i);v.measure(View.MeasureSpec.makeMeasureSpec(box[i][2]-box[i][0],View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(box[i][3]-box[i][1],View.MeasureSpec.EXACTLY));v.layout(box[i][0],box[i][1],box[i][2],box[i][3]);v.requestLayout();}}
+        // Footer: the Kadamm logo and name on the left, "crafted by V" on the right.
+        float fy=b.getHeight()-pad-foot/2f;android.graphics.drawable.Drawable logo=getDrawable(darkTheme?R.drawable.ic_kadamm_logo_dark:R.drawable.ic_kadamm_logo);int ls=dp(26);
+        if(logo!=null){logo.setBounds(pad,(int)(fy-ls/2f),pad+ls,(int)(fy+ls/2f));logo.draw(c);}
+        android.graphics.Paint tp=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);tp.setColor(ink);tp.setTextSize(dp(14));tp.setTypeface(Typeface.create("sans-serif-medium",Typeface.BOLD));tp.setLetterSpacing(.12f);
+        c.drawText("KADAMM",pad+ls+dp(10),fy+dp(5),tp);
+        ShareCard.signature(this,c,w+pad,fy+dp(8),muted,dp(14)/52f*1.5f);
+        return b;
+    }
     private android.widget.ImageView shareIcon(String what,Runnable go){android.widget.ImageView s=icon(R.drawable.ic_share,muted,10);s.setContentDescription("Share "+what);s.setFocusable(true);s.setBackground(rippleOn(Color.TRANSPARENT,20));s.setOnClickListener(v->go.run());return s;}
     private void shareTarget(LinearLayout parent,String label,int res,int color,Runnable go){
         LinearLayout t=col();t.setGravity(Gravity.CENTER_HORIZONTAL);t.setPadding(0,dp(6),0,dp(6));t.setBackground(rippleOn(Color.TRANSPARENT,14));t.setFocusable(true);t.setContentDescription("Share to "+label);
-        android.widget.ImageView ic=icon(res,Color.WHITE,13);GradientDrawable g=new GradientDrawable();g.setShape(GradientDrawable.OVAL);g.setColor(color);ic.setBackground(g);t.addView(ic,lp(52,52));
+        // WhatsApp shows its own app icon (as installed on this phone), not a generic chat bubble.
+        android.graphics.drawable.Drawable app=null;String pkg=label.equals("WhatsApp")?"com.whatsapp":label.equals("WA Business")?"com.whatsapp.w4b":null;
+        if(pkg!=null)try{app=getPackageManager().getApplicationIcon(pkg);}catch(Exception ignored){}
+        android.widget.ImageView ic;if(app!=null){ic=new android.widget.ImageView(this);ic.setImageDrawable(app);ic.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);}
+        else{ic=icon(res,Color.WHITE,13);GradientDrawable g=new GradientDrawable();g.setShape(GradientDrawable.OVAL);g.setColor(color);ic.setBackground(g);}t.addView(ic,lp(52,52));
         TextView l=tx(label,11,ink,true);l.setGravity(Gravity.CENTER);LinearLayout.LayoutParams lpp=lp(-1,-2);lpp.topMargin=dp(6);t.addView(l,lpp);
         parent.addView(t,new LinearLayout.LayoutParams(0,-2,1));t.setOnClickListener(v->go.run());
     }
@@ -2353,7 +2415,11 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         openDays.add(day);summaryDay=day;page="DaySummary";String share=intent.getStringExtra("shareDay");intent.removeExtra("openDay");intent.removeExtra("shareDay");
         if(share!=null)handler.postDelayed(()->shareDay(share),600);
     }
-    private void shareDay(String day){DaySummary d=DaySummary.of(this,history(),day);if(d.sessions==0)return;shareSheet("Share your day",d.text(dayTitle(day)+" in Kadamm")+"\nTracked with Kadamm",null,null);}
+    private void shareDay(String day){DaySummary d=DaySummary.of(this,history(),day);if(d.sessions==0)return;String text=d.text(dayTitle(day)+" in Kadamm")+"\nTracked with Kadamm";
+        // The day page as it looks (title, map and totals), not the back bar or the sessions list below.
+        java.util.List<View> v=new java.util.ArrayList<>();int h=0,maxH=(int)(content.getWidth()*1.9f);
+        if("DaySummary".equals(page))for(int i=1;i<content.getChildCount();i++){View c=content.getChildAt(i);if(h+c.getHeight()>maxH&&!v.isEmpty())break;v.add(c);h+=c.getHeight();}
+        if(v.isEmpty())shareSheet("Share your day",text,null,null);else shareViews("Share your day",text,v,null);}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handleDayIntent(intent);if(intent!=null&&intent.getStringExtra("page")!=null){navigate(intent.getStringExtra("page"));if(intent.getBooleanExtra("startWalk",false)&&!prefs.getBoolean("active",false)){activityType="Walk";onRecord();}return;}if(intent!=null&&intent.getBooleanExtra("openLive",false)&&prefs.getBoolean("active",false))openLive();}
     // ---- Session summary: records, route attempts, charts ----
     private void renderSessionInsights(JSONObject o){
@@ -2463,6 +2529,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         TextView[] opts=new TextView[names.length];
         java.util.function.IntConsumer pick=k->{
             for(int i=0;i<opts.length;i++){boolean on=i==k;opts[i].setTextColor(on?accentOn:ink);opts[i].setBackground(on?shape(lime,13):null);}
+            if(rv.replay()>=0&&replayExit!=null)replayExit.run();
             rv.setOverlay(k==1?m.paceOverlay:k==2?m.gradeOverlay:null);rv.setLabels(k==1?pins:null);
             android.text.SpannableStringBuilder b=new android.text.SpannableStringBuilder();
             if(k==1){append(b,"● ",MetricViews.ZONE_COLORS[2]);b.append("Slow   ");append(b,"● ",MetricViews.ZONE_COLORS[3]);b.append("Steady   ");append(b,"● ",MetricViews.ZONE_COLORS[4]);b.append("Fast");}
@@ -2835,7 +2902,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         LinearLayout h=row();c.addView(h);
         android.widget.ImageView ic=icon(R.drawable.ic_trophy,darkTheme?Color.rgb(11,11,13):Color.WHITE,9);ic.setBackground(shape(flame(),16));h.addView(ic,lp(46,46));
         LinearLayout ht=col();LinearLayout.LayoutParams htp=new LinearLayout.LayoutParams(0,-2,1);htp.leftMargin=dp(12);h.addView(ht,htp);
-        ht.addView(tx("Personal records",18,ink,true));ht.addView(tx(recs.size()+" bests so far · tap one to relive it",11,muted,false));StringBuilder rt=new StringBuilder("My personal records on Kadamm");for(Insights.Record r:recs)rt.append("\n• ").append(r.label).append(": ").append(r.value);String recText=rt.toString();h.addView(shareIcon("records",()->shareSheet("Share your records",recText,null,null)),lp(40,40));
+        ht.addView(tx("Personal records",18,ink,true));ht.addView(tx(recs.size()+" bests so far · tap one to relive it",11,muted,false));StringBuilder rt=new StringBuilder("My personal records on Kadamm");for(Insights.Record r:recs)rt.append("\n• ").append(r.label).append(": ").append(r.value);String recText=rt.toString();h.addView(shareCardIcon("records","Share your records",recText),lp(40,40));
         int[] colors={flame(),lime,purple(),teal(),pink(),green(),indigo(),orange()};
         LinearLayout line2=null;
         for(int i=0;i<recs.size();i++){

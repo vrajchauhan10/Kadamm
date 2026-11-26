@@ -1,5 +1,14 @@
 # Changelog
 
+## 10.2.1 (versionCode 59)
+
+- Sharing sends pictures, not text: Daily goals, Your body today, This week, the goal streak, the History calendar, personal records, the coach's weekly review, challenge results and the day summary each go out as a picture of the card exactly as it looks in the app (light or dark), with the Kadamm logo and "crafted by V" below. Buttons and links are left out of the picture. The share sheet previews the picture before you send it.
+- Your body today and the History calendar have a share button; This week does too.
+- The share sheet shows WhatsApp's own icon.
+- Tapping the goal streak opens the calendar in History. The streak chain shows the date under each day.
+- Session map: the replay strip ("Walking · 0.04 km · 0:42") sits at the top right, clear of the Route / Pace / Grade switch. After a replay, or when you pause one, Route, Pace and Grade work again and the full coloured route comes back; pausing keeps the replay where it stopped.
+- Replay video: short walks are no longer blown up. The map zooms to street level at most, so the route and the streets around it are both in view.
+
 ## 10.2.0 (versionCode 58)
 
 - Edit Home: a link at the bottom of Home lets you choose which sections show there (Your body today, Coach, Trainer, plan, steps by hour, step spread, movement quality, sitting breaks, today at a glance, live route map, this week, reports, new badges). Steps and starting an activity always show; "Show all" brings everything back.
