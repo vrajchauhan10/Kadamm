@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="10.3.2";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="10.3.3";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -2816,7 +2816,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         TextView t=tx(title,12,ink,true);t.setLetterSpacing(.06f);h.addView(t);
         if(unit!=null&&!unit.isEmpty())h.addView(tx("  "+unit,12,muted,false));
         h.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
-        if(how!=null){String guide=readingGuide(title);TextView i=tx("ⓘ",15,muted,false);i.setPadding(dp(10),0,0,0);i.setContentDescription("How "+title.toLowerCase(Locale.US)+" is worked out");i.setOnClickListener(v->dialog().setTitle(title.charAt(0)+title.substring(1).toLowerCase(Locale.US)).setMessage(how+(guide.isEmpty()?"":"\n\nHOW TO READ IT\n"+guide)).setPositiveButton("OK",null).show());h.addView(i);}
+        if(how!=null){String guide=readingGuide(title);TextView i=tx("ⓘ",15,muted,false);i.setTag("noshare");i.setPadding(dp(10),0,0,0);i.setContentDescription("How "+title.toLowerCase(Locale.US)+" is worked out");i.setOnClickListener(v->dialog().setTitle(title.charAt(0)+title.substring(1).toLowerCase(Locale.US)).setMessage(how+(guide.isEmpty()?"":"\n\nHOW TO READ IT\n"+guide)).setPositiveButton("OK",null).show());h.addView(i);}
         return c;
     }
     /** What the units and number formats on a card mean, shown under its explanation. */
@@ -3737,7 +3737,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         TextView head=tx("HEALTH & FITNESS",10,muted,true);head.setLetterSpacing(.08f);LinearLayout.LayoutParams hp=lp(-1,-2);hp.topMargin=dp(20);content.addView(head,hp);
         // Intensity minutes
         double weeks=Math.max(1,elapsed)/7d,target=150*Math.max(1,weeks);
-        LinearLayout im=metricCard("INTENSITY MINUTES","","Moderate minutes plus twice the vigorous ones, from your sessions' intensity zones. The World Health Organization recommends at least 150 a week for adults; 300 brings extra benefit. A month's target is 150 for every week that has passed.");
+        LinearLayout im=metricCard("INTENSITY MINUTES","","Moderate minutes plus twice the vigorous ones, from your sessions' intensity zones. The World Health Organization recommends at least 150 a week for adults; 300 brings extra benefit. A month's target is 150 for every week that has passed.");reportShare(im,"INTENSITY MINUTES");
         LinearLayout r=row();LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(10);im.addView(r,rp);
         r.addView(new MetricViews.Ring(this,th,(float)(now[5]/target),MetricViews.ZONE_COLORS[2],String.valueOf(Math.round(now[5])),"of "+Math.round(target)),lp(112,112));
         LinearLayout rc=col();LinearLayout.LayoutParams rcp=new LinearLayout.LayoutParams(0,-2,1);rcp.leftMargin=dp(16);r.addView(rc,rcp);
@@ -3755,7 +3755,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         // Fitness and form
         SessionMetrics.Fitness fit=SessionMetrics.fitness(this,h);
         if(!fit.days.isEmpty()){
-            LinearLayout fc=metricCard("FITNESS & FORM","","Fitness is a 42-day weighted average of your daily effort and fatigue a 7-day one (the Banister model used by Strava's Fitness & Freshness and TrainingPeaks). Form is fitness minus fatigue: above +5 you're fresh, −10 to +5 is neutral, −30 to −10 is productive training, and below −30 is a lot at once.");
+            LinearLayout fc=metricCard("FITNESS & FORM","","Fitness is a 42-day weighted average of your daily effort and fatigue a 7-day one (the Banister model used by Strava's Fitness & Freshness and TrainingPeaks). Form is fitness minus fatigue: above +5 you're fresh, −10 to +5 is neutral, −30 to −10 is productive training, and below −30 is a lot at once.");reportShare(fc,"FITNESS & FORM");
             String verdict=fit.form>5?"Fresh":fit.form>=-10?"Neutral":fit.form>=-30?"Productive":"Overreaching";int vc=fit.form>5?positive:fit.form>=-10?lime:fit.form>=-30?flame():critical;
             statGrid(fc,new String[][]{{"Fitness",String.format(Locale.US,"%.0f",fit.fitness),""},{"Fatigue",String.format(Locale.US,"%.0f",fit.fatigue),""},{"Form",String.format(Locale.US,"%+.0f",fit.form),verdict}},10);
             java.util.List<double[]> pts=new java.util.ArrayList<>();java.util.List<String> keys=new java.util.ArrayList<>(fit.days.keySet());int startI=Math.max(0,keys.size()-60);
@@ -3768,7 +3768,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             java.util.List<double[]> vals=new java.util.ArrayList<>(fit.days.values());double a7=0,a28=0;int n=vals.size();
             for(int i=Math.max(0,n-28);i<n;i++){a28+=vals.get(i)[3];if(i>=n-7)a7+=vals.get(i)[3];}a7/=7;a28/=28;
             if(a28>0){double ratio=a7/a28;
-                LinearLayout lc=metricCard("TRAINING LOAD","","Acute:chronic workload ratio: your average daily effort over the last 7 days divided by the last 28. Sports science uses it to pace increases: 0.8–1.3 is the sweet spot, above 1.5 means you've ramped up quickly and injury risk rises, below 0.8 means you're doing less than you're used to.");
+                LinearLayout lc=metricCard("TRAINING LOAD","","Acute:chronic workload ratio: your average daily effort over the last 7 days divided by the last 28. Sports science uses it to pace increases: 0.8–1.3 is the sweet spot, above 1.5 means you've ramped up quickly and injury risk rises, below 0.8 means you're doing less than you're used to.");reportShare(lc,"TRAINING LOAD");
                 String verdict=ratio>1.5?"Ramping up fast":ratio>1.3?"Building, keep an eye on it":ratio>=.8?"Sweet spot":"Lighter than usual";int vc=ratio>1.5?critical:ratio>1.3?flame():ratio>=.8?positive:lime;
                 LinearLayout lr=row();LinearLayout.LayoutParams rp2=lp(-1,-2);rp2.topMargin=dp(8);lc.addView(lr,rp2);
                 lr.addView(valueUnit(String.format(Locale.US,"%.2f",ratio),"ratio",30,ink),new LinearLayout.LayoutParams(0,-2,1));lr.addView(tx(verdict,13,vc,true));
@@ -3784,7 +3784,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             p30.add(new double[]{i,x.optDouble("p30"),0});briskSum+=x.optDouble("brisk");sitSum+=x.optDouble("sit");nd++;
             int wd=(dc.get(Calendar.DAY_OF_WEEK)+5)%7;JSONArray hh=x.optJSONArray("h");if(hh!=null){for(int k=0;k<24;k++)heat[wd][k]+=hh.optDouble(k);heatN[wd]++;}}
         if(nd>=1){
-            LinearLayout pc=metricCard("PEAK-30 CADENCE","(spm)","Each day's average of its 30 highest minutes of steps per minute. Studies of thousands of adults link a higher peak-30 cadence with lower risk of death, heart disease and dementia, independent of total steps. About 100 is moderate intensity; 110 or more is excellent. From Samsung Health's minute steps through Health Connect.");
+            LinearLayout pc=metricCard("PEAK-30 CADENCE","(spm)","Each day's average of its 30 highest minutes of steps per minute. Studies of thousands of adults link a higher peak-30 cadence with lower risk of death, heart disease and dementia, independent of total steps. About 100 is moderate intensity; 110 or more is excellent. From Samsung Health's minute steps through Health Connect.");reportShare(pc,"PEAK-30 CADENCE");
             double avg=0,best=0;for(double[] q:p30){avg+=q[1];best=Math.max(best,q[1]);}avg/=p30.size();
             statGrid(pc,new String[][]{{"Average",String.format(Locale.US,"%.0f",avg),"spm"},{"Best day",String.format(Locale.US,"%.0f",best),"spm"},{"Brisk min a day",String.format(Locale.US,"%.0f",briskSum/nd),""}},10);
             if(p30.size()>=3){final Progress.Period fp=per;LinearLayout.LayoutParams p=lp(-1,140);p.topMargin=dp(10);pc.addView(new MetricViews.Series(this,th,p30,true,lime,new double[]{80,100,115,130},avg,v->String.format(Locale.US,"%.0f",v),v->{Calendar c2=(Calendar)fp.start.clone();c2.add(Calendar.DAY_OF_YEAR,(int)Math.round(v));return new java.text.SimpleDateFormat("d MMM",Locale.getDefault()).format(c2.getTime());}),p);}
@@ -3792,33 +3792,14 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             sit.setText(String.format(Locale.US,"Longest sitting stretch: %dh %02d a day on average",Math.round(sitSum/nd)/60,Math.round(sitSum/nd)%60));LinearLayout.LayoutParams sp3=lp(-1,-2);sp3.topMargin=dp(8);pc.addView(sit,sp3);
             // When you move: weekday × hour
             for(int wr=0;wr<7;wr++)if(heatN[wr]>0)for(int k=0;k<24;k++)heat[wr][k]/=heatN[wr];
-            LinearLayout hm=metricCard("WHEN YOU MOVE","","Average steps in each hour, by weekday, over this period. Darker means more steps. From minute-level steps in Health Connect.");
+            LinearLayout hm=metricCard("WHEN YOU MOVE","","Average steps in each hour, by weekday, over this period. Darker means more steps. From minute-level steps in Health Connect.");reportShare(hm,"WHEN YOU MOVE");
             int bh=0,bd=0;for(int wr=0;wr<7;wr++)for(int k=0;k<24;k++)if(heat[wr][k]>heat[bd][bh]){bd=wr;bh=k;}
             hm.addView(tx(String.format(Locale.US,"Most active: %s around %s",new String[]{"Mondays","Tuesdays","Wednesdays","Thursdays","Fridays","Saturdays","Sundays"}[bd],bh==0?"midnight":bh<12?bh+" am":bh==12?"noon":(bh-12)+" pm"),12,muted,false));
             LinearLayout.LayoutParams hp2=lp(-1,150);hp2.topMargin=dp(10);hm.addView(new MetricViews.Heatmap(this,th,heat,lime),hp2);
         }
-        // Pace curve: best pace held for each duration, all-time against the last 90 days
-        java.util.Map<Integer,double[]> allBest=new java.util.TreeMap<>(),recentBest=new java.util.TreeMap<>();String since=DaySteps.key(System.currentTimeMillis()-90L*86400000L);
-        for(int i=0;i<h.length();i++){JSONObject o=h.optJSONObject(i);if(o==null)continue;SessionMetrics m=SessionMetrics.of(this,o);
-            for(java.util.Map.Entry<Integer,Double> e:m.bestByTime.entrySet()){double[] a=allBest.get(e.getKey());if(a==null||e.getValue()<a[0])allBest.put(e.getKey(),new double[]{e.getValue()});
-                if(o.optString("day","").compareTo(since)>=0){double[] b=recentBest.get(e.getKey());if(b==null||e.getValue()<b[0])recentBest.put(e.getKey(),new double[]{e.getValue()});}}}
-        if(allBest.size()>=3){
-            LinearLayout cv=metricCard("PACE CURVE","","Your fastest pace held for 1, 5, 10, 20, 30 and 60 minutes, from the GPS of every outdoor session: the walking version of a power curve. The bars compare your all-time best with the last 90 days.");
-            for(int dur:SessionMetrics.CURVE){double[] a=allBest.get(dur);if(a==null)continue;double[] rec=recentBest.get(dur);
-                LinearLayout crow=row();crow.setPadding(0,dp(8),0,dp(2));cv.addView(crow,lp(-1,-2));
-                crow.addView(tx(dur<3600?dur/60+" min":"1 hour",13,ink,true),lp(64,-2));
-                LinearLayout bars=col();crow.addView(bars,new LinearLayout.LayoutParams(0,-2,1));
-                double slow=1800,fast=400;float fa=(float)Math.max(.08,Math.min(1,(slow-a[0])/(slow-fast))),fr=rec==null?0:(float)Math.max(.08,Math.min(1,(slow-rec[0])/(slow-fast)));
-                View ab=new View(this);ab.setBackground(shape(MetricViews.alpha(lime,120),4));LinearLayout.LayoutParams abp=new LinearLayout.LayoutParams(0,dp(7));bars.addView(ab,abp);
-                View rb=new View(this);rb.setBackground(shape(lime,4));LinearLayout.LayoutParams rbp=new LinearLayout.LayoutParams(0,dp(7));rbp.topMargin=dp(3);bars.addView(rb,rbp);
-                bars.post(()->{abp.width=(int)(bars.getWidth()*fa);ab.setLayoutParams(abp);rbp.width=(int)(bars.getWidth()*fr);rb.setLayoutParams(rbp);});
-                LinearLayout vals=col();vals.setGravity(Gravity.END);crow.addView(vals,lp(84,-2));vals.addView(tx(paceText(a[0]),12,ink,true));vals.addView(tx(rec==null?"—":paceText(rec[0]),11,lime,true));
-            }
-            android.text.SpannableStringBuilder b=new android.text.SpannableStringBuilder();append(b,"■ ",MetricViews.alpha(lime,120));b.append("All time    ");append(b,"■ ",lime);b.append("Last 90 days");TextView lg=tx("",11,muted,false);lg.setText(b);LinearLayout.LayoutParams lgp=lp(-1,-2);lgp.topMargin=dp(8);cv.addView(lg,lgp);
-        }
         // Walking quality
         if(now[9]>0||now[11]>0){
-            LinearLayout wq=metricCard("WALKING QUALITY","","Average walking speed (outdoor walks, over moving time) and cadence across this period's sessions, each weighted by how long the session was, compared with the period before. Walking speed of 1.0 m/s or more is linked with healthier ageing.");
+            LinearLayout wq=metricCard("WALKING QUALITY","","Average walking speed (outdoor walks, over moving time) and cadence across this period's sessions, each weighted by how long the session was, compared with the period before. Walking speed of 1.0 m/s or more is linked with healthier ageing.");reportShare(wq,"WALKING QUALITY");
             String sp=now[9]>0?String.format(Locale.US,"%.2f",now[8]/now[9]):"—",cd=now[11]>0?String.valueOf(Math.round(now[10]/now[11])):"—";
             statGrid(wq,new String[][]{{"Walking speed",sp,now[9]>0?"m/s":""},{"Cadence",cd,now[11]>0?"spm":""},{"Effort per session",now[7]>0?String.valueOf(Math.round(now[6]/now[7])):"—",""}},10);
             StringBuilder cmp=new StringBuilder();
@@ -3826,6 +3807,81 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             if(now[11]>0&&before[11]>0){double d=now[10]/now[11]-before[10]/before[11];if(cmp.length()>0)cmp.append(" · ");cmp.append(String.format(Locale.US,"cadence %s%d spm",d>=0?"+":"−",Math.abs(Math.round(d))));}
             if(cmp.length()>0){TextView c=tx(cmp+" vs the period before",12,muted,false);LinearLayout.LayoutParams cp=lp(-1,-2);cp.topMargin=dp(10);wq.addView(c,cp);}
         }
+        renderReportConsistency(per,prevP,elapsed);
+        renderReportBody(per,prevP,h,elapsed);
+        renderReportSessions(per,prevP,h,elapsed);
+    }
+    /** The days of a period that have passed (all of them for a finished one), as yyyy-MM-dd keys. */
+    private java.util.List<String> periodDays(Progress.Period p,int limit){
+        java.util.List<String> out=new java.util.ArrayList<>();Calendar d=(Calendar)p.start.clone();String today=todayKey();
+        for(int i=0;i<p.days&&(limit<=0||i<limit);i++,d.add(Calendar.DAY_OF_YEAR,1)){String k=DaySteps.key(d.getTimeInMillis());if(k.compareTo(today)>0)break;out.add(k);}
+        return out;
+    }
+    private String vsBefore(double now,double before,boolean higherBetter,String fmt,String unit){
+        if(Double.isNaN(before)||Double.isNaN(now))return "";double d=now-before;if(Math.abs(d)<1e-9)return "same as before";
+        return (d>0?"▲ ":"▼ ")+String.format(Locale.US,fmt,Math.abs(d))+unit+" vs before";
+    }
+    /** Consistency: active days, goal days, the longest goal streak inside the period, how much days vary, weekdays against weekends. */
+    private void renderReportConsistency(Progress.Period per,Progress.Period prevP,int elapsed){
+        java.util.Map<String,Long> totals=DaySteps.allDayTotals(this);int goal=dailyGoal();java.util.List<String> days=periodDays(per,0),pdays=periodDays(prevP,elapsed<per.days?elapsed:0);
+        if(days.isEmpty())return;
+        long[] v=new long[days.size()];int active=0,goalDays=0,run=0,best=0;double wkS=0,weS=0;int wkN=0,weN=0;
+        for(int i=0;i<v.length;i++){Long t=totals.get(days.get(i));v[i]=t==null?0:t;if(v[i]>=5000)active++;if(v[i]>=goal){goalDays++;run++;best=Math.max(best,run);}else run=0;
+            Calendar c=Calendar.getInstance();try{c.setTime(new SimpleDateFormat("yyyy-MM-dd",Locale.US).parse(days.get(i)));}catch(Exception ignored){}int dw=c.get(Calendar.DAY_OF_WEEK);
+            if(v[i]>0){if(dw==Calendar.SATURDAY||dw==Calendar.SUNDAY){weS+=v[i];weN++;}else{wkS+=v[i];wkN++;}}}
+        double mean=0;int n=0;for(long x:v)if(x>0){mean+=x;n++;}mean=n>0?mean/n:0;double var=0;for(long x:v)if(x>0)var+=(x-mean)*(x-mean);double cv=n>1&&mean>0?Math.sqrt(var/n)/mean*100:-1;
+        int pActive=0,pGoal=0;for(String k:pdays){Long t=totals.get(k);if(t!=null&&t>=5000)pActive++;if(t!=null&&t>=goal)pGoal++;}
+        LinearLayout c=metricCard("CONSISTENCY","","How steady this period was. Active days have 5,000+ steps; goal days reach your daily goal. The streak is the longest run of goal days inside this period. Variation is how much your step days differ from each other (lower is steadier). Weekdays and weekends compare your average steps on each.");
+        statGrid(c,new String[][]{{"Active days",active+" / "+v.length,""},{"Goal days",Math.round(goalDays*100.0/v.length)+"%",goalDays+" days"},{"Longest streak",String.valueOf(best),best==1?"day":"days"},
+            {"Variation",cv<0?"—":Math.round(cv)+"%",cv<0?"":cv<30?"steady":cv<50?"mixed":"up and down"},{"Weekdays",wkN==0?"—":String.format(Locale.US,"%,d",Math.round(wkS/wkN)),wkN==0?"":"a day"},{"Weekends",weN==0?"—":String.format(Locale.US,"%,d",Math.round(weS/weN)),weN==0?"":"a day"}},10);
+        if(!pdays.isEmpty()){String line=vsBefore(goalDays,pGoal,true,"%.0f"," goal days")+(pActive!=active?" · "+vsBefore(active,pActive,true,"%.0f"," active days"):"");if(!line.isEmpty())c.addView(withTop(tx(line,12,goalDays>=pGoal?positive:muted,false),10));}
+        reportShare(c,"CONSISTENCY");
+    }
+    /** Your body over the period: sleep, resting heart rate, HRV, stress, floors and weight, against the period before. */
+    private void renderReportBody(Progress.Period per,Progress.Period prevP,JSONArray h,int elapsed){
+        java.util.List<String> days=periodDays(per,0),pdays=periodDays(prevP,elapsed<per.days?elapsed:0);if(days.isEmpty())return;JSONObject v=Vitals.all(this);
+        java.util.TreeMap<String,Double> sleep=Vitals.series(v,"sleep"),rhr=Pro.restSeries(this,v),hrv=Pro.hrvSeries(this,v);java.util.TreeMap<String,Double> weight=new java.util.TreeMap<>(Vitals.series(v,"weight"));weight.putAll(Trends.manualWeights(this));
+        java.util.List<String[]> rows=new java.util.ArrayList<>();java.util.List<String> lines=new java.util.ArrayList<>();
+        Object[][] m={{"Sleep",sleep,"sleep"},{"Resting heart rate",rhr,"rhr"},{"HRV",hrv,"hrv"}};
+        for(Object[] x:m){@SuppressWarnings("unchecked")java.util.TreeMap<String,Double> sr=(java.util.TreeMap<String,Double>)x[1];double a=avgOver(sr,days,"sleep".equals(x[2])?180:0),b=avgOver(sr,pdays,"sleep".equals(x[2])?180:0);if(Double.isNaN(a))continue;
+            String k=(String)x[2];rows.add(new String[]{(String)x[0],"sleep".equals(k)?Pro.hm((int)Math.round(a)):String.valueOf(Math.round(a)),"sleep".equals(k)?"a night":"rhr".equals(k)?"bpm":"ms"});
+            if(!Double.isNaN(b))lines.add((String)x[0]+" "+("sleep".equals(k)?vsBefore(a,b,true,"%.0f"," min"):vsBefore(a,b,"hrv".equals(k),"%.0f","rhr".equals(k)?" bpm":" ms")));}
+        double st=0,pst=0;int sn=0,psn=0;for(String k:days){JSONObject o=Pro.stress(this,k);if(o!=null&&o.has("score")){st+=o.optDouble("score");sn++;}}for(String k:pdays){JSONObject o=Pro.stress(this,k);if(o!=null&&o.has("score")){pst+=o.optDouble("score");psn++;}}
+        if(sn>0){rows.add(new String[]{"Stress",String.valueOf(Math.round(st/sn)),"of 100"});if(psn>0)lines.add("Stress "+vsBefore(st/sn,pst/psn,false,"%.0f"," points"));}
+        double fl=0,pfl=0;int fn=0,pfn=0;for(String k:days){double[] f=Pro.floors(this,h,k);if(f[0]>=0){fl+=f[0];fn++;}}for(String k:pdays){double[] f=Pro.floors(this,h,k);if(f[0]>=0){pfl+=f[0];pfn++;}}
+        if(fn>0){rows.add(new String[]{"Floors",String.format(Locale.US,"%.1f",fl/fn),"a day"});if(pfn>0)lines.add("Floors "+vsBefore(fl/fn,pfl/pfn,true,"%.1f"," a day"));}
+        Double w0=null,w1=null;for(String k:days){Double w=weight.get(k);if(w!=null){if(w0==null)w0=w;w1=w;}}
+        if(w1!=null){rows.add(new String[]{"Weight",String.format(Locale.US,"%.1f",w1),"kg"});if(w0!=null&&!w0.equals(w1))lines.add(String.format(Locale.US,"Weight %+.1f kg over the period",w1-w0));}
+        if(rows.isEmpty())return;
+        LinearLayout c=metricCard("YOUR BODY","this period","Averages over the days of this period that have a reading: sleep from nights of 3+ hours, resting heart rate and HRV from your watch, stress on days with enough heart-rate readings, floors on days with a count. Weight is the latest in the period, with the change from the first. Each is compared with the same days of the period before.");
+        statGrid(c,rows.toArray(new String[0][]),10);
+        for(String l:lines)if(!l.endsWith(" ")){TextView t=tx("•  "+l,12,ink,false);t.setPadding(0,dp(4),0,0);c.addView(t);}
+        reportShare(c,"YOUR BODY");
+    }
+    private double avgOver(java.util.Map<String,Double> s,java.util.List<String> days,double min){double sum=0;int n=0;for(String k:days){Double x=s.get(k);if(x!=null&&x>=min){sum+=x;n++;}}return n==0?Double.NaN:sum/n;}
+    /** Sessions in the period: what kind they were, and aerobic efficiency against the period before. */
+    private void renderReportSessions(Progress.Period per,Progress.Period prevP,JSONArray h,int elapsed){
+        java.util.Set<String> days=new java.util.HashSet<>(periodDays(per,0)),pdays=new java.util.HashSet<>(periodDays(prevP,elapsed<per.days?elapsed:0));
+        java.util.Map<String,Integer> types=new java.util.LinkedHashMap<>();int n=0;double ef=0,pef=0;int en=0,pen=0;long longest=0;
+        for(int i=0;i<h.length();i++){JSONObject o=h.optJSONObject(i);if(o==null||!DaySummary.counts(o))continue;String d=o.optString("day","");SessionMetrics m=SessionMetrics.of(this,o);
+            if(days.contains(d)){n++;Training.Type t=Training.type(this,h,o);if(!t.name.isEmpty()){Integer c=types.get(t.name);types.put(t.name,c==null?1:c+1);}if(m.efficiency>0){ef+=m.efficiency;en++;}longest=Math.max(longest,m.movingS);}
+            else if(pdays.contains(d)&&m.efficiency>0){pef+=m.efficiency;pen++;}}
+        if(n==0)return;
+        LinearLayout c=metricCard("SESSIONS","this period","Every session of 5+ minutes sorted by what it was (easy, steady, brisk or tempo, intervals, long, recovery, run-walk), the longest one, and aerobic efficiency: metres covered per heartbeat on sessions with heart rate from a watch, against the period before.");
+        statGrid(c,new String[][]{{"Sessions",String.valueOf(n),""},{"Longest",longest>=3600?String.format(Locale.US,"%dh %02d",longest/3600,(longest/60)%60):String.valueOf(longest/60),longest>=3600?"":"min"},{"Efficiency",en==0?"—":String.format(Locale.US,"%.2f",ef/en),en==0?"needs a watch":"m/beat"}},10);
+        java.util.List<java.util.Map.Entry<String,Integer>> es=new java.util.ArrayList<>(types.entrySet());es.sort((a,b)->b.getValue()-a.getValue());int typed=0;for(java.util.Map.Entry<String,Integer> e:es)typed+=e.getValue();
+        for(java.util.Map.Entry<String,Integer> e:es){LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);LinearLayout.LayoutParams rp=lp(-1,28);rp.topMargin=dp(4);c.addView(r,rp);
+            r.addView(tx(e.getKey(),12,ink,true),new LinearLayout.LayoutParams(0,-2,1.1f));LinearLayout tr=row();tr.setBackground(shape(raised,5));tr.setClipToOutline(true);r.addView(tr,new LinearLayout.LayoutParams(0,dp(9),1.6f));
+            View f=new View(this);f.setBackgroundColor(e.getKey().matches("(Tempo|Brisk|Interval|Long).*")?flame():lime);tr.addView(f,new LinearLayout.LayoutParams(0,-1,e.getValue()));tr.addView(new View(this),new LinearLayout.LayoutParams(0,-1,typed-e.getValue()));
+            TextView cnt=tx(String.valueOf(e.getValue()),12,ink,true);cnt.setGravity(Gravity.END);r.addView(cnt,lp(32,-2));}
+        if(en>0&&pen>0){double a=ef/en,b=pef/pen;c.addView(withTop(tx(String.format(Locale.US,"Efficiency %s%.0f %% vs the period before",a>=b?"▲ ":"▼ ",Math.abs((a-b)/b*100)),12,a>=b?positive:muted,false),10));}
+        reportShare(c,"SESSIONS");
+    }
+    /** A share button on a report card: the card goes out as a picture, as it looks. */
+    private void reportShare(LinearLayout card,String title){
+        try{LinearLayout head=(LinearLayout)card.getChildAt(0);head.setGravity(Gravity.CENTER_VERTICAL);android.widget.ImageView[] me=new android.widget.ImageView[1];
+            me[0]=shareIcon(title.toLowerCase(Locale.US),()->shareViews("Share "+title.charAt(0)+title.substring(1).toLowerCase(Locale.US),"My "+title.toLowerCase(Locale.US)+" on Kadamm",java.util.Collections.singletonList(card),me[0]));
+            LinearLayout.LayoutParams p=lp(34,34);p.leftMargin=dp(4);head.addView(me[0],head.getChildCount()>2?head.getChildCount()-1:head.getChildCount(),p);}catch(Exception ignored){}
     }
     private void renderReports(){
         brand("YOUR PROGRESS","Reports","How your weeks and months add up.");
@@ -3844,7 +3900,8 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         for(TextView b:new TextView[]{prevB,nextB}){b.setGravity(Gravity.CENTER);b.setBackground(rippleOn(raised,22));}
         nav.addView(prevB,lp(44,44));TextView lab=tx(per.label,14,ink,true);lab.setGravity(Gravity.CENTER);nav.addView(lab,new LinearLayout.LayoutParams(0,-2,1));nav.addView(nextB,lp(44,44));
         prevB.setOnClickListener(v->{reportOffset--;renderPageNow();});nextB.setOnClickListener(v->{if(reportOffset<0){reportOffset++;renderPageNow();}});
-        LinearLayout hero=card();hero.addView(tx("STEPS",10,muted,true));
+        LinearLayout hero=card();{LinearLayout hh=row();hh.setGravity(Gravity.CENTER_VERTICAL);hero.addView(hh,lp(-1,-2));hh.addView(tx("STEPS",10,muted,true),new LinearLayout.LayoutParams(0,-2,1));
+            android.widget.ImageView[] hs=new android.widget.ImageView[1];hs[0]=shareIcon("steps",()->shareViews("Share "+per.label,per.label+" on Kadamm",java.util.Collections.singletonList(hero),hs[0]));hh.addView(hs[0],lp(34,34));}
         LinearLayout big=row();hero.addView(big);big.addView(tx(String.format(Locale.US,"%,d",s.steps),32,ink,true));
         // A period still in progress is compared with the same number of days at the start of the one before.
         long prevSteps=prev.steps;if(s.future>0){prevSteps=0;for(int i=0;i<Math.min(s.elapsed,prev.daily.length);i++)prevSteps+=prev.daily[i];}
