@@ -62,6 +62,19 @@ object HealthSync {
     }
     @JvmStatic fun backgroundGranted(context: Context) = context.getSharedPreferences("kadamm_health", Context.MODE_PRIVATE).getBoolean("hcBackground", false)
     private const val SAMSUNG = "com.sec.android.app.shealth"
+    /** Google Fit relays other apps' data and writes its own merged total back, so it can double a day. */
+    const val FIT = "com.google.android.apps.fitness"
+    /**
+     * The most complete count from separate sources, never their sum. Google Fit is a relay: it counts only when no
+     * other source has the period, or when it's within 40 % of the best other source (a watch can rightly count more
+     * than a phone left on a desk); higher than that it's counting the same steps twice.
+     */
+    @JvmStatic fun pick(values: Map<String, Long>): Pair<String?, Long> {
+        val others = values.filterKeys { it != FIT }; val best = others.maxByOrNull { it.value }; val fit = values[FIT]
+        if (best == null || best.value <= 0L) return if (fit != null) FIT to fit else null to 0L
+        if (fit != null && fit > best.value && fit <= best.value * 1.4) return FIT to fit
+        return best.key to best.value
+    }
     @JvmStatic fun label(pkg: String) = when {
         pkg == SAMSUNG -> "Samsung Health"
         pkg.startsWith("com.android.healthconnect.phone") -> "Phone (Health Connect)"
@@ -183,7 +196,7 @@ object HealthSync {
             perOrigin[origin.packageName] = hc.aggregate(AggregateRequest(setOf(StepsRecord.COUNT_TOTAL), dayRange, setOf(origin)))[StepsRecord.COUNT_TOTAL] ?: 0L
             origins.add(origin.packageName)
         }
-        val preferred = perOrigin.maxByOrNull { it.value }?.key
+        val preferred = pick(perOrigin).first
         val dayTotal = preferred?.let { perOrigin[it] } ?: (all[StepsRecord.COUNT_TOTAL] ?: 0L)
         val filter = preferred?.let { setOf(DataOrigin(it)) } ?: emptySet()
 
@@ -192,7 +205,10 @@ object HealthSync {
         val fresh = JSONObject()
         // Past days: the highest single source per day, for the same reason.
         val window = TimeRangeFilter.between(today.minusDays(29).atStartOfDay(), LocalDateTime.now(zone))
-        for (origin in perOrigin.keys.ifEmpty { listOf("") }) {
+        // Every source that wrote steps in the window (Google Fit may have filled past days only), each day apart.
+        val windowOrigins = try { hc.aggregate(AggregateRequest(setOf(StepsRecord.COUNT_TOTAL), window)).dataOrigins.map { it.packageName } } catch (_: Exception) { emptyList() }
+        val byDay = mutableMapOf<String, MutableMap<String, Long>>()
+        for (origin in (perOrigin.keys + windowOrigins).distinct().ifEmpty { listOf("") }) {
             try {
                 val groups = hc.aggregateGroupByPeriod(
                     AggregateGroupByPeriodRequest(setOf(StepsRecord.COUNT_TOTAL), window, Period.ofDays(1),
@@ -200,13 +216,13 @@ object HealthSync {
                 )
                 for (group in groups) {
                     val count = group.result[StepsRecord.COUNT_TOTAL] ?: continue
-                    val key = group.startTime.toLocalDate().toString()
-                    if (fresh.optLong(key, -1) < count) fresh.put(key, count)
+                    byDay.getOrPut(group.startTime.toLocalDate().toString()) { mutableMapOf() }[origin] = count
                 }
             } catch (_: Exception) {
                 // Daily history is a bonus for the calendar; today's total is what matters.
             }
         }
+        for ((key, v) in byDay) fresh.put(key, pick(v).second)
         for (key in fresh.keys()) days.put(key, fresh.getLong(key))
 
         val granted = try { hc.permissionController.getGrantedPermissions() } catch (_: Exception) { emptySet() }
@@ -214,10 +230,12 @@ object HealthSync {
         edit.remove("healthDistanceM").remove("healthKcal").remove("healthActiveKcal")
         suspend fun best(metric: androidx.health.connect.client.aggregate.AggregateMetric<*>, value: (Any) -> Double): Double? {
             var top: Double? = null
+            val vals = mutableMapOf<String, Long>()
             for (origin in perOrigin.keys) {
                 val v = try { hc.aggregate(AggregateRequest(setOf(metric), dayRange, setOf(DataOrigin(origin))))[metric] } catch (_: Exception) { null } ?: continue
-                val d = value(v); if (top == null || d > top) top = d
+                vals[origin] = Math.round(value(v) * 1000)
             }
+            if (vals.isNotEmpty()) top = pick(vals).second / 1000.0
             return top ?: try { hc.aggregate(AggregateRequest(setOf(metric), dayRange))[metric]?.let(value) } catch (_: Exception) { null }
         }
         if (granted.contains(HealthPermission.getReadPermission(DistanceRecord::class)))
@@ -238,6 +256,9 @@ object HealthSync {
         try {
             val history = context.getSharedPreferences("kadamm_history", Context.MODE_PRIVATE)
             val sessionsAll = JSONArray(history.getString("sessions", "[]"))
+            // 10.3.2: sessions synced while Google Fit's doubled totals could win are read again, once.
+            val fixPrefs = context.getSharedPreferences("kadamm_health", Context.MODE_PRIVATE)
+            if (!fixPrefs.getBoolean("fitRelayFix", false)) { for (i in 0 until sessionsAll.length()) sessionsAll.optJSONObject(i)?.remove("hcSyncedAt"); fixPrefs.edit().putBoolean("fitRelayFix", true).apply() }
             val now = System.currentTimeMillis(); var changed = false
             val activeAllowed = granted.contains(HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class))
             val hrAllowed = granted.contains(HealthPermission.getReadPermission(HeartRateRecord::class)) && context.getSharedPreferences("kadamm_settings", Context.MODE_PRIVATE).getBoolean("hcHeart", true)
@@ -253,13 +274,14 @@ object HealthSync {
                 // Steps minute by minute from the preferred source: cadence over time for sessions recorded before 8.2.
                 if (!s.has("hcMin") && now - to > 30L * 60000L && to - from >= 3L * 60000L) { minuteSteps(hc, s, range, from, filter); changed = true }
                 if (s.optLong("hcSyncedAt", 0L) > to + 6L * 3600000L) continue
-                var steps = 0L; var kcal = -1.0
+                var steps = 0L; var kcal = -1.0; val perSession = mutableMapOf<String, Long>()
                 for (origin in perOrigin.keys) {
                     val o = setOf(DataOrigin(origin))
-                    steps = maxOf(steps, hc.aggregate(AggregateRequest(setOf(StepsRecord.COUNT_TOTAL), range, o))[StepsRecord.COUNT_TOTAL] ?: 0L)
+                    perSession[origin] = hc.aggregate(AggregateRequest(setOf(StepsRecord.COUNT_TOTAL), range, o))[StepsRecord.COUNT_TOTAL] ?: 0L
                     if (activeAllowed) hc.aggregate(AggregateRequest(setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL), range, o))[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]
                         ?.let { kcal = maxOf(kcal, it.inKilocalories) }
                 }
+                steps = pick(perSession).second
                 s.put("hcSteps", steps); if (kcal >= 0) s.put("hcActiveKcal", Math.round(kcal)) else s.remove("hcActiveKcal")
                 s.put("hcSyncedAt", now); changed = true
             }

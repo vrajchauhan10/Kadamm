@@ -1,5 +1,9 @@
 # Changelog
 
+## 10.3.2 (versionCode 62)
+
+- Steps are no longer doubled once Google Fit syncs with Health Connect. Google Fit writes its own merged total (the phone's steps plus other apps' again), which reached 1.6–1.9× the real count on past days, and Kadamm took it as the most complete source. Google Fit now counts only when no other source has the day, or when it's within 40 % of the best other source (a watch can rightly count more than a phone left on a desk). The same rule applies to today, past days, each session's steps, distance and calories. The last 30 days are corrected on the next sync, and sessions synced since are read again once.
+
 ## 10.3.1 (versionCode 61)
 
 - Watches that sync through their own app (NoiseFit, realme Link, Fire-Boltt, boAt, Da Fit, Mi Fitness, Zepp and any other app that works with Health Connect): when that app isn't allowed to write into Health Connect, so the watch's data stays inside it, the watch card now says so, lists what it would bring (heart rate, sleep, blood oxygen, HRV and so on) and has "Allow <app>", which opens Health Connect (only Health Connect's own screen, never another app that answers the same request) with the steps to allow it, and "Open <app>" to sync the watch. Only apps that write sleep (watch and band apps) are listed, by their real names. When a watch is paired but no app on the phone can share its data, the card says so. The list refreshes whenever Kadamm reopens. Measures that app could share are no longer hidden as unsupported; they say "Allow <app> in Health Connect".
