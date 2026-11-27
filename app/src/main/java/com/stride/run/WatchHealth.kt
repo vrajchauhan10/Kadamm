@@ -91,6 +91,8 @@ object WatchHealth {
             val sleep = JSONObject(); val detail = JSONObject()
             for (r in all(SleepSessionRecord::class)) {
                 val total = Duration.between(r.startTime, r.endTime).toMinutes(); if (total < 60 || total > 16 * 60) continue
+                // A night that ends in the future isn't real (some apps relaying through Google Fit send shifted times).
+                if (r.endTime.isAfter(Instant.now().plusSeconds(600))) continue
                 // A night belongs to the morning it ends on: a part saved before midnight (a watch app sometimes
                 // splits one night) counts toward the next day's night, where the longer record wins.
                 val key = day(r.endTime.plus(Duration.ofHours(6))); val prev = detail.optJSONObject(key)
@@ -124,7 +126,7 @@ object WatchHealth {
             if (!has(key)) return
             try {
                 val byDay = mutableMapOf<String, MutableList<Double>>(); var n = 0
-                for (r in all(type)) { val v = value(r) ?: continue; if (!ok(v)) continue; byDay.getOrPut(day(time(r))) { mutableListOf() }.add(v); src(key, r.metadata.dataOrigin.packageName); n++ }
+                for (r in all(type)) { val v = value(r) ?: continue; if (!ok(v)) continue; if (time(r).isAfter(Instant.now().plusSeconds(600))) continue; byDay.getOrPut(day(time(r))) { mutableListOf() }.add(v); src(key, r.metadata.dataOrigin.packageName); n++ }
                 out.put(key, medianByDay(byDay)); counts.put(key, n)
             } catch (_: Exception) { }
         }
@@ -137,7 +139,7 @@ object WatchHealth {
             try {
                 val night = mutableMapOf<String, MutableList<Double>>(); val dayVals = mutableMapOf<String, MutableList<Double>>(); var n = 0
                 for (r in all(type)) {
-                    val v = value(r); if (!ok(v)) continue; val t = time(r).toEpochMilli(); n++; src(key, r.metadata.dataOrigin.packageName)
+                    val v = value(r); if (!ok(v)) continue; val t = time(r).toEpochMilli(); if (t > System.currentTimeMillis() + 600000L) continue; n++; src(key, r.metadata.dataOrigin.packageName)
                     val nk = nights.entries.firstOrNull { t >= it.value[0] && t <= it.value[1] }?.key
                     if (nk != null) night.getOrPut(nk) { mutableListOf() }.add(v) else dayVals.getOrPut(day(time(r))) { mutableListOf() }.add(v)
                 }
@@ -192,7 +194,7 @@ object WatchHealth {
                 val sum = DoubleArray(1440); val cnt = IntArray(1440)
                 for (r in all(HeartRateRecord::class, TimeRangeFilter.between(from, to))) {
                     for (x in r.samples) {
-                        val m = ((x.time.toEpochMilli() - from.toEpochMilli()) / 60000L).toInt(); if (m !in 0..1439 || x.beatsPerMinute !in 30L..230L) continue
+                        val m = ((x.time.toEpochMilli() - from.toEpochMilli()) / 60000L).toInt(); if (m !in 0..1439 || x.beatsPerMinute !in 30L..230L || x.time.toEpochMilli() > System.currentTimeMillis() + 600000L) continue
                         sum[m] += x.beatsPerMinute.toDouble(); cnt[m]++; n++
                         if (x.time.toEpochMilli() > lastAt) { lastAt = x.time.toEpochMilli(); lastBpm = x.beatsPerMinute; lastSrc = r.metadata.dataOrigin.packageName }
                     }

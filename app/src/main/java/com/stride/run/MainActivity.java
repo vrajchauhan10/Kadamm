@@ -3607,7 +3607,8 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         String[] reads={"STEPS","HEART_RATE","SLEEP","RESTING_HEART_RATE","HEART_RATE_VARIABILITY","OXYGEN_SATURATION","RESPIRATORY_RATE"};int miss=0;
         if(Build.VERSION.SDK_INT>=34)for(String r:reads)if(checkSelfPermission("android.permission.health.READ_"+r)!=PackageManager.PERMISSION_GRANTED)miss++;
         boolean s1=watchName!=null||app!=null,s2=getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false)&&miss==0,
-            s3=app!=null&&!app.blocked()&&app.allowed.contains("HEART_RATE"),s4=app!=null&&sentFrom(app.pkg);
+            s3=app!=null&&!app.blocked()&&app.allowed.contains("HEART_RATE"),s4=app!=null&&(sentFrom(app.pkg)||sentFrom(Pro.FIT));
+        boolean[] fit=Pro.fitBridge(this);
         final Pro.App ap=app;int current=!s1?1:!s2?2:!s3?3:!s4?4:5;
         // Step 1: the watch and its app.
         setupStep(1,current,"Your watch",s1?(watchName!=null?watchName+(on?" is connected":" is paired")+(app!=null?" · app: "+app.label:""):"Watch app: "+app.label)
@@ -3620,20 +3621,31 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             ap==null||s3?null:"Allow",ap==null?null:()->{if(Pro.openAppPermissions(this,ap.pkg))toast("Find "+ap.label+" and turn on Allow all");});
         // Step 4: data has arrived.
         String w4=ap==null?"—":s4?"Data from "+ap.label+" is in Health Connect.":"Open "+ap.label+", wear the watch and pull down to sync. Kadamm checks again every 15 seconds while this page is open.";
-        setupStep(4,current,"Data reaches Kadamm",w4,ap==null||s4?null:"Open "+ap.label,ap==null?null:()->{Intent l=getPackageManager().getLaunchIntentForPackage(ap.pkg);try{if(l!=null)startActivity(l);}catch(Exception e){toast("Couldn't open "+ap.label);}});
+        setupStep(4,current,"Data reaches Kadamm",s4&&!sentFrom(ap.pkg)?"Data from "+ap.label+" arrives through Google Fit.":w4,ap==null||s4?null:"Open "+ap.label,ap==null?null:()->{Intent l=getPackageManager().getLaunchIntentForPackage(ap.pkg);try{if(l!=null)startActivity(l);}catch(Exception e){toast("Couldn't open "+ap.label);}});
+        // The Google Fit bridge: for watch apps that send to Google Fit but not to Health Connect.
+        if(ap!=null&&!s4&&fit[0]){
+            LinearLayout c=card();c.addView(tx("Or bring it in through Google Fit",15,ink,true));
+            TextView t=tx(ap.label+" can send your watch's data to Google Fit. The Google Fit app on this phone can then copy it into Health Connect for Kadamm."+(fit[1]?" Google Fit is allowed: open it once so it syncs.":" In Google Fit, tap \"Sync Fit with Health Connect\" (or Profile › Settings › Sync Fit with Health Connect) and allow it, and make sure "+ap.label+"'s Google Fit link is on."),12,ink,false);
+            t.setLineSpacing(dp(2),1f);t.setPadding(0,dp(4),0,0);c.addView(t);
+            LinearLayout br=row();LinearLayout.LayoutParams brp=lp(-1,44);brp.topMargin=dp(12);c.addView(br,brp);
+            Button of=button("Open Google Fit",lime,accentOn);br.addView(of,new LinearLayout.LayoutParams(0,-1,1));of.setOnClickListener(v->{Intent l=getPackageManager().getLaunchIntentForPackage(Pro.FIT);try{if(l!=null)startActivity(l);}catch(Exception e){toast("Couldn't open Google Fit");}});
+            if(!fit[1]){Button al=button("Allow in Health Connect",raised,ink);LinearLayout.LayoutParams alp=new LinearLayout.LayoutParams(0,-1,1);alp.leftMargin=dp(8);br.addView(al,alp);al.setOnClickListener(v->{if(Pro.openAppPermissions(this,Pro.FIT))toast("Find Google Fit and turn on Allow all");});}}
         if(ap!=null&&s3&&!s4){LinearLayout r=row();LinearLayout.LayoutParams rp=lp(-1,46);rp.topMargin=dp(10);content.addView(r,rp);
             Button chk=button("Check again",raised,ink);r.addView(chk,new LinearLayout.LayoutParams(0,-1,1));chk.setOnClickListener(v->{toast("Checking Health Connect…");Pro.forgetApps();refreshHealth(true);});
             Button upd=button("Update "+ap.label,raised,ink);LinearLayout.LayoutParams up=new LinearLayout.LayoutParams(0,-1,1);up.leftMargin=dp(8);r.addView(upd,up);
             upd.setOnClickListener(v->{try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("market://details?id="+ap.pkg)));}catch(Exception e){toast("Couldn't open the Play Store");}});
             setupNote("Still nothing after a sync? Some versions of "+ap.label+" only start writing to Health Connect after an update, or after you sign out of its Google Fit link and back in. Wear the watch for a while too: heart rate, sleep and blood oxygen appear only once the watch has measured them.");}
         // Done.
-        if(s4){LinearLayout c=card();c.setBackground(shape(blend(panel,positive,darkTheme?.16f:.08f),16));c.addView(tx("All set",16,positive,true));
-            int have=0,total=0;java.util.List<String> got=new java.util.ArrayList<>();for(String[] m:BODY_METRICS){if(unsupported(m[0]))continue;total++;if(!"-2".equals(bodyMetric(m[0],history())[3])){have++;got.add(m[1]);}}
-            c.addView(withTop(tx(have+" of "+total+" measures arriving: "+android.text.TextUtils.join(", ",got)+". Recovery needs 5 days to learn your normal.",13,ink,false),4));
+        if(s4){int have=0,total=0,fromWatch=0;java.util.List<String> got=new java.util.ArrayList<>();java.util.List<String> watchKeys=java.util.Arrays.asList("live","rhr","hrv","sleep","spo2","resp","stress","strain","btemp","skin");
+            for(String[] m:BODY_METRICS){if(unsupported(m[0]))continue;total++;if(!"-2".equals(bodyMetric(m[0],history())[3])){have++;got.add(m[1]);if(watchKeys.contains(m[0]))fromWatch++;}}
+            boolean ready=fromWatch>0;LinearLayout c=card();c.setBackground(shape(blend(panel,ready?positive:lime,darkTheme?.16f:.08f),16));
+            c.addView(tx(ready?"All set":"Connected: waiting for your watch's readings",16,ready?positive:lime,true));
+            c.addView(withTop(tx(ready?have+" of "+total+" measures arriving: "+android.text.TextUtils.join(", ",got)+". Recovery needs 5 days to learn your normal."
+                :"The path works, but no heart rate, sleep or blood oxygen has come through yet. Wear the watch: it records heart rate every few minutes and sleep overnight, and "+ap.label+" passes them on after each sync. Kadamm keeps checking.",13,ink,false),4));
             Button go=button("See your body data",lime,accentOn);LinearLayout.LayoutParams gp=lp(-1,46);gp.topMargin=dp(12);c.addView(go,gp);go.setOnClickListener(v->navigate("Body"));}
         // While waiting on step 4, look again every 15 seconds.
         if(setupPoll!=null)handler.removeCallbacks(setupPoll);
-        if(!s4&&s3){String forPage=renderedPage;setupPoll=()->{if(!"WatchSetup".equals(page)||!forPage.equals(renderedPage))return;Pro.forgetApps();refreshHealth(true);handler.postDelayed(setupPoll,15000);};handler.postDelayed(setupPoll,15000);}
+        if(s3&&(!s4||Pro.connectedSources(this).isEmpty()||Vitals.all(this).optJSONObject("counts")==null||Vitals.all(this).optJSONObject("counts").optInt("hr")==0)){String forPage=renderedPage;setupPoll=()->{if(!"WatchSetup".equals(page)||!forPage.equals(renderedPage))return;Pro.forgetApps();refreshHealth(true);handler.postDelayed(setupPoll,15000);};handler.postDelayed(setupPoll,15000);}
     }
     private void setupStep(int n,int current,String title,String why,String action,Runnable go){
         boolean done=n<current,now=n==current;LinearLayout c=card();if(now){GradientDrawable g=shape(panel,16);g.setStroke(dp(2),lime);c.setBackground(g);}
@@ -3657,7 +3669,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         boolean anyData=!Pro.connectedSources(this).isEmpty();
         String paired=bluetoothWatch();paired=paired==null?null:paired.split("\\|")[0];
         for(Pro.App a:Pro.watchAppsFor(this,paired)){
-            if(a.blocked()||a.partly()&&(!a.allowed.contains("HEART_RATE")||!a.allowed.contains("SLEEP"))||!sentFrom(a.pkg)){
+            if(a.blocked()||a.partly()&&(!a.allowed.contains("HEART_RATE")||!a.allowed.contains("SLEEP"))||!sentFrom(a.pkg)&&!sentFrom(Pro.FIT)){
                 items.add(new Object[]{"Connect your watch",(paired!=null?paired:a.label)+"'s data isn't reaching Kadamm yet. A short guide checks each step for you.","Start",(Runnable)()->navigate("WatchSetup")});break;}}
         // 3. Phone permissions.
         if(!home&&!DaySteps.permitted(this))items.add(new Object[]{"Physical activity","Counts your steps all day with the phone's step sensor.","Allow",(Runnable)this::requestStepPermission});

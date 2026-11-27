@@ -285,6 +285,19 @@ final class Pro {
     static boolean watchApp(App a){return a.wants.contains("SLEEP");}
     /** An app on this phone that asks to write this type but isn't allowed to yet (the fix is one switch), or null. */
     static App blockedFor(Context c,String type){for(App a:healthApps(c))if(watchApp(a)&&a.wants.contains(type)&&!a.allowed.contains(type))return a;return null;}
+    static final String FIT="com.google.android.apps.fitness";
+    /**
+     * Google Fit as a bridge: many watch apps (NoiseFit, boAt, Fire-Boltt and others) send their data to Google Fit
+     * online but not to Health Connect, and the Google Fit app copies it into Health Connect once allowed to.
+     * {installed, allowed to write heart rate and sleep}.
+     */
+    static boolean[] fitBridge(Context c){
+        try{android.content.pm.PackageInfo pi=c.getPackageManager().getPackageInfo(FIT,android.content.pm.PackageManager.GET_PERMISSIONS);boolean hr=false,sl=false;
+            for(int i=0;pi.requestedPermissions!=null&&i<pi.requestedPermissions.length;i++){boolean g=(pi.requestedPermissionsFlags[i]&android.content.pm.PackageInfo.REQUESTED_PERMISSION_GRANTED)!=0;
+                if(pi.requestedPermissions[i].equals("android.permission.health.WRITE_HEART_RATE"))hr=g;if(pi.requestedPermissions[i].equals("android.permission.health.WRITE_SLEEP"))sl=g;}
+            return new boolean[]{true,hr&&sl};}catch(Exception e){return new boolean[]{false,false};}
+    }
+
     /** Opens Health Connect's permission page for one app (Android 14+), else Health Connect's settings. */
     static boolean openAppPermissions(Context c,String pkg){
         // Health Connect's own screens only (other apps answer the same actions; MyFitnessPal does). The page for one
