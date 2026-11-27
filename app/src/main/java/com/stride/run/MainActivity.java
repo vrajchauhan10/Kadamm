@@ -265,8 +265,8 @@ public class MainActivity extends Activity {
         goingBack=false;
     }
     private void goBack(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.pop();Integer y=scrollMemory.get(to);restoreScroll=y==null?-1:y;goingBack=true;page=to;closeDrawer();renderPage();}
-    private String backLabel(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.peek();return "DaySummary".equals(to)?"Day summary":"Import".equals(to)?"Import":"Detail".equals(to)?"Session":"Auto".equals(to)?"Auto tracking":"Body".equals(to)?"Body":"Labs".equals(to)?"Lab results":"LabEdit".equals(to)?"Lab result":"Today".equals(to)?"Home":to;}
-    private void renderPageInner(){trackBack();if(!"Sessions".equals(page)&&!"Detail".equals(page)&&!"DaySummary".equals(page))recentDays=7;if(replayAnim!=null){replayAnim.cancel();replayAnim=null;}if(!page.equals(renderedPage)&&scroller!=null)scroller.scrollTo(0,0);renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else if(page.equals("Routes"))renderRoutes();else if(page.equals("Notifications"))renderNotifications();else if(page.equals("Reports"))renderReports();else if(page.equals("Achievements"))renderAchievements();else if(page.equals("Permissions"))renderPermissions();else if(page.equals("Auto"))renderAutoTracking();else if(page.equals("Storage"))renderStorage();else if(page.equals("Places"))renderPlaces();else if(page.equals("Sessions"))renderSessions();else if(page.equals("DaySummary"))renderDaySummary();else if(page.equals("Trainer"))renderTrainer();else if(page.equals("Import"))renderImport();else if(page.equals("Body"))renderBody();else if(page.equals("Labs"))renderLabs();else if(page.equals("LabEdit"))renderLabEdit();else renderDetail(lastSession);if(content.getChildCount()>0)signatureAtEnd();}
+    private String backLabel(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.peek();return "DaySummary".equals(to)?"Day summary":"Import".equals(to)?"Import":"Detail".equals(to)?"Session":"Auto".equals(to)?"Auto tracking":"Body".equals(to)?"Body":"Labs".equals(to)?"Lab results":"WatchSetup".equals(to)?"Watch":"LabEdit".equals(to)?"Lab result":"Today".equals(to)?"Home":to;}
+    private void renderPageInner(){trackBack();if(!"Sessions".equals(page)&&!"Detail".equals(page)&&!"DaySummary".equals(page))recentDays=7;if(replayAnim!=null){replayAnim.cancel();replayAnim=null;}if(!page.equals(renderedPage)&&scroller!=null)scroller.scrollTo(0,0);renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else if(page.equals("Routes"))renderRoutes();else if(page.equals("Notifications"))renderNotifications();else if(page.equals("Reports"))renderReports();else if(page.equals("Achievements"))renderAchievements();else if(page.equals("Permissions"))renderPermissions();else if(page.equals("Auto"))renderAutoTracking();else if(page.equals("Storage"))renderStorage();else if(page.equals("Places"))renderPlaces();else if(page.equals("Sessions"))renderSessions();else if(page.equals("DaySummary"))renderDaySummary();else if(page.equals("Trainer"))renderTrainer();else if(page.equals("Import"))renderImport();else if(page.equals("Body"))renderBody();else if(page.equals("Labs"))renderLabs();else if(page.equals("WatchSetup"))renderWatchSetup();else if(page.equals("LabEdit"))renderLabEdit();else renderDetail(lastSession);if(content.getChildCount()>0)signatureAtEnd();}
     private void styleNavItem(LinearLayout item,boolean selected){int color=selected?lime:muted;item.setBackground(rippleOn(selected?raised:Color.TRANSPARENT,14));((android.widget.ImageView)item.getChildAt(0)).setImageTintList(android.content.res.ColorStateList.valueOf(color));((TextView)item.getChildAt(1)).setTextColor(selected?ink:muted);}
     private void brand(String eyebrow,String headline,String sub){LinearLayout brand=row();content.addView(brand,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);brand.addView(brandButton(),bbp);if(tabIndex(page)<0){brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));boolean narrowBack=getResources().getConfiguration().screenWidthDp<400;TextView bk=tx(narrowBack?"‹":"‹  "+backLabel(),narrowBack?20:13,ink,true);bk.setGravity(Gravity.CENTER);bk.setPadding(narrowBack?0:dp(14),0,narrowBack?0:dp(16),narrowBack?dp(2):0);bk.setBackground(rippleOn(raised,18));bk.setContentDescription("Back to "+backLabel());bk.setOnClickListener(v->goBack());brand.addView(bk,narrowBack?lp(40,40):lp(-2,36));}TextView e=tx(eyebrow.toUpperCase(Locale.US),10,muted,true);LinearLayout.LayoutParams ep=lp(-1,25);ep.topMargin=dp(8);content.addView(e,ep);TextView h=tx(headline,29,ink,true);content.addView(h);if(sub!=null){TextView s=tx(sub,13,muted,false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(5);sp.bottomMargin=dp(16);content.addView(s,sp);}}
     private LinearLayout card(){LinearLayout c=col();c.setPadding(dp(16),dp(16),dp(16),dp(16));c.setBackground(panelShape(16));LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(12);content.addView(c,p);return c;}
@@ -1105,6 +1105,7 @@ public class MainActivity extends Activity {
         // What it shares
         int have=0,total=0;StringBuilder got=new StringBuilder();for(String[] m:BODY_METRICS){if(unsupported(m[0]))continue;total++;String[] x=bodyMetric(m[0],history());if(!"-2".equals(x[3])){have++;if(got.length()>0)got.append(" · ");got.append(m[1]);}}
         // One short line; the full list is "What Kadamm captures" on the Body page.
+        TextView guide=tx("Connect your watch, step by step  ›",13,lime,true);guide.setPadding(0,dp(10),0,0);c.addView(guide);guide.setOnClickListener(x->navigate("WatchSetup"));
         TextView cap=tx(have+" of "+total+" measures available  ›",13,lime,true);cap.setPadding(0,dp(10),0,dp(2));c.addView(cap);
         cap.setOnClickListener(x->{catalogOpen=true;scrollToCatalog=true;if("Body".equals(page))renderPageNow();else navigate("Body");});
         LinearLayout bs=row();LinearLayout.LayoutParams bsp=lp(-1,44);bsp.topMargin=dp(12);c.addView(bs,bsp);
@@ -2260,7 +2261,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     }
     private void refreshHealth(boolean force){
         long now=android.os.SystemClock.elapsedRealtime();if(!force&&now-lastHealthRefresh<120000)return;lastHealthRefresh=now;
-        try{HealthSync.refresh(this,()->{StepsWidget.refresh(this);if(resumed&&!dragging&&("Health".equals(page)||"Today".equals(page)||"Body".equals(page)||"Profile".equals(page)||"Trainer".equals(page))){int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));}syncing=false;});}catch(Throwable ignored){}
+        try{HealthSync.refresh(this,()->{StepsWidget.refresh(this);if(resumed&&!dragging&&("Health".equals(page)||"Today".equals(page)||"Body".equals(page)||"Profile".equals(page)||"Trainer".equals(page)||"WatchSetup".equals(page))){int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));}syncing=false;});}catch(Throwable ignored){}
     }
     @Override protected void onResume(){
         super.onResume();Pro.forgetApps();resumed=true;checkForUpdateOnce();WidgetTick.schedule(this);handler.removeCallbacks(refresh);handler.post(refresh);startStepCounting();refreshHealth(true);handler.postDelayed(()->SessionMetrics.warm(this,history()),1500);handler.postDelayed(()->{WearBridge.pushToday(this);WearBridge.pushLive(this);WearBridge.ping(this);},4000);SleepTracker.register(this);handler.removeCallbacks(bodyTick);handler.postDelayed(bodyTick,2000);
@@ -3591,6 +3592,59 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
      * "Set up access": one card at the top of Home and Body listing only what's still missing, each with the one tap
      * that fixes it, in the order that matters for getting data in. Hidden once everything is allowed.
      */
+    // ---- Connect your watch: the whole path, step by step, checked live ----
+    /** Whether Health Connect holds anything from this app (steps or any watch measure). */
+    private boolean sentFrom(String pkg){
+        JSONObject v=Vitals.all(this);JSONArray a=v.optJSONArray("sources");for(int i=0;a!=null&&i<a.length();i++)if(pkg.equals(a.optString(i)))return true;
+        for(String p:getSharedPreferences("kadamm_health",MODE_PRIVATE).getString("healthSources","").split(","))if(pkg.equals(p.trim()))return true;return false;
+    }
+    private Runnable setupPoll;
+    private void renderWatchSetup(){
+        brand("YOUR WATCH","Connect your watch","Four steps from your wrist to Kadamm. Each one is checked here as you go.");
+        String paired=bluetoothWatch();String watchName=paired==null?null:paired.split("\\|")[0];boolean on=paired!=null&&paired.endsWith("|true");
+        java.util.List<Pro.App> apps=Pro.watchAppsFor(this,watchName);Pro.App app=apps.isEmpty()?null:apps.get(0);
+        for(Pro.App a:apps)if(sentFrom(a.pkg)){app=a;break;}
+        String[] reads={"STEPS","HEART_RATE","SLEEP","RESTING_HEART_RATE","HEART_RATE_VARIABILITY","OXYGEN_SATURATION","RESPIRATORY_RATE"};int miss=0;
+        if(Build.VERSION.SDK_INT>=34)for(String r:reads)if(checkSelfPermission("android.permission.health.READ_"+r)!=PackageManager.PERMISSION_GRANTED)miss++;
+        boolean s1=watchName!=null||app!=null,s2=getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false)&&miss==0,
+            s3=app!=null&&!app.blocked()&&app.allowed.contains("HEART_RATE"),s4=app!=null&&sentFrom(app.pkg);
+        final Pro.App ap=app;int current=!s1?1:!s2?2:!s3?3:!s4?4:5;
+        // Step 1: the watch and its app.
+        setupStep(1,current,"Your watch",s1?(watchName!=null?watchName+(on?" is connected":" is paired")+(app!=null?" · app: "+app.label:""):"Watch app: "+app.label)
+            :"Pair your watch in its own app first (Zepp, NoiseFit, Samsung Health, Garmin Connect…), then come back.",null,null);
+        if(s1&&app==null)setupNote("No app on this phone can bring "+watchName+"'s data into Health Connect. Check its app for a Health Connect or Google Fit option; without one, its data can't reach any other app.");
+        // Step 2: Kadamm reads Health Connect.
+        setupStep(2,current,"Kadamm can read Health Connect",s2?"Allowed":"Health Connect is where your watch's app leaves its data for Kadamm.",s2?null:"Allow",()->navigate("Health"));
+        // Step 3: the watch app may share.
+        setupStep(3,current,(ap==null?"Your watch app":ap.label)+" can share",ap==null?"—":s3?"Allowed":"In Health Connect, open "+ap.label+" (under \"See more health apps\" if needed) and turn on Allow all.",
+            ap==null||s3?null:"Allow",ap==null?null:()->{if(Pro.openAppPermissions(this,ap.pkg))toast("Find "+ap.label+" and turn on Allow all");});
+        // Step 4: data has arrived.
+        String w4=ap==null?"—":s4?"Data from "+ap.label+" is in Health Connect.":"Open "+ap.label+", wear the watch and pull down to sync. Kadamm checks again every 15 seconds while this page is open.";
+        setupStep(4,current,"Data reaches Kadamm",w4,ap==null||s4?null:"Open "+ap.label,ap==null?null:()->{Intent l=getPackageManager().getLaunchIntentForPackage(ap.pkg);try{if(l!=null)startActivity(l);}catch(Exception e){toast("Couldn't open "+ap.label);}});
+        if(ap!=null&&s3&&!s4){LinearLayout r=row();LinearLayout.LayoutParams rp=lp(-1,46);rp.topMargin=dp(10);content.addView(r,rp);
+            Button chk=button("Check again",raised,ink);r.addView(chk,new LinearLayout.LayoutParams(0,-1,1));chk.setOnClickListener(v->{toast("Checking Health Connect…");Pro.forgetApps();refreshHealth(true);});
+            Button upd=button("Update "+ap.label,raised,ink);LinearLayout.LayoutParams up=new LinearLayout.LayoutParams(0,-1,1);up.leftMargin=dp(8);r.addView(upd,up);
+            upd.setOnClickListener(v->{try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("market://details?id="+ap.pkg)));}catch(Exception e){toast("Couldn't open the Play Store");}});
+            setupNote("Still nothing after a sync? Some versions of "+ap.label+" only start writing to Health Connect after an update, or after you sign out of its Google Fit link and back in. Wear the watch for a while too: heart rate, sleep and blood oxygen appear only once the watch has measured them.");}
+        // Done.
+        if(s4){LinearLayout c=card();c.setBackground(shape(blend(panel,positive,darkTheme?.16f:.08f),16));c.addView(tx("All set",16,positive,true));
+            int have=0,total=0;java.util.List<String> got=new java.util.ArrayList<>();for(String[] m:BODY_METRICS){if(unsupported(m[0]))continue;total++;if(!"-2".equals(bodyMetric(m[0],history())[3])){have++;got.add(m[1]);}}
+            c.addView(withTop(tx(have+" of "+total+" measures arriving: "+android.text.TextUtils.join(", ",got)+". Recovery needs 5 days to learn your normal.",13,ink,false),4));
+            Button go=button("See your body data",lime,accentOn);LinearLayout.LayoutParams gp=lp(-1,46);gp.topMargin=dp(12);c.addView(go,gp);go.setOnClickListener(v->navigate("Body"));}
+        // While waiting on step 4, look again every 15 seconds.
+        if(setupPoll!=null)handler.removeCallbacks(setupPoll);
+        if(!s4&&s3){String forPage=renderedPage;setupPoll=()->{if(!"WatchSetup".equals(page)||!forPage.equals(renderedPage))return;Pro.forgetApps();refreshHealth(true);handler.postDelayed(setupPoll,15000);};handler.postDelayed(setupPoll,15000);}
+    }
+    private void setupStep(int n,int current,String title,String why,String action,Runnable go){
+        boolean done=n<current,now=n==current;LinearLayout c=card();if(now){GradientDrawable g=shape(panel,16);g.setStroke(dp(2),lime);c.setBackground(g);}
+        LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);c.addView(r,lp(-1,-2));
+        TextView b=tx(done?"✓":String.valueOf(n),14,done||now?accentOn:muted,true);b.setGravity(Gravity.CENTER);GradientDrawable o=new GradientDrawable();o.setShape(GradientDrawable.OVAL);o.setColor(done?positive:now?lime:raised);b.setBackground(o);r.addView(b,lp(32,32));
+        LinearLayout t=col();LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,-2,1);tp.leftMargin=dp(12);r.addView(t,tp);t.addView(tx(title,15,done||now?ink:muted,true));
+        TextView w=tx(why,12,done?positive:muted,false);w.setLineSpacing(dp(2),1f);t.addView(w);
+        if(now&&action!=null&&go!=null){Button a=button(action,lime,accentOn);LinearLayout.LayoutParams ap=lp(-1,44);ap.topMargin=dp(12);c.addView(a,ap);a.setOnClickListener(v->go.run());}
+    }
+    private void setupNote(String t){TextView x=tx(t,12,muted,false);x.setLineSpacing(dp(2),1f);x.setPadding(dp(6),dp(10),dp(6),0);content.addView(x);}
+
     private boolean accessShown;
     private void renderAccessCard(boolean home){
         java.util.List<Object[]> items=new java.util.ArrayList<>();   // {title, why, button, Runnable}
@@ -3603,10 +3657,8 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         boolean anyData=!Pro.connectedSources(this).isEmpty();
         String paired=bluetoothWatch();paired=paired==null?null:paired.split("\\|")[0];
         for(Pro.App a:Pro.watchAppsFor(this,paired)){
-            if(a.blocked()||a.partly()&&(!a.allowed.contains("HEART_RATE")||!a.allowed.contains("SLEEP")))
-                items.add(new Object[]{"Let "+a.label+" share your watch's data","In Health Connect, open "+a.label+" (under \"See more health apps\" if needed) and turn on Allow all.","Allow",(Runnable)()->{if(Pro.openAppPermissions(this,a.pkg))toast("Find "+a.label+" and turn on Allow all");else toast("Open Health Connect and allow "+a.label);}});
-            else if(!anyData&&hcOk){Intent launch=getPackageManager().getLaunchIntentForPackage(a.pkg);
-                items.add(new Object[]{"Sync "+a.label+" with your watch",a.label+" is allowed to share. Open it so it syncs your watch (turn on Health Connect in its settings if it has a switch); Kadamm picks it up a minute later.","Open",(Runnable)()->{try{if(launch!=null)startActivity(launch);}catch(Exception e){toast("Couldn't open "+a.label);}}});}}
+            if(a.blocked()||a.partly()&&(!a.allowed.contains("HEART_RATE")||!a.allowed.contains("SLEEP"))||!sentFrom(a.pkg)){
+                items.add(new Object[]{"Connect your watch",(paired!=null?paired:a.label)+"'s data isn't reaching Kadamm yet. A short guide checks each step for you.","Start",(Runnable)()->navigate("WatchSetup")});break;}}
         // 3. Phone permissions.
         if(!home&&!DaySteps.permitted(this))items.add(new Object[]{"Physical activity","Counts your steps all day with the phone's step sensor.","Allow",(Runnable)this::requestStepPermission});
         if(Build.VERSION.SDK_INT>=31&&checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)items.add(new Object[]{"Nearby devices","Lets Kadamm see which watch is paired and connected.","Allow",(Runnable)()->requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},BT_PERMISSION)});
