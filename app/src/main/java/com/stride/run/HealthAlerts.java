@@ -80,6 +80,7 @@ final class HealthAlerts {
 
     /** From the background sync: posts new alerts, within the limits. */
     static void notifyIfDue(Context c){
+        {int hh=Calendar.getInstance().get(Calendar.HOUR_OF_DAY);if(hh>=9&&hh<21)sinceReport(c);}
         try{
             if(!c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getBoolean("bodyAlerts",true))return;
             int h=Calendar.getInstance().get(Calendar.HOUR_OF_DAY),mins=h*60+Calendar.getInstance().get(Calendar.MINUTE);if(h<7||mins>=23*60+30)return;
@@ -94,6 +95,40 @@ final class HealthAlerts {
                 int id=id(a.key);nm.notify(id,Reminders.rich(c,CHANNEL,id,a.title,a.text,"Body",false).build());
                 sent++;p.edit().putString("a_"+a.key,today).putString("day",today).putInt("sent",sent).apply();
             }
+        }catch(Exception ignored){}
+    }
+
+    // ---- Health reports ----
+    static final String LAB_CHANNEL="kadamm_reports";static final int LAB_SAVED=7470,LAB_SINCE=7471;
+    private static boolean labOn(Context c){return c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getBoolean("labNotes",true);}
+    private static NotificationManager labChannel(Context c){NotificationManager nm=c.getSystemService(NotificationManager.class);if(nm!=null&&Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(LAB_CHANNEL,"Health report updates",NotificationManager.IMPORTANCE_DEFAULT));return nm;}
+    /** After saving a report: how its tests compare with the report before (toward or away from the range). */
+    static void reportSaved(Context c,String date){
+        try{if(!labOn(c))return;java.util.List<JSONObject> reps=HealthReports.all(c);java.util.List<HealthReports.Marker> mk=HealthReports.markers(c,reps);
+            java.util.List<String> good=new ArrayList<>(),bad=new ArrayList<>();int in=0,out=0;
+            for(HealthReports.Marker m:mk){HealthReports.Point p=m.last();if(!p.date.equals(date))continue;int st=HealthReports.status(p);if(st==0)in++;else if(st!=2)out++;
+                int d=HealthReports.direction(m.prev(),p);if(d!=0){String t=m.name+" "+HealthReports.fmt(m.prev().v)+" → "+HealthReports.fmt(p.v);(d>0?good:bad).add(t);}}
+            String title=out==0?"Report saved: every test in range":String.format(Locale.US,"Report saved: %d of %d tests in range",in,in+out);
+            StringBuilder b=new StringBuilder();if(!good.isEmpty())b.append("Better: ").append(String.join(", ",good)).append(". ");if(!bad.isEmpty())b.append("Moved away from the range: ").append(String.join(", ",bad)).append(". ");
+            if(b.length()==0)b.append("Open Health reports to see each test and what moved with it.");
+            NotificationManager nm=labChannel(c);if(nm!=null)nm.notify(LAB_SAVED,Reminders.rich(c,LAB_CHANNEL,LAB_SAVED,title,b.toString().trim(),"Labs",false).build());
+        }catch(Exception ignored){}
+    }
+    /**
+     * Once a week from the background sync, when measures have clearly changed since your latest report: the good
+     * changes and the ones to watch, so you know what your next test may reflect.
+     */
+    static void sinceReport(Context c){
+        try{if(!labOn(c))return;SharedPreferences p=c.getSharedPreferences("kadamm_alerts",Context.MODE_PRIVATE);if(System.currentTimeMillis()-p.getLong("labSinceAt",0)<7L*86400000L)return;
+            java.util.List<JSONObject> reps=HealthReports.all(c);if(reps.isEmpty())return;String ld=reps.get(reps.size()-1).optString("date");
+            java.util.List<HealthReports.Change> ch=HealthReports.since(c,DaySteps.sessions(c));if(ch.isEmpty())return;
+            StringBuilder g=new StringBuilder(),b=new StringBuilder();for(HealthReports.Change x:ch){if(x.tone==0)continue;StringBuilder t=x.tone>0?g:b;if(t.length()>0)t.append(", ");t.append(HealthReports.changeText(x));}
+            if(g.length()==0&&b.length()==0)return;
+            String nice;try{nice=new java.text.SimpleDateFormat("d MMM",Locale.getDefault()).format(new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US).parse(ld));}catch(Exception e){nice=ld;}
+            String text=(g.length()>0?"Going well: "+g+". ":"")+(b.length()>0?"Worth watching: "+b+".":"");
+            NotificationManager nm=labChannel(c);if(nm==null)return;
+            nm.notify(LAB_SINCE,Reminders.rich(c,LAB_CHANNEL,LAB_SINCE,"Since your "+nice+" health report",text.trim(),"Labs",false).build());
+            p.edit().putLong("labSinceAt",System.currentTimeMillis()).apply();
         }catch(Exception ignored){}
     }
 

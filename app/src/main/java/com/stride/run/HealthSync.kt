@@ -233,6 +233,8 @@ object HealthSync {
                 val range = TimeRangeFilter.between(Instant.ofEpochMilli(from), Instant.ofEpochMilli(to))
                 // Heart rate from a watch (via Samsung Health or any app writing to Health Connect), read once per session.
                 if (hrAllowed && !s.optBoolean("hrChecked", false) && now - to > 30L * 60000L) { heartRate(hc, s, range, from); changed = true }
+                // The 5 minutes after the session, for heart-rate recovery (read once, also for sessions synced before 10.3).
+                if (hrAllowed && s.has("hr") && !s.optBoolean("hrAfterChecked", false) && now - to > 30L * 60000L) { afterHeartRate(hc, s, to); changed = true }
                 // Steps minute by minute from the preferred source: cadence over time for sessions recorded before 8.2.
                 if (!s.has("hcMin") && now - to > 30L * 60000L && to - from >= 3L * 60000L) { minuteSteps(hc, s, range, from, filter); changed = true }
                 if (s.optLong("hcSyncedAt", 0L) > to + 6L * 3600000L) continue
@@ -307,6 +309,32 @@ object HealthSync {
         }
     }
 
+    /**
+     * Heart rate in the 5 minutes after a session ends, as {seconds after the end, bpm} in 5-second buckets
+     * ("hrAfter"), for heart-rate recovery. Nothing is stored when the watch recorded too little after the end.
+     */
+    private suspend fun afterHeartRate(hc: HealthConnectClient, s: JSONObject, end: Long) {
+        try {
+            val buckets = sortedMapOf<Long, MutableList<Long>>(); var token: String? = null
+            val range = TimeRangeFilter.between(Instant.ofEpochMilli(end - 60000L), Instant.ofEpochMilli(end + 300000L))
+            do {
+                val page = hc.readRecords(ReadRecordsRequest(HeartRateRecord::class, range, pageToken = token))
+                for (r in page.records) for (x in r.samples) {
+                    val sec = Math.floorDiv(x.time.toEpochMilli() - end, 1000L)
+                    if (sec in -60L..300L && x.beatsPerMinute in 30L..230L) buckets.getOrPut(Math.floorDiv(sec, 5L) * 5L) { mutableListOf() }.add(x.beatsPerMinute)
+                }
+                token = page.pageToken
+            } while (!token.isNullOrEmpty())
+            if (buckets.size >= 6) {
+                val out = JSONArray()
+                for ((sec, v) in buckets) out.put(JSONArray().put(sec).put(Math.round(v.average())))
+                s.put("hrAfter", out)
+            }
+            s.put("hrAfterChecked", true)
+        } catch (_: Exception) {
+        }
+    }
+
     /** Heart rate for an imported workout, read the same way as for Kadamm's own sessions. */
     suspend fun importHeartRate(hc: HealthConnectClient, s: JSONObject, range: TimeRangeFilter, from: Long) = heartRate(hc, s, range, from)
 
@@ -320,6 +348,12 @@ object HealthSync {
             val from = s.optLong("startTimeMs", 0L); val to = s.optLong("endTimeMs", 0L)
             if (to <= from || now - to > 30L * 86400000L || s.optBoolean("hrChecked", false) || now - to < 30L * 60000L) continue
             heartRate(hc, s, TimeRangeFilter.between(Instant.ofEpochMilli(from), Instant.ofEpochMilli(to)), from); changed = true
+        }
+        for (i in 0 until all.length()) {
+            val s = all.optJSONObject(i) ?: continue
+            val to = s.optLong("endTimeMs", 0L)
+            if (!s.has("hr") || s.optBoolean("hrAfterChecked", false) || now - to > 30L * 86400000L || now - to < 30L * 60000L) continue
+            afterHeartRate(hc, s, to); changed = true
         }
         if (changed) history.edit().putString("sessions", all.toString()).apply()
     }

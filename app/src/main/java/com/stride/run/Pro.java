@@ -208,7 +208,7 @@ final class Pro {
 
     // ---- What the watch's app can share ----
     /** The Health Connect type a measure needs written by the watch's app. */
-    private static final String[][] WRITES={{"sleep","SLEEP"},{"hr","HEART_RATE"},{"rhr","RESTING_HEART_RATE"},{"hrv","HEART_RATE_VARIABILITY"},{"resp","RESPIRATORY_RATE"},
+    private static final String[][] WRITES={{"floors","FLOORS_CLIMBED"},{"sleep","SLEEP"},{"hr","HEART_RATE"},{"rhr","RESTING_HEART_RATE"},{"hrv","HEART_RATE_VARIABILITY"},{"resp","RESPIRATORY_RATE"},
         {"spo2","OXYGEN_SATURATION"},{"skin","SKIN_TEMPERATURE"},{"btemp","BODY_TEMPERATURE"},{"bp","BLOOD_PRESSURE"},{"vo2","VO2_MAX"},{"weight","WEIGHT"}};
     /**
      * Whether any app that shares into Health Connect on this phone (the watch's app: Zepp, Samsung Health, Fitbit,
@@ -233,6 +233,20 @@ final class Pro {
     }
     /** The watch apps that share, by name ("Zepp, Google Fit"). */
     static String sharingApps(Context c){java.util.List<String> n=new ArrayList<>();JSONArray a=Vitals.all(c).optJSONArray("sources");if(a!=null)for(int i=0;i<a.length();i++){String p=a.optString(i);if(p.startsWith("com.android.healthconnect")||p.equals("com.google.android.apps.fitness")||p.equals(c.getPackageName()))continue;String l=HealthSync.label(p);if(!n.contains(l))n.add(l);}return String.join(", ",n);}
+
+    // ---- Floors ----
+    /**
+     * Floors climbed on a day: {floors, source} with source 1 = Health Connect (the phone's or watch's own count),
+     * 2 = Kadamm sessions recorded with the barometer (metres climbed ÷ 3, a standard floor). The higher of the two,
+     * never their sum; {-1, 0} when neither has anything for the day.
+     */
+    static double[] floors(Context c,JSONArray hist,String day){
+        double hc=-1;Double v=Vitals.series(Vitals.all(c),"floors").get(day);if(v!=null)hc=v;
+        double gain=0;boolean any=false;
+        for(int i=0;i<hist.length();i++){JSONObject o=hist.optJSONObject(i);if(o==null||!day.equals(o.optString("day",""))||Insights.vehicle(o))continue;SessionMetrics m=SessionMetrics.of(c,o);if(m.barometer&&m.gain>=0){gain+=m.gain;any=true;}}
+        double ses=any?Math.floor(gain/3.0):-1;
+        if(hc<0&&ses<0)return new double[]{-1,0};return hc>=ses?new double[]{hc,1}:new double[]{ses,2};
+    }
 
     // ---- Which watch ----
     /** The apps and watches Health Connect data came from, and when it last synced. */

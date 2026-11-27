@@ -160,6 +160,7 @@ final class TrainerCoach {
             else if(day.recovery)m.append(String.format(Locale.US,"Yesterday was a big day: effort %d, about %.1f× your usual. Today is an easy day, so I've eased your targets. Keep the pace comfortable. ",Math.round(day.yEffort),day.yEffort/day.usualEffort));
             else if(yv!=null&&yv>0&&minute<12*60)m.append(String.format(Locale.US,"Yesterday you walked %,d steps%s. ",yv,yDone>=3?" and finished every challenge, brilliant":yDone==2?" and finished two of three challenges":""));
             m.append(sleepFocus(c));
+            m.append(trainingWords(c));
             Challenge next=null;for(Challenge ch:day.list)if(!ch.done&&(next==null||ch.fraction()>next.fraction()))next=ch;
             if(day.done==0)m.append("Here are today's three challenges, set from your last four weeks. ");
             else m.append(day.done==1?"One challenge down, two to go. ":"Two done, one to go. ");
@@ -182,6 +183,24 @@ final class TrainerCoach {
         }
         day.message=m.toString().trim();
     }
+
+    /**
+     * One or two sentences from the training analysis: the latest session's report (if it ended in the last 18 hours)
+     * and a warning when the last 7 days have been monotonous. Empty when there's nothing to say.
+     */
+    static String trainingWords(Context c){
+        if(!SessionMetrics.ready())return "";StringBuilder b=new StringBuilder();
+        try{JSONArray hist=DaySteps.sessions(c);JSONObject ls=Training.latest(hist,18);
+            if(ls!=null){Training.Report r=Training.report(c,hist,ls);String what=r.type.name.isEmpty()?"last session":r.type.name.toLowerCase(Locale.US);
+                String note=!r.good.isEmpty()?r.good.get(0):!r.limit.isEmpty()?r.limit.get(0):"";
+                b.append("About your ").append(what).append(": ").append(note.isEmpty()?"it's in your history with its full report. ":lower(note)+" ");
+                if(!r.next.isEmpty())b.append(r.next).append(' ');}
+            Training.Monotony mo=Training.monotony(c,hist);
+            if(mo.monotony>=2)b.append(String.format(Locale.US,"Your last 7 days carried almost the same load every day (monotony %.1f): make one day clearly easier so the harder ones count. ",mo.monotony));
+        }catch(Exception ignored){}
+        return b.toString();
+    }
+    private static String lower(String s){return s.isEmpty()?s:Character.toLowerCase(s.charAt(0))+s.substring(1);}
 
     // ---- Report: patterns in the last four weeks ----
     static final class Finding { final String title,value,verdict;final int tone; Finding(String t,String v,String verdict,int tone){title=t;value=v;this.verdict=verdict;this.tone=tone;} }
@@ -217,6 +236,12 @@ final class TrainerCoach {
         if(easy+hard>=4)out.add(new Finding("Effort mix",hard+" hard · "+easy+" easy sessions",hard==0?"All your sessions are easy; one brisk or interval walk a week builds fitness faster.":hard>easy?"More hard than easy sessions; balance with easy days to recover.":"A healthy mix of easy and harder sessions.",hard==0?-1:hard>easy?0:1));
         // Challenges kept
         SharedPreferences p=prefs(c);int done=0,full=0,daysTracked=0;Calendar q=Calendar.getInstance();for(int i=0;i<14;i++){q.add(Calendar.DAY_OF_YEAR,-1);int r=p.getInt("done_"+DaySteps.key(q.getTimeInMillis()),-1);if(r<0)continue;daysTracked++;done+=r;if(r>=3)full++;}
+        // Training analysis: efficiency trend (runs if you run with heart rate, else walks) and monotony.
+        try{java.util.List<double[]> ef=Training.series(c,hist,"efficiency",90);int nr=0;for(double[] pt:ef)if(pt[2]>0)nr++;boolean runs=nr>=3;double[] ch=Training.change(ef,14,runs);
+            if(ch!=null)out.add(new Finding("Aerobic efficiency",String.format(Locale.US,"%.2f m/beat (%+.0f%%)",ch[0],ch[2]),ch[2]>=1?"More distance per heartbeat on your "+(runs?"runs":"walks")+" than before: aerobic fitness is improving.":ch[2]<=-3?"Less distance per heartbeat than before; tiredness, heat or illness can lower it for a while.":"Steady compared with before.",ch[2]>=1?1:ch[2]<=-3?-1:0));
+            Training.Monotony mo=Training.monotony(c,hist);
+            if(mo.monotony>=0)out.add(new Finding("Training monotony",String.format(Locale.US,"%.2f (%s)",mo.monotony,Training.monotonyWord(mo.monotony).toLowerCase(Locale.US)),mo.monotony>=2?"Every day this week carried about the same load. Add an easy day.":mo.monotony>=1.5?"Fairly even days; an easier day between harder ones helps.":"Hard and easy days are well mixed.",mo.monotony>=2?-1:mo.monotony>=1.5?0:1));
+        }catch(Exception ignored){}
         if(daysTracked>0)out.add(new Finding("Challenges",full+" perfect days of "+daysTracked,done*100/Math.max(1,daysTracked*3)+"% of challenges completed over the last two weeks.",full*2>=daysTracked?1:0));
         return out;
     }

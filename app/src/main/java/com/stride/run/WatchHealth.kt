@@ -6,6 +6,8 @@ import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.BloodPressureRecord
 import androidx.health.connect.client.records.BodyTemperatureRecord
+import androidx.health.connect.client.records.FloorsClimbedRecord
+import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
 import androidx.health.connect.client.records.OxygenSaturationRecord
@@ -49,7 +51,7 @@ object WatchHealth {
         "sleep" to SleepSessionRecord::class, "hr" to HeartRateRecord::class, "rhr" to RestingHeartRateRecord::class,
         "hrv" to HeartRateVariabilityRmssdRecord::class, "resp" to RespiratoryRateRecord::class, "spo2" to OxygenSaturationRecord::class,
         "skin" to SkinTemperatureRecord::class, "btemp" to BodyTemperatureRecord::class, "bp" to BloodPressureRecord::class,
-        "vo2" to Vo2MaxRecord::class, "weight" to WeightRecord::class,
+        "vo2" to Vo2MaxRecord::class, "weight" to WeightRecord::class, "floors" to FloorsClimbedRecord::class,
     )
     val readPermissions: Set<String> get() = readTypes.values.map { HealthPermission.getReadPermission(it) }.toSet()
     /** What you can add yourself and save to Health Connect too. */
@@ -213,6 +215,17 @@ object WatchHealth {
             if (todayMinutes != null) out.put("hrToday", JSONArray().apply { todayMinutes.forEach { put(it) } }).put("hrTodayDay", today.toString())
             if (lastAt > 0) out.put("hrLast", JSONObject().put("bpm", lastBpm).put("at", lastAt).put("src", lastSrc))
             else old.optJSONObject("hrLast")?.let { out.put("hrLast", it) }
+        } catch (_: Exception) { }
+
+        // Floors climbed per day: Health Connect's own daily total, which already picks one app when several write
+        // floors (so a phone and a watch aren't added together).
+        if (has("floors")) try {
+            val floors = JSONObject(); var n = 0
+            val rows = hc.aggregateGroupByPeriod(AggregateGroupByPeriodRequest(setOf(FloorsClimbedRecord.FLOORS_CLIMBED_TOTAL),
+                TimeRangeFilter.between(today.minusDays(DAYS.toLong()).atStartOfDay(), java.time.LocalDateTime.now()), java.time.Period.ofDays(1)))
+            for (r in rows) { val f = r.result[FloorsClimbedRecord.FLOORS_CLIMBED_TOTAL] ?: continue; if (f <= 0.0 || f > 500.0) continue; floors.put(r.startTime.toLocalDate().toString(), Math.round(f * 10) / 10.0); n++ }
+            for (r in all(FloorsClimbedRecord::class, TimeRangeFilter.between(today.minusDays(2).atStartOfDay(zone).toInstant(), Instant.now()))) src("floors", r.metadata.dataOrigin.packageName)
+            out.put("floors", floors); counts.put("floors", n)
         } catch (_: Exception) { }
 
         out.put("sources", JSONArray(allSources.toList())).put("by", sources).put("counts", counts).put("at", System.currentTimeMillis())

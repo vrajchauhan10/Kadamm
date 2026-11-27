@@ -70,6 +70,21 @@ final class SessionMetrics {
     final List<double[]> paceOverlay=new ArrayList<>(),gradeOverlay=new ArrayList<>();
     /** Where each best effort finished {lat, lon}, for pinning labels on the map. */
     final Map<Integer,double[]> bestEnd=new HashMap<>();
+    /**
+     * Aerobic efficiency: metres covered per heartbeat while moving (average speed in m/min ÷ average heart rate),
+     * leaving out the first 2 minutes while heart rate catches up. Higher at the same kind of effort = fitter. -1
+     * without heart rate, measured distance or 10 moving minutes.
+     */
+    double efficiency=-1;
+    /**
+     * Cardiac drift (Friel's aerobic decoupling): how much efficiency fell from the first half of the moving time to
+     * the second, in % (heart rate rising at the same pace). Only for steady sessions of 20+ moving minutes after a
+     * 3-minute warm-up; NaN otherwise, with the reason in {@link #driftNeed}. {@link #driftHalves} = {speed m/min, bpm}
+     * for each half.
+     */
+    double drift=Double.NaN;String driftNeed="";double[][] driftHalves;
+    /** Heart-rate recovery: heart rate at the end, and how far it fell 1 and 2 minutes later; -1 when not recorded. */
+    int hrEnd=-1,hrr1=-1,hrr2=-1;boolean hrEndMoving;
     /** Speeds (km/h) by 30-second window while moving, for pace zones: {seconds, km/h}. */
     final List<double[]> speeds=new ArrayList<>();
 
@@ -80,7 +95,7 @@ final class SessionMetrics {
     // ---- Cache: sessions don't change once saved, apart from Health Connect extras ----
     /** Bounded: the least recently used analyses are dropped past 250 sessions, so memory stays flat over years of use. */
     private static final Map<Long,Object[]> cache=new java.util.LinkedHashMap<Long,Object[]>(64,.75f,true){@Override protected boolean removeEldestEntry(Map.Entry<Long,Object[]> e){return size()>250;}};
-    private static String signature(JSONObject o){return o.optString("route","").length()+"/"+o.optString("timeline","").length()+"/"+o.optString("hr","").length()+"/"+o.optString("hcMin","").length()+"/"+o.optDouble("distanceKm")+"/"+o.optLong("steps")+"/"+o.optString("activityMode");}
+    private static String signature(JSONObject o){return o.optString("route","").length()+"/"+o.optString("timeline","").length()+"/"+o.optString("hr","").length()+"/"+o.optString("hrAfter","").length()+"/"+o.optString("hcMin","").length()+"/"+o.optDouble("distanceKm")+"/"+o.optLong("steps")+"/"+o.optString("activityMode");}
     static SessionMetrics of(Context c,JSONObject o){
         long id=o.optLong("id");String sig=signature(o)+"/"+settingsKey(c)+"/"+DaySteps.hcSteps(c);
         synchronized(cache){Object[] hit=cache.get(id);if(hit!=null&&sig.equals(hit[0]))return (SessionMetrics)hit[1];}
@@ -150,6 +165,8 @@ final class SessionMetrics {
         if(x.gps&&!x.vehicle)bestEfforts(x,pts);
         elevation(x,pts,tl,o);
         heartRate(c,x,o);
+        aerobic(x,dist);
+        hrRecovery(x,o,dist);
         // Effort: minutes in each zone weighted by intensity; heart-rate zones replace movement zones when present.
         long[] z=x.hrZoneS!=null?x.hrZoneS:x.zoneS;double e=0;for(int i=0;i<5;i++)e+=z[i]/60d*ZONE_WEIGHT[i];x.effort=e;
         // WHO counts a vigorous minute as two moderate ones; 150 a week is the guideline.
@@ -380,6 +397,41 @@ final class SessionMetrics {
         }
     }
 
+    /** Mean heart rate between two times (seconds from the start), or -1 with no reading in it. */
+    private static double hrBetween(List<double[]> hr,double a,double b){double sum=0;int n=0;for(double[] h:hr)if(h[0]>=a&&h[0]<b){sum+=h[1];n++;}return n==0?-1:sum/n;}
+    /** Efficiency and cardiac drift from minute-by-minute speed and heart rate. */
+    private static void aerobic(SessionMetrics x,List<double[]> dist){
+        if(x.hr.size()<6){x.driftNeed="hr";return;}
+        if(x.estimatedDistance||x.vehicle||dist.size()<6){x.driftNeed="distance";return;}
+        double end=dist.get(dist.size()-1)[0];List<double[]> mins=new ArrayList<>();
+        // 1-minute windows from minute 2: speed from distance covered, heart rate averaged; still minutes left out.
+        for(double a=120;a+60<=end;a+=60){double m=metresAt(dist,a+60)-metresAt(dist,a),bpm=hrBetween(x.hr,a,a+60);if(m<40||bpm<40)continue;mins.add(new double[]{a,m,bpm});}
+        if(mins.size()<10){x.driftNeed="short";return;}
+        double sm=0,sb=0;for(double[] q:mins){sm+=q[1];sb+=q[2];}x.efficiency=sm/sb;
+        // Drift: from minute 3 on, the moving minutes split into two halves; needs 20 of them and an even pace.
+        List<double[]> d=new ArrayList<>();for(double[] q:mins)if(q[0]>=180)d.add(q);
+        if(d.size()<20){x.driftNeed="short";return;}
+        double mean=0;for(double[] q:d)mean+=q[1];mean/=d.size();double var=0;for(double[] q:d)var+=(q[1]-mean)*(q[1]-mean);double cv=Math.sqrt(var/d.size())/mean;
+        if(cv>.15){x.driftNeed="uneven";return;}
+        int h=d.size()/2;double[][] half=new double[2][2];
+        for(int i=0;i<d.size();i++){int k=i<h?0:1;half[k][0]+=d.get(i)[1];half[k][1]+=d.get(i)[2];}
+        half[0][0]/=h;half[0][1]/=h;half[1][0]/=d.size()-h;half[1][1]/=d.size()-h;
+        double ef1=half[0][0]/half[0][1],ef2=half[1][0]/half[1][1];x.drift=(ef1-ef2)/ef1*100;x.driftHalves=half;
+    }
+    /**
+     * Heart-rate recovery from the watch's readings around the end ("hrAfter", read from Health Connect for the
+     * 5 minutes after a session): end = average of the last 15 s, then the average around 1 and 2 minutes later.
+     */
+    private static void hrRecovery(SessionMetrics x,JSONObject o,List<double[]> dist){
+        JSONArray a=o.optJSONArray("hrAfter");if(a==null){try{String v=o.optString("hrAfter","");if(!v.isEmpty())a=new JSONArray(v);}catch(Exception ignored){}}
+        if(a==null||a.length()<4)return;List<double[]> after=new ArrayList<>();for(int i=0;i<a.length();i++){JSONArray r=a.optJSONArray(i);if(r!=null)after.add(new double[]{r.optDouble(0),r.optDouble(1)});}
+        double endSec=(o.optLong("endTimeMs",0)-o.optLong("startTimeMs",0))/1000d;
+        double e=endSec>0?hrBetween(x.hr,endSec-15,endSec+1):-1;if(e<0)e=hrBetween(after,-15,1);
+        double h1=hrBetween(after,50,71),h2=hrBetween(after,110,131);if(e<0)return;
+        x.hrEnd=(int)Math.round(e);if(h1>0)x.hrr1=(int)Math.round(e-h1);if(h2>0)x.hrr2=(int)Math.round(e-h2);
+        // Recovery only means something if you were still moving in the last minute before stopping.
+        if(dist.size()>=2){double last=dist.get(dist.size()-1)[0];x.hrEndMoving=metresAt(dist,last)-metresAt(dist,last-60)>=40;}
+    }
     private static List<double[]> smooth(List<double[]> d,int w){List<double[]> out=new ArrayList<>();for(int i=0;i<d.size();i++){double sum=0;int n=0;for(int k=Math.max(0,i-w);k<=Math.min(d.size()-1,i+w);k++){sum+=d.get(k)[1];n++;}out.add(new double[]{d.get(i)[0],sum/n,0});}return out;}
 
     /** Fastest pace held over each duration in {@link #CURVE}: the most distance covered in that much time. */
