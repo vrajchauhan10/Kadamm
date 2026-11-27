@@ -265,6 +265,22 @@ final class Pro {
                 if(!a.wants.isEmpty())out.add(a);}catch(Exception ignored){}}
         synchronized(Pro.class){appsCache=new Object[]{System.currentTimeMillis(),out};}return out;
     }
+    /** Watch names by companion app, for matching a paired watch to its app. */
+    private static final String[][] BRANDS={{"com.noisefit","noise|colorfit|twist|halo|luna|pulse|xfit|vivid|icon"},{"com.huami.watch.hmwatchmanager","amazfit|gtr|gts|bip|balance|active|cheetah|falcon|t-rex|trex|helio"},
+        {"com.sec.android.app.shealth","galaxy|gear"},{"com.samsung.android.app.watchmanager","galaxy|gear"},{"com.fitbit.FitbitMobile","fitbit|versa|sense|charge|inspire|luxe"},{"com.garmin.android.apps.connectmobile","garmin|forerunner|venu|fenix|vivo|instinct|epix"},
+        {"com.mi.health","xiaomi|redmi|mi band|mi watch|smart band"},{"com.xiaomi.wearable","xiaomi|redmi|mi band|mi watch|smart band"},{"com.realme.link","realme"},{"com.boat.crest","boat|wave|storm|xtend|lunar|ultima"},
+        {"com.fireboltt","fire|boltt|ninja|phoenix"},{"com.huawei.health","huawei|honor"},{"com.google.android.apps.wear.companion","pixel watch"},{"com.coros.coros","coros"},{"com.suunto.connectivity","suunto"},{"fi.polar.polarflow","polar"},{"com.heytap.health","oppo|oneplus"},{"com.oplus.healthservice","oppo|oneplus"}};
+    /** Whether this app goes with the paired watch named {@code watch} (by brand words, or the app's own name). */
+    static boolean matches(App a,String watch){
+        if(watch==null)return false;String w=watch.toLowerCase(java.util.Locale.US);
+        for(String[] b:BRANDS)if(b[0].equals(a.pkg)&&w.matches(".*("+b[1]+").*"))return true;
+        String first=a.label.toLowerCase(java.util.Locale.US).split("[^a-z0-9]")[0];return first.length()>=3&&w.contains(first);
+    }
+    /** The watch apps to talk about: the ones that match the paired watch if any does, else all of them. */
+    static List<App> watchAppsFor(Context c,String watch){
+        List<App> all=new ArrayList<>(),match=new ArrayList<>();for(App a:healthApps(c))if(watchApp(a)){all.add(a);if(matches(a,watch))match.add(a);}
+        return match.isEmpty()?all:match;
+    }
     /** Apps that look like a watch or band's companion: they write sleep, which phones and run or food apps don't. */
     static boolean watchApp(App a){return a.wants.contains("SLEEP");}
     /** An app on this phone that asks to write this type but isn't allowed to yet (the fix is one switch), or null. */
