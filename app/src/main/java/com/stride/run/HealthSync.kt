@@ -204,7 +204,10 @@ object HealthSync {
         val days = try { JSONObject(prefs.getString("healthDays", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
         val fresh = JSONObject()
         // Past days: the highest single source per day, for the same reason.
-        val window = TimeRangeFilter.between(today.minusDays(29).atStartOfDay(), LocalDateTime.now(zone))
+        // Normally the last 30 days; once after 10.3.2, the last year, so days Google Fit doubled long ago are corrected too
+        // (older than 30 days needs Health Connect's history permission; without it the read just covers what's allowed).
+        val longFix = !prefs.getBoolean("fitRelayDays", false)
+        val window = TimeRangeFilter.between(today.minusDays(if (longFix) 364 else 29).atStartOfDay(), LocalDateTime.now(zone))
         // Every source that wrote steps in the window (Google Fit may have filled past days only), each day apart.
         val windowOrigins = try { hc.aggregate(AggregateRequest(setOf(StepsRecord.COUNT_TOTAL), window)).dataOrigins.map { it.packageName } } catch (_: Exception) { emptyList() }
         val byDay = mutableMapOf<String, MutableMap<String, Long>>()
@@ -224,6 +227,7 @@ object HealthSync {
         }
         for ((key, v) in byDay) fresh.put(key, pick(v).second)
         for (key in fresh.keys()) days.put(key, fresh.getLong(key))
+        if (longFix && fresh.length() > 0) prefs.edit().putBoolean("fitRelayDays", true).apply()
 
         val granted = try { hc.permissionController.getGrantedPermissions() } catch (_: Exception) { emptySet() }
         val edit = prefs.edit()

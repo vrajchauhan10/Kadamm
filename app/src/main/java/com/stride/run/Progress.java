@@ -190,7 +190,10 @@ final class Progress {
     private static SharedPreferences seen(Context c){return c.getSharedPreferences("kadamm_badges",Context.MODE_PRIVATE);}
     /** Badges earned since the user last looked at Achievements. */
     static List<Badge> unseen(Context c,List<Badge> all){
-        Set<String> s=seen(c).getStringSet("seen",new HashSet<>());List<Badge> out=new ArrayList<>();
+        Set<String> s=new HashSet<>(seen(c).getStringSet("seen",new HashSet<>()));List<Badge> out=new ArrayList<>();
+        // A badge that's no longer earned (its data was corrected, e.g. steps a relay app had doubled) is forgotten, so
+        // it's celebrated properly when it's really earned.
+        boolean pruned=false;for(Badge b:all)if(!b.earned()&&s.remove(b.id))pruned=true;if(pruned)seen(c).edit().putStringSet("seen",s).apply();
         for(Badge b:all)if(b.earned()&&!s.contains(b.id))out.add(b);return out;
     }
     static void markSeen(Context c,List<Badge> all){Set<String> s=new HashSet<>();for(Badge b:all)if(b.earned())s.add(b.id);seen(c).edit().putStringSet("seen",s).apply();}

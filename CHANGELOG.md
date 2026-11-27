@@ -2,7 +2,7 @@
 
 ## 10.3.2 (versionCode 62)
 
-- Steps are no longer doubled once Google Fit syncs with Health Connect. Google Fit writes its own merged total (the phone's steps plus other apps' again), which reached 1.6–1.9× the real count on past days, and Kadamm took it as the most complete source. Google Fit now counts only when no other source has the day, or when it's within 40 % of the best other source (a watch can rightly count more than a phone left on a desk). The same rule applies to today, past days, each session's steps, distance and calories. The last 30 days are corrected on the next sync, and sessions synced since are read again once.
+- Steps are no longer doubled once Google Fit syncs with Health Connect. Google Fit writes its own merged total (the phone's steps plus other apps' again), which reached 1.6–1.9× the real count on past days, and Kadamm took it as the most complete source. Google Fit now counts only when no other source has the day, or when it's within 40 % of the best other source (a watch can rightly count more than a phone left on a desk). The same rule applies to today, past days, each session's steps, distance and calories. Once, after updating, the last year is read again (where Health Connect allows), so days doubled long ago are corrected too, and sessions synced since are read again. Achievements follow the corrected totals: a badge earned only from doubled days (30K day, 20K day, Half a million) is no longer shown as earned, and is celebrated properly when you really reach it.
 
 ## 10.3.1 (versionCode 61)
 
