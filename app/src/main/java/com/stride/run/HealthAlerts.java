@@ -101,16 +101,16 @@ final class HealthAlerts {
     // ---- Health reports ----
     static final String LAB_CHANNEL="kadamm_reports";static final int LAB_SAVED=7470,LAB_SINCE=7471;
     private static boolean labOn(Context c){return c.getSharedPreferences("kadamm_settings",Context.MODE_PRIVATE).getBoolean("labNotes",true);}
-    private static NotificationManager labChannel(Context c){NotificationManager nm=c.getSystemService(NotificationManager.class);if(nm!=null&&Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(LAB_CHANNEL,"Health report updates",NotificationManager.IMPORTANCE_DEFAULT));return nm;}
+    private static NotificationManager labChannel(Context c){NotificationManager nm=c.getSystemService(NotificationManager.class);if(nm!=null&&Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(LAB_CHANNEL,"Lab result updates",NotificationManager.IMPORTANCE_DEFAULT));return nm;}
     /** After saving a report: how its tests compare with the report before (toward or away from the range). */
     static void reportSaved(Context c,String date){
         try{if(!labOn(c))return;java.util.List<JSONObject> reps=HealthReports.all(c);java.util.List<HealthReports.Marker> mk=HealthReports.markers(c,reps);
             java.util.List<String> good=new ArrayList<>(),bad=new ArrayList<>();int in=0,out=0;
             for(HealthReports.Marker m:mk){HealthReports.Point p=m.last();if(!p.date.equals(date))continue;int st=HealthReports.status(p);if(st==0)in++;else if(st!=2)out++;
                 int d=HealthReports.direction(m.prev(),p);if(d!=0){String t=m.name+" "+HealthReports.fmt(m.prev().v)+" → "+HealthReports.fmt(p.v);(d>0?good:bad).add(t);}}
-            String title=out==0?"Report saved: every test in range":String.format(Locale.US,"Report saved: %d of %d tests in range",in,in+out);
+            String title=out==0?"Lab results saved: every test in range":String.format(Locale.US,"Lab results saved: %d of %d tests in range",in,in+out);
             StringBuilder b=new StringBuilder();if(!good.isEmpty())b.append("Better: ").append(String.join(", ",good)).append(". ");if(!bad.isEmpty())b.append("Moved away from the range: ").append(String.join(", ",bad)).append(". ");
-            if(b.length()==0)b.append("Open Health reports to see each test and what moved with it.");
+            if(b.length()==0)b.append("Open Lab results to see each test and what moved with it.");
             NotificationManager nm=labChannel(c);if(nm!=null)nm.notify(LAB_SAVED,Reminders.rich(c,LAB_CHANNEL,LAB_SAVED,title,b.toString().trim(),"Labs",false).build());
         }catch(Exception ignored){}
     }
@@ -127,7 +127,7 @@ final class HealthAlerts {
             String nice;try{nice=new java.text.SimpleDateFormat("d MMM",Locale.getDefault()).format(new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US).parse(ld));}catch(Exception e){nice=ld;}
             String text=(g.length()>0?"Going well: "+g+". ":"")+(b.length()>0?"Worth watching: "+b+".":"");
             NotificationManager nm=labChannel(c);if(nm==null)return;
-            nm.notify(LAB_SINCE,Reminders.rich(c,LAB_CHANNEL,LAB_SINCE,"Since your "+nice+" health report",text.trim(),"Labs",false).build());
+            nm.notify(LAB_SINCE,Reminders.rich(c,LAB_CHANNEL,LAB_SINCE,"Since your "+nice+" lab results",text.trim(),"Labs",false).build());
             p.edit().putLong("labSinceAt",System.currentTimeMillis()).apply();
         }catch(Exception ignored){}
     }

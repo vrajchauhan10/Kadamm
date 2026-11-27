@@ -195,7 +195,7 @@ public class MainActivity extends Activity {
         drawerAction("Today","◷","Today",null);drawerAction("History","▦","History",sessions.length()+(sessions.length()==1?" session":" sessions"));drawerAction("Profile","◉","Profile",null);int nr=Insights.routes(this).length();drawerAction("Routes","↗","Routes",nr==0?null:nr+(nr==1?" route":" routes"));drawerAction("Places","place","Places",null);drawerAction("Reports","≈","Reports",null);int earned=0;for(Progress.Badge bd:Progress.badges(SessionMetrics.ready()?this:null,history(),DaySteps.allDayTotals(this),dailyGoal()))if(bd.earned())earned++;drawerAction("Achievements","★","Achievements",earned+" badges");
         drawerSection("SETTINGS");
         drawerAction("Goals & targets","◎","Goals",String.format(Locale.US,"%,d steps",goal));drawerAction("Notifications","bell","Notifications",notificationsAllowed()?"On":"Off");drawerAction("Auto","run","Auto",AutoTrack.enabled(this)?"On":"Off");drawerAction("Permissions","gear","Permissions",null);drawerAction("Storage","storage","Storage",null);drawerAction("Share Kadamm","share","ShareApp","Send the app");
-        drawerAction("Health data","♥","Body",watchData()?"Watch":"Phone");{int nrep=HealthReports.all(this).size();drawerAction("Health reports","♥","Labs",nrep==0?"Add":nrep+(nrep==1?" report":" reports"));}
+        drawerAction("Body","♥","Body",watchData()?"Watch":"Phone");{int nrep=HealthReports.all(this).size();drawerAction("Lab results","♥","Labs",nrep==0?"Add":nrep+(nrep==1?" test":" tests"));}
         drawerAction("Step sources & health","＋","Health",getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false)?"Connected":"Set up");
         drawerSection("APPEARANCE");
         LinearLayout modes=row();drawerList.addView(modes,lp(-1,40));String selectedMode=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("themeMode","system");
@@ -265,7 +265,7 @@ public class MainActivity extends Activity {
         goingBack=false;
     }
     private void goBack(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.pop();Integer y=scrollMemory.get(to);restoreScroll=y==null?-1:y;goingBack=true;page=to;closeDrawer();renderPage();}
-    private String backLabel(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.peek();return "DaySummary".equals(to)?"Day summary":"Import".equals(to)?"Import":"Detail".equals(to)?"Session":"Auto".equals(to)?"Auto tracking":"Body".equals(to)?"Health data":"Labs".equals(to)?"Health reports":"LabEdit".equals(to)?"Report":"Today".equals(to)?"Home":to;}
+    private String backLabel(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.peek();return "DaySummary".equals(to)?"Day summary":"Import".equals(to)?"Import":"Detail".equals(to)?"Session":"Auto".equals(to)?"Auto tracking":"Body".equals(to)?"Body":"Labs".equals(to)?"Lab results":"LabEdit".equals(to)?"Lab result":"Today".equals(to)?"Home":to;}
     private void renderPageInner(){trackBack();if(!"Sessions".equals(page)&&!"Detail".equals(page)&&!"DaySummary".equals(page))recentDays=7;if(replayAnim!=null){replayAnim.cancel();replayAnim=null;}if(!page.equals(renderedPage)&&scroller!=null)scroller.scrollTo(0,0);renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else if(page.equals("Routes"))renderRoutes();else if(page.equals("Notifications"))renderNotifications();else if(page.equals("Reports"))renderReports();else if(page.equals("Achievements"))renderAchievements();else if(page.equals("Permissions"))renderPermissions();else if(page.equals("Auto"))renderAutoTracking();else if(page.equals("Storage"))renderStorage();else if(page.equals("Places"))renderPlaces();else if(page.equals("Sessions"))renderSessions();else if(page.equals("DaySummary"))renderDaySummary();else if(page.equals("Trainer"))renderTrainer();else if(page.equals("Import"))renderImport();else if(page.equals("Body"))renderBody();else if(page.equals("Labs"))renderLabs();else if(page.equals("LabEdit"))renderLabEdit();else renderDetail(lastSession);if(content.getChildCount()>0)signatureAtEnd();}
     private void styleNavItem(LinearLayout item,boolean selected){int color=selected?lime:muted;item.setBackground(rippleOn(selected?raised:Color.TRANSPARENT,14));((android.widget.ImageView)item.getChildAt(0)).setImageTintList(android.content.res.ColorStateList.valueOf(color));((TextView)item.getChildAt(1)).setTextColor(selected?ink:muted);}
     private void brand(String eyebrow,String headline,String sub){LinearLayout brand=row();content.addView(brand,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);brand.addView(brandButton(),bbp);if(tabIndex(page)<0){brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));boolean narrowBack=getResources().getConfiguration().screenWidthDp<400;TextView bk=tx(narrowBack?"‹":"‹  "+backLabel(),narrowBack?20:13,ink,true);bk.setGravity(Gravity.CENTER);bk.setPadding(narrowBack?0:dp(14),0,narrowBack?0:dp(16),narrowBack?dp(2):0);bk.setBackground(rippleOn(raised,18));bk.setContentDescription("Back to "+backLabel());bk.setOnClickListener(v->goBack());brand.addView(bk,narrowBack?lp(40,40):lp(-2,36));}TextView e=tx(eyebrow.toUpperCase(Locale.US),10,muted,true);LinearLayout.LayoutParams ep=lp(-1,25);ep.topMargin=dp(8);content.addView(e,ep);TextView h=tx(headline,29,ink,true);content.addView(h);if(sub!=null){TextView s=tx(sub,13,muted,false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(5);sp.bottomMargin=dp(16);content.addView(s,sp);}}
@@ -296,7 +296,7 @@ public class MainActivity extends Activity {
         TextView edit=tx("Edit Home",13,muted,false);edit.setGravity(Gravity.CENTER);edit.setBackground(rippleOn(Color.TRANSPARENT,10));LinearLayout.LayoutParams ep=lp(-1,44);ep.topMargin=dp(18);content.addView(edit,ep);edit.setOnClickListener(v->editHome());
     }
     /** Home's sections that can be hidden ("Edit Home", as in Aalap). Steps, starting an activity and setup always show. */
-    private static final String[][] HOME_SECTIONS={{"body","Your body today"},{"labs","Health report"},{"coach","Coach"},{"trainer","Trainer"},{"plan","Today's plan"},{"hourly","Steps by hour"},{"spread","Step spread"},{"quality","Movement quality"},{"sitting","Sitting breaks"},{"tiles","Today at a glance"},{"route","Live route map"},{"week","This week"},{"reports","Reports"},{"badges","New badges"}};
+    private static final String[][] HOME_SECTIONS={{"body","Your body today"},{"labs","Lab results"},{"coach","Coach"},{"trainer","Trainer"},{"plan","Today's plan"},{"hourly","Steps by hour"},{"spread","Step spread"},{"quality","Movement quality"},{"sitting","Sitting breaks"},{"tiles","Today at a glance"},{"route","Live route map"},{"week","This week"},{"reports","Reports"},{"badges","New badges"}};
     private boolean homeShows(String key){return !(","+getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("homeHidden","")+",").contains(","+key+",");}
     /** Draws a section; a hidden one is drawn but not shown, so nothing that refers to it breaks. */
     private void homeSection(String key,Runnable draw){if(!homeShows(key)&&!key.equals("route")){int n=content.getChildCount();try{draw.run();}finally{for(int i=n;i<content.getChildCount();i++)content.getChildAt(i).setVisibility(View.GONE);}return;}draw.run();}
@@ -795,11 +795,11 @@ public class MainActivity extends Activity {
     }
     private String prettyDay(String key){try{return new java.text.SimpleDateFormat("EEE d MMM",Locale.getDefault()).format(new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US).parse(key));}catch(Exception e){return key;}}
     private void renderWatchFitness(JSONArray h){
-        // Watch measurements live on the Health data page now; Trainer keeps fitness age, from the app's one VO2max.
+        // Watch measurements live on the Body page now; Trainer keeps fitness age, from the app's one VO2max.
         // Fitness age
         Vitals.FitnessAge fa=Vitals.fitnessAge(this,h);
         LinearLayout fc=metricCard("FITNESS AGE","","The age whose average VO2max matches yours (HUNT fitness study norms). It uses the same VO2max as the Health data page: measured by your watch, a Cooper 12-minute test, your heart rate (15.3 × max ÷ resting), or walks with heart rate, in that order.");
-        if(fa.need!=null){String msg="age".equals(fa.need)?"Add your age in Profile to see your fitness age.":"rest".equals(fa.need)?"Needs a VO2max: from your watch, a Cooper test (Health data page), or a resting heart rate from a watch.":"Needs 2 or more walks of 10+ minutes with heart rate from a watch in the last 60 days ("+fa.sessions+" so far).";fc.addView(tx(msg,13,ink,false));}
+        if(fa.need!=null){String msg="age".equals(fa.need)?"Add your age in Profile to see your fitness age.":"rest".equals(fa.need)?"Needs a VO2max: from your watch, a Cooper test (Body page), or a resting heart rate from a watch.":"Needs 2 or more walks of 10+ minutes with heart rate from a watch in the last 60 days ("+fa.sessions+" so far).";fc.addView(tx(msg,13,ink,false));}
         else{LinearLayout r=row();r.setGravity(Gravity.BOTTOM);fc.addView(r);r.addView(tx(String.valueOf(fa.fitAge),40,fa.fitAge<=fa.age?positive:warning,true));TextView yr=tx(" years",14,muted,false);yr.setPadding(0,0,0,dp(8));r.addView(yr);
             fc.addView(tx(fa.fitAge<fa.age?(fa.age-fa.fitAge)+" years younger than your age ("+fa.age+")":fa.fitAge==fa.age?"The same as your age":(fa.fitAge-fa.age)+" years older than your age ("+fa.age+"): brisk walks bring it down",13,ink,true));
             fc.addView(tx(String.format(Locale.US,"VO₂max %.1f ml/kg/min · %s",fa.vo2,fa.method),12,muted,false));}
@@ -1063,12 +1063,12 @@ public class MainActivity extends Activity {
         if(dev.has("caps")){JSONArray caps=dev.optJSONArray("caps");StringBuilder b=new StringBuilder();for(int i=0;caps!=null&&i<caps.length();i++){if(b.length()>0)b.append(", ");b.append(caps.optString(i));}if(b.length()>0)c.addView(tx("Sensors on the watch: "+b,12,muted,false));}
         // What it shares
         int have=0,total=0;StringBuilder got=new StringBuilder();for(String[] m:BODY_METRICS){if(unsupported(m[0]))continue;total++;String[] x=bodyMetric(m[0],history());if(!"-2".equals(x[3])){have++;if(got.length()>0)got.append(" · ");got.append(m[1]);}}
-        // One short line; the full list is "What Kadamm captures" on the Health data page.
+        // One short line; the full list is "What Kadamm captures" on the Body page.
         TextView cap=tx(have+" of "+total+" measures available  ›",13,lime,true);cap.setPadding(0,dp(10),0,dp(2));c.addView(cap);
         cap.setOnClickListener(x->{catalogOpen=true;scrollToCatalog=true;if("Body".equals(page))renderPageNow();else navigate("Body");});
         LinearLayout bs=row();LinearLayout.LayoutParams bsp=lp(-1,44);bsp.topMargin=dp(12);c.addView(bs,bsp);
         Button sync1=button("Sync now",raised,ink);bs.addView(sync1,new LinearLayout.LayoutParams(0,-1,1));sync1.setOnClickListener(x->{toast("Syncing with your watch…");WearBridge.ping(this);refreshHealth(true);});
-        Button more=button(full?"Health Connect":"All health data",lime,accentOn);LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(0,-1,1);mp.leftMargin=dp(10);bs.addView(more,mp);
+        Button more=button(full?"Health Connect":"All body data",lime,accentOn);LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(0,-1,1);mp.leftMargin=dp(10);bs.addView(more,mp);
         more.setOnClickListener(x->{if(full){try{startActivity(new Intent(this,HealthConnectActivity.class));}catch(Exception e){toast("Health Connect could not be opened");}}else navigate("Body");});
         if(btWatch==null&&Build.VERSION.SDK_INT>=31&&checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED){TextView f=tx("Find a watch paired with this phone  ›",13,lime,true);f.setPadding(0,dp(12),0,0);c.addView(f);f.setOnClickListener(x->requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},BT_PERMISSION));}
     }
@@ -1163,7 +1163,7 @@ public class MainActivity extends Activity {
 
     // ---- The Health data page ----
     private void renderBody(){
-        JSONArray h=history();brand("YOUR BODY","Health data","What your watch and phone measure. Estimates are marked.");
+        JSONArray h=history();brand("MEASURED EVERY DAY","Body","What your watch and phone measure each day. Estimates are marked.");
         renderWatchConnection(true);renderSyncHealth();renderAlertsCard();renderBodyToday(h);renderLabsLink();renderRecoveryCard();renderStrainCard(h);renderSleepCard();renderHeartCard();renderStressCard();
         // Breathing, oxygen and temperature only come from a watch: the card appears once any of them does.
         boolean any=false;for(String k:new String[]{"resp","spo2","skin","btemp"})if(!"-2".equals(bodyMetric(k,h)[3]))any=true;if(any)renderOxygenCard();
@@ -1181,21 +1181,21 @@ public class MainActivity extends Activity {
     }
     private void renderLabs(){
         java.util.List<JSONObject> reps=HealthReports.all(this);
-        brand("YOUR BODY","Health reports","Your test results over time, and what Kadamm measured in the 30 days up to each test.");
+        brand("BLOOD TESTS YOU ADD","Lab results","Your blood test and lab results over time, and what Kadamm measured in the 30 days up to each test.");
         LinearLayout ab=row();LinearLayout.LayoutParams ap=lp(-1,50);ap.topMargin=dp(14);content.addView(ab,ap);
-        Button add=button("+  Add a report",lime,accentOn);add.setTextSize(15);ab.addView(add,new LinearLayout.LayoutParams(0,-1,1.4f));add.setOnClickListener(v->openLabEditor(null));
+        Button add=button("+  Add lab results",lime,accentOn);add.setTextSize(15);ab.addView(add,new LinearLayout.LayoutParams(0,-1,1.4f));add.setOnClickListener(v->openLabEditor(null));
         if(!reps.isEmpty()){Button pdf=button("Share as PDF",raised,ink);LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(0,-1,1);pp.leftMargin=dp(10);ab.addView(pdf,pp);pdf.setOnClickListener(v->shareLabPdf());}
-        if(reps.isEmpty()){LinearLayout e=card();e.addView(tx("No reports yet",16,ink,true));TextView t=tx("Add a blood test or any lab report: pick the tests, type each value as printed, and add the normal range from the report if you'd like each value checked against it. Everything stays on this phone.\n\nWith two or more reports, this page shows how each test changed and how it moved with your steps, sleep, heart rate, weight and the rest.",13,muted,false);t.setLineSpacing(dp(2),1f);t.setPadding(0,dp(6),0,0);e.addView(t);return;}
+        if(reps.isEmpty()){LinearLayout e=card();e.addView(tx("No lab results yet",16,ink,true));TextView t=tx("Add the results from a blood test or any lab test: pick the tests, type each value as printed, and add the normal range from the printout if you like. Everything stays on this phone.\n\nWith results from two or more dates, this page shows how each test changed and how it moved with your steps, sleep, heart rate, weight and the rest.",13,muted,false);t.setLineSpacing(dp(2),1f);t.setPadding(0,dp(6),0,0);e.addView(t);return;}
         java.util.List<HealthReports.Marker> mk=HealthReports.markers(this,reps);JSONObject latest=reps.get(reps.size()-1);String ld=latest.optString("date");
         // Summary of the latest report.
         int in=0,out=0,none=0,better=0,worse=0;java.util.List<String> outside=new java.util.ArrayList<>();
         for(HealthReports.Marker m:mk){HealthReports.Point p=m.last();if(!p.date.equals(ld))continue;int s=HealthReports.status(p);if(s==0)in++;else if(s==2)none++;else{out++;outside.add(m.name+" "+HealthReports.fmt(p.v)+" "+p.unit+" ("+(s>0?"above":"below")+" "+rangeText(p)+")");}
             int d=HealthReports.direction(m.prev(),p);if(d>0)better++;else if(d<0)worse++;}
         LinearLayout sc=card();sc.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(panel,violet,darkTheme?.18f:.08f),panel}){{setCornerRadius(dp(16));setStroke(dp(1),blend(line,violet,.3f));}});
-        TextView se=tx("LATEST REPORT · "+niceDate(ld).toUpperCase(Locale.getDefault())+(latest.optString("lab").isEmpty()?"":" · "+latest.optString("lab").toUpperCase(Locale.getDefault())),10,violet,true);se.setLetterSpacing(.08f);sc.addView(se);
+        TextView se=tx("LATEST TEST · "+niceDate(ld).toUpperCase(Locale.getDefault())+(latest.optString("lab").isEmpty()?"":" · "+latest.optString("lab").toUpperCase(Locale.getDefault())),10,violet,true);se.setLetterSpacing(.08f);sc.addView(se);
         int total=in+out+none;sc.addView(tx(total+(total==1?" test":" tests"),22,ink,true));
         statGrid(sc,new String[][]{{"In range",String.valueOf(in),""},{"Outside range",String.valueOf(out),""},{"No range",String.valueOf(none),""}},10);
-        if(reps.size()>=2)sc.addView(withTop(tx(String.format(Locale.US,"Since the report before: %d moved toward the range, %d moved away from it.",better,worse),12,muted,false),10));
+        if(reps.size()>=2)sc.addView(withTop(tx(String.format(Locale.US,"Since the test before: %d moved toward the range, %d moved away from it.",better,worse),12,muted,false),10));
         for(String o:outside){TextView t=tx("!  "+o,13,warning,true);t.setPadding(0,dp(6),0,0);sc.addView(t);}
         // Every test by group: latest value, status, change and a small chart.
         String group="";LinearLayout gc=null;
@@ -1208,7 +1208,7 @@ public class MainActivity extends Activity {
             java.util.List<HealthReports.Change> since=HealthReports.since(this,h);
             runOnUiThread(()->{if(!"Labs".equals(page)||!forPage.equals(renderedPage)||holder.getParent()!=content)return;LinearLayout real=content;content=holder;holder.removeAllViews();try{labSince(reps,since);labAround(reps,around);labLinks(mk,around);}catch(Exception ignored){}finally{content=real;}});},"KadammLabs").start();
         // The reports themselves.
-        LinearLayout lc=card();TextView lt=tx("YOUR REPORTS",11,ink,true);lt.setLetterSpacing(.06f);lc.addView(lt);
+        LinearLayout lc=card();TextView lt=tx("ALL YOUR LAB RESULTS",11,ink,true);lt.setLetterSpacing(.06f);lc.addView(lt);
         for(int i=reps.size()-1;i>=0;i--){JSONObject r=reps.get(i);JSONArray t=r.optJSONArray("tests");int n=t==null?0:t.length(),o2=0;for(int k=0;k<n;k++){JSONObject x=t.optJSONObject(k);HealthReports.Point p=new HealthReports.Point();p.v=x.optDouble("v");if(x.has("lo"))p.lo=x.optDouble("lo");if(x.has("hi"))p.hi=x.optDouble("hi");if(!x.has("lo")&&!x.has("hi")){double[] ty=HealthReports.typical(this,x.optString("n"));if(ty!=null){p.lo=ty[0];p.hi=ty[1];}}int s=HealthReports.status(p);if(s==1||s==-1)o2++;}
             LinearLayout row=row();row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,dp(10),0,dp(10));row.setBackground(rippleOn(Color.TRANSPARENT,10));lc.addView(row,lp(-1,-2));
             LinearLayout tc=col();row.addView(tc,new LinearLayout.LayoutParams(0,-2,1));tc.addView(tx(niceDate(r.optString("date"))+(r.optString("lab").isEmpty()?"":" · "+r.optString("lab")),14,ink,true));
@@ -1216,19 +1216,19 @@ public class MainActivity extends Activity {
             TextView ed=tx("Edit",12,lime,true);ed.setGravity(Gravity.CENTER);ed.setPadding(dp(12),0,dp(12),0);ed.setBackground(rippleOn(raised,14));row.addView(ed,lp(-2,34));ed.setOnClickListener(v->openLabEditor(r));
             TextView del=tx("Delete",12,critical,true);del.setGravity(Gravity.CENTER);del.setPadding(dp(12),0,dp(12),0);del.setBackground(rippleOn(blend(panel,critical,darkTheme?.18f:.08f),14));LinearLayout.LayoutParams dlp=lp(-2,34);dlp.leftMargin=dp(8);row.addView(del,dlp);
             del.setContentDescription("Delete the report from "+niceDate(r.optString("date")));
-            del.setOnClickListener(v->dialog().setTitle("Delete this report?").setMessage("The report from "+niceDate(r.optString("date"))+" ("+n+(n==1?" test":" tests")+") will be removed from this phone. This can't be undone.").setNegativeButton("Keep",null).setPositiveButton("Delete",(d,w)->{HealthReports.delete(this,r.optLong("id"));toast("Report deleted");int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));}).show());
+            del.setOnClickListener(v->dialog().setTitle("Delete these lab results?").setMessage("The report from "+niceDate(r.optString("date"))+" ("+n+(n==1?" test":" tests")+") will be removed from this phone. This can't be undone.").setNegativeButton("Keep",null).setPositiveButton("Delete",(d,w)->{HealthReports.delete(this,r.optLong("id"));toast("Lab results deleted");int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));}).show());
             row.setOnClickListener(v->openLabEditor(r));}
         TextView foot=tx("Kadamm only compares and shows; it doesn't diagnose. Your report's range is used first; the typical adult range only when you didn't enter one.",11,muted,false);foot.setPadding(dp(4),dp(12),dp(4),0);content.addView(foot);
     }
     /** Makes the PDF off the main thread, then opens the share sheet with it. */
     private void shareLabPdf(){
         toast("Preparing the PDF…");JSONArray h=history();
-        // Every measure as it stands today, as on the Health data page: {name, value, unit, where it came from}.
+        // Every measure as it stands today, as on the Body page: {name, value, unit, where it came from}.
         java.util.List<String[]> now=new java.util.ArrayList<>();for(String[] m:BODY_METRICS){if("live".equals(m[0]))continue;String[] v;try{v=bodyMetric(m[0],h);}catch(Exception e){v=new String[]{"—","","","-2"};}
             now.add(new String[]{m[1],v[0],v[1],unsupported(m[0])?"Not shared by the apps on this phone":v[2]});}
         new Thread(()->{java.io.File f=null;try{f=ReportPdf.make(this,h,now);}catch(Exception ignored){}java.io.File out=f;
             runOnUiThread(()->{if(out==null){toast("Couldn't make the PDF");return;}Uri uri=androidx.core.content.FileProvider.getUriForFile(this,getPackageName()+".files",out);
-                shareSheet("Share health report","My health report from Kadamm",uri,"application/pdf");});},"KadammPdf").start();
+                shareSheet("Share lab results","My lab results from Kadamm",uri,"application/pdf");});},"KadammPdf").start();
     }
     private TextView withTop(TextView t,int top){t.setPadding(0,dp(top),0,0);return t;}
     private String rangeText(HealthReports.Point p){return !Double.isNaN(p.lo)&&!Double.isNaN(p.hi)?HealthReports.fmt(p.lo)+"–"+HealthReports.fmt(p.hi):!Double.isNaN(p.lo)?"min "+HealthReports.fmt(p.lo):!Double.isNaN(p.hi)?"max "+HealthReports.fmt(p.hi):"";}
@@ -1253,7 +1253,7 @@ public class MainActivity extends Activity {
     /** What has changed in your measures since the latest report, as good or needing attention. */
     private void labSince(java.util.List<JSONObject> reps,java.util.List<HealthReports.Change> ch){
         String ld=reps.get(reps.size()-1).optString("date");int days=HealthReports.daysSince(ld);
-        LinearLayout c=metricCard("SINCE YOUR LAST REPORT",niceDate(ld),"Each measure's average in the days since your latest report (up to 30, from 7 days after it) against its average in the 30 days up to the report. Only clear changes are listed: steps, session time, floors, HRV, fitness and efficiency 10 %+, sleep 20+ minutes, resting heart rate 3+ bpm, stress 8+ points, blood pressure 5+ mmHg, weight 1.5+ kg. Green is the healthier direction; weight is shown without a judgement. Your next report shows whether the tests followed.");
+        LinearLayout c=metricCard("SINCE YOUR LAST TEST",niceDate(ld),"Each measure's average in the days since your latest report (up to 30, from 7 days after it) against its average in the 30 days up to the report. Only clear changes are listed: steps, session time, floors, HRV, fitness and efficiency 10 %+, sleep 20+ minutes, resting heart rate 3+ bpm, stress 8+ points, blood pressure 5+ mmHg, weight 1.5+ kg. Green is the healthier direction; weight is shown without a judgement. Your next report shows whether the tests followed.");
         if(days<7){c.addView(tx(String.format(Locale.US,"Appears %d day%s after the report, once there's a week of new data to compare.",7-days,7-days==1?"":"s"),13,muted,false));return;}
         if(ch.isEmpty()){c.addView(tx("No clear change in your measures since then.",13,muted,false));return;}
         for(HealthReports.Change x:ch){LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);r.setPadding(0,dp(7),0,dp(7));c.addView(r,lp(-1,-2));int col=x.tone>0?positive:x.tone<0?warning:muted;
@@ -1291,7 +1291,7 @@ public class MainActivity extends Activity {
     }
     private void renderLabEdit(){
         if(labDraft==null){page="Labs";renderPage();return;}boolean isNew=labDraft.optBoolean("new",false);
-        brand("HEALTH REPORT",isNew?"New report":"Edit report","Type each value as printed on your report. Add the range from the report to see whether a value is in range.");
+        brand("LAB RESULTS",isNew?"New lab result":"Edit lab result","Type each value as printed on your report. Add the range from the report to see whether a value is in range.");
         LinearLayout c=card();c.addView(tx("DATE OF THE TEST",10,muted,true));
         Button date=button(niceDate(labDraft.optString("date")),raised,ink);LinearLayout.LayoutParams dp1=lp(-1,46);dp1.topMargin=dp(6);c.addView(date,dp1);
         date.setOnClickListener(v->{Calendar cal=Calendar.getInstance();try{cal.setTime(new SimpleDateFormat("yyyy-MM-dd",Locale.US).parse(labDraft.optString("date")));}catch(Exception ignored){}
@@ -1325,7 +1325,7 @@ public class MainActivity extends Activity {
         LinearLayout br=row();LinearLayout.LayoutParams brp=lp(-1,50);brp.topMargin=dp(14);content.addView(br,brp);
         Button save=button("Save report",lime,accentOn);br.addView(save,new LinearLayout.LayoutParams(0,-1,1));save.setOnClickListener(v->saveLabDraft());
         if(!isNew){Button del=button("Delete",raised,critical);LinearLayout.LayoutParams dlp=new LinearLayout.LayoutParams(0,-1,1);dlp.leftMargin=dp(10);br.addView(del,dlp);
-            del.setOnClickListener(v->dialog().setTitle("Delete this report?").setMessage("The report from "+niceDate(labDraft.optString("date"))+" and all its values will be removed from this phone. This can't be undone.").setNegativeButton("Keep",null).setPositiveButton("Delete",(d,w)->{HealthReports.delete(this,labDraft.optLong("id"));labDraft=null;toast("Report deleted");goBack();}).show());}
+            del.setOnClickListener(v->dialog().setTitle("Delete these lab results?").setMessage("The report from "+niceDate(labDraft.optString("date"))+" and all its values will be removed from this phone. This can't be undone.").setNegativeButton("Keep",null).setPositiveButton("Delete",(d,w)->{HealthReports.delete(this,labDraft.optLong("id"));labDraft=null;toast("Lab results deleted");goBack();}).show());}
     }
     private android.text.TextWatcher watcher(java.util.function.Consumer<String> on){return new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int b,int c){}public void onTextChanged(CharSequence s,int a,int b,int c){}public void afterTextChanged(android.text.Editable e){on.accept(e.toString().trim());}};}
     private void pickLabGroup(){
@@ -1358,14 +1358,14 @@ public class MainActivity extends Activity {
                 if(lo!=null)t.put("lo",lo);if(hi!=null)t.put("hi",hi);out.put(t);}
             if(out.length()==0){toast("Type at least one value");return;}
             JSONObject r=new JSONObject().put("id",labDraft.optLong("id")).put("date",labDraft.optString("date")).put("lab",labDraft.optString("lab","")).put("tests",out);
-            HealthReports.save(this,r);labDraft=null;toast("Report saved");String dd=r.optString("date");new Thread(()->HealthAlerts.reportSaved(this,dd),"KadammLabNote").start();goBack();
+            HealthReports.save(this,r);labDraft=null;toast("Lab results saved");String dd=r.optString("date");new Thread(()->HealthAlerts.reportSaved(this,dd),"KadammLabNote").start();goBack();
         }catch(Exception e){toast("Couldn't save the report");}
     }
     /** Health data page: a way into Health reports, with the latest one in a line. */
     private void renderLabsLink(){
         java.util.List<JSONObject> reps=HealthReports.all(this);LinearLayout c=card();c.setOnClickListener(v->navigate("Labs"));
-        LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);c.addView(r,lp(-1,-2));android.widget.ImageView ic=icon(R.drawable.ic_chart,Color.WHITE,9);ic.setBackground(shape(violet,12));r.addView(ic,lp(40,40));
-        LinearLayout t=col();LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,-2,1);tp.leftMargin=dp(12);r.addView(t,tp);t.addView(tx("Health reports",15,ink,true));
+        LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);c.addView(r,lp(-1,-2));android.widget.ImageView ic=icon(R.drawable.ic_lab,Color.WHITE,9);ic.setBackground(shape(violet,12));r.addView(ic,lp(40,40));
+        LinearLayout t=col();LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,-2,1);tp.leftMargin=dp(12);r.addView(t,tp);t.addView(tx("Lab results",15,ink,true));
         t.addView(tx(reps.isEmpty()?"Add your blood test results and see how they move with your activity, sleep and heart":"Latest "+niceDate(reps.get(reps.size()-1).optString("date"))+" · "+reps.size()+(reps.size()==1?" report":" reports"),12,muted,false));r.addView(tx("›",20,muted,false));
     }
     /** Home: the latest health report in one card. */
@@ -1375,11 +1375,11 @@ public class MainActivity extends Activity {
         for(HealthReports.Marker m:mk){HealthReports.Point p=m.last();if(!p.date.equals(ld))continue;total++;int s=HealthReports.status(p);if(s==0)in++;else if(s!=2){out++;if(outside.size()<3)outside.add(m.name);}
             int d=HealthReports.direction(m.prev(),p);if(d>0)better++;else if(d<0)worse++;
             if(m.prev()!=null&&m.prev().v!=0){double ch=Math.abs((p.v-m.prev().v)/m.prev().v);if(ch>bigCh){bigCh=ch;big=m;}}}
-        LinearLayout c=card();c.setOnClickListener(v->navigate("Labs"));c.setContentDescription("Health report. Opens Health reports");
-        LinearLayout h=row();h.setGravity(Gravity.CENTER_VERTICAL);c.addView(h,lp(-1,-2));TextView t=tx("HEALTH REPORT",10,muted,true);t.setLetterSpacing(.08f);h.addView(t,new LinearLayout.LayoutParams(0,-2,1));h.addView(tx(niceDate(ld),11,muted,false));
+        LinearLayout c=card();c.setOnClickListener(v->navigate("Labs"));c.setContentDescription("Lab results. Opens Lab results");
+        LinearLayout h=row();h.setGravity(Gravity.CENTER_VERTICAL);c.addView(h,lp(-1,-2));TextView t=tx("LAB RESULTS",10,muted,true);t.setLetterSpacing(.08f);h.addView(t,new LinearLayout.LayoutParams(0,-2,1));h.addView(tx(niceDate(ld),11,muted,false));
         c.addView(withTop(tx(String.format(Locale.US,"%d of %d tests in range",in,in+out),20,ink,true),8));
         if(out>0)c.addView(withTop(tx("Outside range: "+android.text.TextUtils.join(", ",outside)+(out>outside.size()?" and "+(out-outside.size())+" more":""),13,warning,true),4));
-        if(reps.size()>=2)c.addView(withTop(tx(String.format(Locale.US,"Since the report before: %d toward range, %d away.%s",better,worse,big!=null?String.format(Locale.US," Biggest change: %s %s → %s %s.",big.name,HealthReports.fmt(big.prev().v),HealthReports.fmt(big.last().v),big.unit):""),12,muted,false),4));
+        if(reps.size()>=2)c.addView(withTop(tx(String.format(Locale.US,"Since the test before: %d toward range, %d away.%s",better,worse,big!=null?String.format(Locale.US," Biggest change: %s %s → %s %s.",big.name,HealthReports.fmt(big.prev().v),HealthReports.fmt(big.last().v),big.unit):""),12,muted,false),4));
         if(total-in-out>0)c.addView(withTop(tx((total-in-out)+" without a range entered",11,muted,false),4));
         TextView sl=tx("",12,ink,false);sl.setVisibility(View.GONE);c.addView(withTop(sl,6));JSONArray hh=history();
         new Thread(()->{java.util.List<HealthReports.Change> ch=HealthReports.since(this,hh);if(ch.isEmpty())return;StringBuilder g=new StringBuilder(),b=new StringBuilder();
@@ -2094,7 +2094,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     /** Vector icon for each symbol used across the app. */
     private int iconRes(String g){
         switch(g){
-            case "Goals":return R.drawable.ic_flag;case "Routes":return R.drawable.ic_place;case "Notifications":return R.drawable.ic_bell;case "Permissions":return R.drawable.ic_settings;case "Auto":return R.drawable.ic_run;case "Storage":return R.drawable.ic_storage;case "Reports":return R.drawable.ic_chart;case "Body":return R.drawable.ic_heart;case "Labs":return R.drawable.ic_chart;case "Achievements":return R.drawable.ic_trophy;case "Health":return R.drawable.ic_heart;case "ShareApp":return R.drawable.ic_share;case "Places":return R.drawable.ic_my_location;
+            case "Goals":return R.drawable.ic_flag;case "Routes":return R.drawable.ic_place;case "Notifications":return R.drawable.ic_bell;case "Permissions":return R.drawable.ic_settings;case "Auto":return R.drawable.ic_run;case "Storage":return R.drawable.ic_storage;case "Reports":return R.drawable.ic_chart;case "Body":return R.drawable.ic_heart;case "Labs":return R.drawable.ic_lab;case "Achievements":return R.drawable.ic_trophy;case "Health":return R.drawable.ic_heart;case "ShareApp":return R.drawable.ic_share;case "Places":return R.drawable.ic_my_location;
             case "Today":case "◷home":return R.drawable.ic_home;case "History":case "▦":return R.drawable.ic_calendar;case "Profile":case "◉p":return R.drawable.ic_person;
             case "↗":return R.drawable.ic_place;case "⚡\uFE0E":return R.drawable.ic_flame;case "◷":return R.drawable.ic_timer;case "▶":return R.drawable.ic_walk;case "◉":return R.drawable.ic_walk;
             case "»":return R.drawable.ic_run;case "★":return R.drawable.ic_bolt;case "≈":return R.drawable.ic_chart;case "◎":return R.drawable.ic_flag;case "＋":return R.drawable.ic_heart;case "⇅":return R.drawable.ic_ruler;
@@ -2364,7 +2364,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     /** Copies a shared file into Movies/Kadamm or Pictures/Kadamm (Android 10+ needs no storage permission). */
     private void saveToGallery(Uri src,String mime){
         boolean video=mime.startsWith("video/");
-        if("application/pdf".equals(mime)){try{android.content.ContentValues v=new android.content.ContentValues();v.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,"Kadamm-health-report-"+todayKey()+".pdf");v.put(android.provider.MediaStore.MediaColumns.MIME_TYPE,mime);v.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,"Download/Kadamm");
+        if("application/pdf".equals(mime)){try{android.content.ContentValues v=new android.content.ContentValues();v.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,"Kadamm-lab-results-"+todayKey()+".pdf");v.put(android.provider.MediaStore.MediaColumns.MIME_TYPE,mime);v.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,"Download/Kadamm");
             Uri dst=getContentResolver().insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,v);if(dst==null)throw new IllegalStateException();
             try(java.io.InputStream in=getContentResolver().openInputStream(src);java.io.OutputStream out=getContentResolver().openOutputStream(dst)){byte[] b=new byte[65536];int n;while((n=in.read(b))>0)out.write(b,0,n);}toast("Saved to Download/Kadamm");}catch(Exception e){toast("Couldn't save it");}return;}
         try{
@@ -3066,7 +3066,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         }
         // Running fitness estimate
         if(m.vdot>0){
-            LinearLayout vc=metricCard("RUNNING FITNESS","","VDOT: Jack Daniels' running-performance score from your best running effort of 1.5 km or more in this session. It's on the same scale as VO₂max but measures this run only, so it's kept separate from your VO₂max on the Health data page. Race predictions use Riegel's formula (time grows with distance to the power 1.06). Estimates, not lab measurements.");
+            LinearLayout vc=metricCard("RUNNING FITNESS","","VDOT: Jack Daniels' running-performance score from your best running effort of 1.5 km or more in this session. It's on the same scale as VO₂max but measures this run only, so it's kept separate from your VO₂max on the Body page. Race predictions use Riegel's formula (time grows with distance to the power 1.06). Estimates, not lab measurements.");
             double bestD=0,bestT=0;for(java.util.Map.Entry<Integer,Double> e:m.best.entrySet())if(e.getKey()>=1500&&e.getKey()>bestD){bestD=e.getKey();bestT=e.getValue();}
             statGrid(vc,new String[][]{{"VDOT",String.format(Locale.US,"%.0f",m.vdot),""},{"5 km",MetricViews.mmss(bestT*Math.pow(5000/bestD,1.06)),""},{"10 km",MetricViews.mmss(bestT*Math.pow(10000/bestD,1.06)),""}},10);
         }
@@ -3345,7 +3345,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         ll.addView(tx("Live session card",14,ink,true));ll.addView(tx("Time, distance, pace and Pause/Finish. Android requires it while recording.",11,muted,false));live.addView(tx("Always",11,positive,true));
         reminderSwitch(ses,"Show details on the lock screen","Off: the lock screen shows only that a session is running","notifyLockPublic");
         LinearLayout goals=card();goals.addView(tx("GOALS",10,muted,true));
-        reminderSwitch(goals,"Daily goal reached","Once a day, when you hit your step goal","notifyGoal");reminderSwitch(goals,"Health alerts","When a watch measure moves well outside your normal, with what to do (at most 3 a day, never at night)","bodyAlerts");reminderSwitch(goals,"Health report updates","When you save a report, how its tests compare with the last one; and once a week, the clear changes in your measures since your latest report","labNotes");
+        reminderSwitch(goals,"Daily goal reached","Once a day, when you hit your step goal","notifyGoal");reminderSwitch(goals,"Health alerts","When a watch measure moves well outside your normal, with what to do (at most 3 a day, never at night)","bodyAlerts");reminderSwitch(goals,"Lab result updates","When you save a report, how its tests compare with the last one; and once a week, the clear changes in your measures since your latest report","labNotes");
         reminderSwitch(goals,"You're making progress","Once a day, at 60% of your goal","notifyProgress");
         reminderSwitch(goals,"Weekly report","Monday morning: last week's steps, goal days and sessions","notifyWeekly");
         int sumAt=Reminders.get(this,"sumAt",21*60);

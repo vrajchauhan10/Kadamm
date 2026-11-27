@@ -40,7 +40,7 @@ final class ReportPdf {
             n++;page=pdf.startPage(new PdfDocument.PageInfo.Builder(W,H,n).create());cv=page.getCanvas();
             Drawable logo=c.getDrawable(R.drawable.ic_kadamm_logo);if(logo!=null){logo.setBounds(M,M-6,M+26,M+20);logo.draw(cv);}
             p.setColor(INK);p.setTypeface(Typeface.create("sans-serif-medium",Typeface.BOLD));p.setTextSize(13);p.setLetterSpacing(.14f);cv.drawText("KADAMM",M+34,M+12,p);p.setLetterSpacing(0);
-            p.setTypeface(Typeface.DEFAULT);p.setTextSize(9);p.setColor(MUTED);p.setTextAlign(Paint.Align.RIGHT);cv.drawText("Health report · "+stamp,W-M,M+12,p);p.setTextAlign(Paint.Align.LEFT);
+            p.setTypeface(Typeface.DEFAULT);p.setTextSize(9);p.setColor(MUTED);p.setTextAlign(Paint.Align.RIGHT);cv.drawText("Lab results · "+stamp,W-M,M+12,p);p.setTextAlign(Paint.Align.LEFT);
             p.setColor(LINE);p.setStrokeWidth(1);cv.drawLine(M,M+28,W-M,M+28,p);y=M+52;
         }
         void footer(){
@@ -70,7 +70,7 @@ final class ReportPdf {
         String name="";LocalAccount.Account acc=LocalAccount.current(c);if(acc!=null&&acc.name!=null)name=acc.name.trim();
 
         // Title block.
-        d.text("Health report",24,INK,true,M);d.y+=18;
+        d.text("Lab results",24,INK,true,M);d.y+=18;
         d.para((name.isEmpty()?"":name+" · ")+reps.size()+(reps.size()==1?" report":" reports")+", "+nice(reps.get(0).optString("date"))+(reps.size()>1?" to "+nice(ld):""),10,MUTED,false,M);
         int in=0,out=0,none=0;for(HealthReports.Marker m:mk){HealthReports.Point p=m.last();if(!p.date.equals(ld))continue;int s=HealthReports.status(p);if(s==0)in++;else if(s==2)none++;else out++;}
         d.y+=8;d.need(56);d.p.setColor(BAND);d.cv.drawRoundRect(new RectF(M,d.y-4,W-M,d.y+44),8,8,d.p);
@@ -125,7 +125,7 @@ final class ReportPdf {
         d.y+=6;d.para("Correlation (r) shows only that two things changed together in these results, not that one caused the other. With few reports, one result can change the picture.",8,MUTED,false,M);
 
         d.footer();d.pdf.finishPage(d.page);
-        try{File dir=new File(c.getCacheDir(),"share");dir.mkdirs();File f=new File(dir,"Kadamm-health-report.pdf");try(FileOutputStream o=new FileOutputStream(f)){d.pdf.writeTo(o);}d.pdf.close();return f;}
+        try{File dir=new File(c.getCacheDir(),"share");dir.mkdirs();File f=new File(dir,"Kadamm-lab-results.pdf");try(FileOutputStream o=new FileOutputStream(f)){d.pdf.writeTo(o);}d.pdf.close();return f;}
         catch(Exception e){d.pdf.close();return null;}
     }
     private static String range(HealthReports.Point p){boolean lo=!Double.isNaN(p.lo),hi=!Double.isNaN(p.hi);return lo&&hi?HealthReports.fmt(p.lo)+"–"+HealthReports.fmt(p.hi):lo?"≥ "+HealthReports.fmt(p.lo):hi?"≤ "+HealthReports.fmt(p.hi):"—";}
