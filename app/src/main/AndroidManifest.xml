@@ -21,6 +21,14 @@
         <package android:name="com.oplus.healthservice" />
         <package android:name="com.heytap.health" />
         <package android:name="com.google.android.apps.fitness" />
+        <package android:name="com.realme.link" />
+        <package android:name="com.boat.crest" />
+        <package android:name="com.fireboltt" />
+        <package android:name="com.crrepa.band.dafit" />
+        <package android:name="com.zjw.zhbraceletsdk" />
+        <!-- Any app that works with Health Connect, whatever the watch brand. -->
+        <intent><action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" /></intent>
+        <intent><action android:name="android.intent.action.VIEW_PERMISSION_USAGE" /><category android:name="android.intent.category.HEALTH_PERMISSIONS" /></intent>
         <package android:name="com.whatsapp" />
         <package android:name="com.whatsapp.w4b" />
     </queries>

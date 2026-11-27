@@ -50,6 +50,12 @@ final class SessionMetrics {
     final List<Split> splits=new ArrayList<>();
     final Map<Integer,Double> best=new LinkedHashMap<>();
     double gain=-1,loss=-1,altMin=Double.NaN,altMax=Double.NaN,gapPace=-1;boolean barometer;long[] gradeS;
+    /**
+     * Metres climbed on foot, for floors (barometer only; -1 without one): rises of 1 m or more at a walking or stair
+     * rate (0.02–0.5 m/s over the middle 80 % of the rise) while stepping. Slower rises are the weather changing air
+     * pressure (up to about 8 m an hour); faster ones, or rises without steps, are lifts and cars. {@link #floorRises} = how many rises counted.
+     */
+    double climbM=-1;int floorRises;
     double consistency=-1,firstHalfPace=-1,secondHalfPace=-1,vdot=-1;
     /** Pace consistency: 0–100 (100 = every 250 m at the same pace), the pacing pattern, pace of the first and last
      *  thirds, surges (250 m stretches 12 %+ faster than your median) and each stretch's pace {seconds per km}. */
@@ -355,6 +361,7 @@ final class SessionMetrics {
         double gain=0,loss=0,ref=sm[0],th=x.barometer?1:5;x.altMin=sm[0];x.altMax=sm[0];
         for(double v:sm){x.altMin=Math.min(x.altMin,v);x.altMax=Math.max(x.altMax,v);if(v-ref>=th){gain+=v-ref;ref=v;}else if(ref-v>=th){loss+=ref-v;ref=v;}}
         x.gain=x.barometer?gain:o.has("elevGainM")?o.optDouble("elevGainM"):gain;x.loss=loss;
+        if(x.barometer)climbOnFoot(x,alt,sm);
         for(int i=0;i<sm.length;i++)x.elevation.add(new double[]{alt.get(i)[1]/1000d,sm[i]});
         for(Split s:x.splits){double a=altAt(alt,sm,(s.index-1)*1000d),b=altAt(alt,sm,(s.index-1)*1000d+s.fraction*1000d);if(!Double.isNaN(a)&&!Double.isNaN(b))s.elev=b-a;}
         if(!x.barometer||!x.gps)return;
@@ -371,6 +378,28 @@ final class SessionMetrics {
         }
         x.gap=smooth(x.gap,8);
         if(adjusted>100)x.gapPace=time/(adjusted/1000d);
+    }
+    /** Splits the smoothed barometer height into rises and keeps those climbed on foot (see {@link #climbM}). */
+    private static void climbOnFoot(SessionMetrics x,List<double[]> alt,double[] sm){
+        double climb=0;int rises=0;int lo=0,hi=0;boolean up=false;
+        for(int i=1;i<=sm.length;i++){
+            boolean end=i==sm.length;
+            if(!end){if(!up){if(sm[i]<sm[lo])lo=i;else if(sm[i]-sm[lo]>=.5){up=true;hi=i;}}else{if(sm[i]>=sm[hi])hi=i;else if(sm[hi]-sm[i]>=.5)end=true;}}
+            if(end&&up){double h=sm[hi]-sm[lo];
+                if(h>=1){
+                    // Rate over the middle 80 % of the rise, so flat stretches either side don't slow it down.
+                    int a=lo,b=hi;while(a<hi&&sm[a]-sm[lo]<.1*h)a++;while(b>lo&&sm[b]-sm[lo]>.9*h)b--;
+                    double dt=alt.get(b)[0]-alt.get(a)[0],rate=dt>0?.8*h/dt:99;
+                    if(rate>=.02&&rate<=.5&&stepping(x,alt.get(a)[0],alt.get(b)[0])){climb+=h;rises++;}}
+                up=false;lo=Math.min(i,sm.length-1);hi=lo;}
+        }
+        x.climbM=climb;x.floorRises=rises;
+    }
+    /** Whether you were taking steps between two times: average cadence 40+ spm, or (without a step series) moving. */
+    private static boolean stepping(SessionMetrics x,double a,double b){
+        if(x.cadence.isEmpty())return x.stepsOk||x.km>0;double sum=0;int n=0;
+        for(double[] q:x.cadence)if(q[0]>=a&&q[0]<=b){sum+=q[1];n++;}
+        return n==0?x.stepsOk:sum/n>=40;
     }
     private static final Map<String,Double> geoidCache=new HashMap<>();
     /** Sea-level height minus ellipsoid height here (metres), from Android's geoid model (Android 14+); NaN if unavailable. */

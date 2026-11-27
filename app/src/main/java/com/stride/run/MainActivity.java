@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="10.3.0";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="10.3.1";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -980,7 +980,11 @@ public class MainActivity extends Activity {
         String k=java.util.Arrays.asList("strain","stress","live").contains(key)?"hr":key;Boolean can=Pro.canShare(this,k);
         if(!Boolean.FALSE.equals(can))return false;return "-2".equals(bodyMetricRaw(key,history())[3]);
     }
-    private String[] bodyMetric(String key,JSONArray hist){return bodyMetricRaw(key,hist);}
+    private String[] bodyMetric(String key,JSONArray hist){String[] r=bodyMetricRaw(key,hist);
+        // Missing because an app on the phone isn't allowed to share it yet: say which one, so it can be fixed.
+        if("-2".equals(r[3])){String type=null;switch(key){case "live":case "strain":case "stress":type="HEART_RATE";break;case "recovery":type="HEART_RATE_VARIABILITY";break;case "rhr":type="RESTING_HEART_RATE";break;case "hrv":type="HEART_RATE_VARIABILITY";break;case "sleep":case "consistency":type="SLEEP";break;case "spo2":type="OXYGEN_SATURATION";break;case "resp":type="RESPIRATORY_RATE";break;case "skin":type="SKIN_TEMPERATURE";break;case "btemp":type="BODY_TEMPERATURE";break;case "floors":type="FLOORS_CLIMBED";break;}
+            if(type!=null){Pro.App a=Pro.blockedFor(this,type);if(a!=null)r=new String[]{r[0],r[1],"Allow "+a.label+" in Health Connect",r[3]};}}
+        return r;}
     private String[] bodyMetricRaw(String key,JSONArray hist){
         JSONObject v=Vitals.all(this);String today=todayKey();
         switch(key){
@@ -1031,12 +1035,46 @@ public class MainActivity extends Activity {
     // ---- Watch connection ----
     private String btWatch;
     /** A watch or band paired over Bluetooth (any brand), when Kadamm may see paired devices; "name|connected". */
+    /**
+     * When a health app on this phone could share into Health Connect but isn't allowed to (the usual reason a
+     * paired watch shows nothing in Kadamm), says which app, what it would bring, and opens the switch.
+     */
+    private void renderSharingFix(LinearLayout c){
+        java.util.List<Pro.App> blocked=new java.util.ArrayList<>(),partly=new java.util.ArrayList<>();
+        for(Pro.App a:Pro.healthApps(this)){if(!Pro.watchApp(a))continue;if(a.blocked())blocked.add(a);else if(a.partly())partly.add(a);}
+        java.util.List<Pro.App> show=new java.util.ArrayList<>(blocked);for(Pro.App a:partly)if(a.wants.contains("HEART_RATE")&&!a.allowed.contains("HEART_RATE")||a.wants.contains("SLEEP")&&!a.allowed.contains("SLEEP"))show.add(a);
+        // A watch is paired but no app on the phone can bring its data into Health Connect, and none has: say so.
+        boolean anyWatchApp=false;for(Pro.App a:Pro.healthApps(this))if(Pro.watchApp(a))anyWatchApp=true;
+        if(btWatch!=null&&!anyWatchApp&&Pro.connectedSources(this).isEmpty()){
+            LinearLayout b=col();b.setPadding(dp(14),dp(12),dp(14),dp(12));b.setBackground(shape(blend(panel,warning,darkTheme?.16f:.09f),14));LinearLayout.LayoutParams bp=lp(-1,-2);bp.topMargin=dp(12);c.addView(b,bp);
+            String w=btWatch.split("\\|")[0];b.addView(tx(w+"'s app doesn't share with Health Connect",14,ink,true));
+            TextView t=tx("Kadamm reads watch data through Health Connect, Android's shared health store. No app on this phone that can share a watch's sleep and heart rate there is installed. Check whether "+w+"'s app has a Health Connect (or Google Fit) option in its settings; if it doesn't, its data can't reach any other app. Kadamm still counts your steps, sessions and floors with the phone.",12,ink,false);
+            t.setLineSpacing(dp(2),1f);t.setPadding(0,dp(4),0,0);b.addView(t);}
+        for(Pro.App a:show){
+            LinearLayout b=col();b.setPadding(dp(14),dp(12),dp(14),dp(12));b.setBackground(shape(blend(panel,warning,darkTheme?.16f:.09f),14));LinearLayout.LayoutParams bp=lp(-1,-2);bp.topMargin=dp(12);c.addView(b,bp);
+            boolean none=a.allowed.isEmpty();b.addView(tx(none?a.label+" isn't sharing with Health Connect":a.label+" shares only part of your data",14,ink,true));
+            java.util.List<String> miss=new java.util.ArrayList<>();for(String t:a.wants)if(!a.allowed.contains(t)){String nm=Pro.readName(t);if(nm!=null&&!miss.contains(nm))miss.add(nm);}
+            TextView t=tx((none?"Your watch's data stays inside "+a.label+", so Kadamm can't see it. ":"")+"It can share "+android.text.TextUtils.join(", ",miss)+".\n\nTap Allow, then in Health Connect open "+a.label+" (under \"See more health apps\" or \"App permissions\" if it isn't listed) and turn on Allow all. Or turn on Health Connect inside "+a.label+"'s own settings. Then open "+a.label+" once so it syncs your watch; Kadamm picks it up on the next sync.",12,ink,false);
+            t.setLineSpacing(dp(2),1f);t.setPadding(0,dp(4),0,0);b.addView(t);
+            LinearLayout br=row();LinearLayout.LayoutParams brp=lp(-1,42);brp.topMargin=dp(10);b.addView(br,brp);
+            Button allow=button("Allow "+a.label,lime,accentOn);br.addView(allow,new LinearLayout.LayoutParams(0,-1,1));
+            allow.setOnClickListener(v->{if(Pro.openAppPermissions(this,a.pkg))toast("Find "+a.label+" and turn on Allow all");else toast("Open Health Connect › App permissions › "+a.label);});
+            Intent launch=getPackageManager().getLaunchIntentForPackage(a.pkg);
+            if(launch!=null){Button open=button("Open "+a.label,raised,ink);LinearLayout.LayoutParams op=new LinearLayout.LayoutParams(0,-1,1);op.leftMargin=dp(8);br.addView(open,op);open.setOnClickListener(v->{try{startActivity(launch);}catch(Exception e){toast("Couldn't open "+a.label);}});}
+        }
+    }
     private String bluetoothWatch(){
         if(Build.VERSION.SDK_INT>=31&&checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)return null;
         try{android.bluetooth.BluetoothManager bm=(android.bluetooth.BluetoothManager)getSystemService(BLUETOOTH_SERVICE);android.bluetooth.BluetoothAdapter a=bm==null?null:bm.getAdapter();if(a==null)return null;
             String best=null;for(android.bluetooth.BluetoothDevice d:a.getBondedDevices()){android.bluetooth.BluetoothClass bc=d.getBluetoothClass();String n=d.getName()==null?"":d.getName();
-                boolean watch=(bc!=null&&(bc.getDeviceClass()==android.bluetooth.BluetoothClass.Device.WEARABLE_WRIST_WATCH||bc.getMajorDeviceClass()==android.bluetooth.BluetoothClass.Device.Major.WEARABLE))||n.matches("(?i).*(watch|band|fit|amazfit|garmin|forerunner|venu|fenix|versa|sense|charge|ticwatch|gt ?\\d|polar|coros|suunto|whoop).*");
-                if(!watch||n.toLowerCase(Locale.US).contains("bud"))continue;boolean on=false;try{on=(Boolean)d.getClass().getMethod("isConnected").invoke(d);}catch(Exception ignored){}
+                // Watches show up as wrist watches, as "wearable", or (calling watches like Noise, boAt and Fire-Boltt) as a
+                // wearable headset: those count when the name isn't an earbud's and it looks like a watch or a watch app is installed.
+                boolean nameWatch=n.matches("(?i).*(watch|band|fit|amazfit|garmin|forerunner|venu|fenix|versa|sense|charge|ticwatch|gt ?\\d|gtr|gts|bip|balance|active|polar|coros|suunto|whoop|noise|colorfit|twist|halo|luna|pulse|boat|xtend|storm|wave|lunar|fire.?boltt|ninja|realme|redmi|mi smart|helio|cmf|pebble|crest|da ?fit).*");
+                boolean wrist=bc!=null&&(bc.getDeviceClass()==android.bluetooth.BluetoothClass.Device.WEARABLE_WRIST_WATCH||bc.getMajorDeviceClass()==android.bluetooth.BluetoothClass.Device.Major.WEARABLE);
+                boolean headsetWatch=bc!=null&&bc.getDeviceClass()==android.bluetooth.BluetoothClass.Device.AUDIO_VIDEO_WEARABLE_HEADSET&&(nameWatch||!Pro.healthApps(this).isEmpty());
+                boolean ear=n.matches("(?i).*(bud|pod|air ?dot|earphone|ear ?\\d|airdopes|nirvana|neckband|rockerz|tws|headphone|headset|speaker|soundbar|car|laptop|tv).*");
+                boolean watch=!ear&&(wrist||nameWatch&&bc!=null&&bc.getMajorDeviceClass()!=android.bluetooth.BluetoothClass.Device.Major.COMPUTER&&bc.getMajorDeviceClass()!=android.bluetooth.BluetoothClass.Device.Major.PHONE||headsetWatch);
+                if(!watch)continue;boolean on=false;try{on=(Boolean)d.getClass().getMethod("isConnected").invoke(d);}catch(Exception ignored){}
                 if(best==null||on)best=n+"|"+on;}
             return best;}catch(Exception e){return null;}
     }
@@ -1053,6 +1091,7 @@ public class MainActivity extends Activity {
         final boolean[] wearOs={false};
         Runnable status=()->{long[] live=WearBridge.live(this);boolean bt=btWatch!=null&&btWatch.endsWith("|true");
             if(wearOs[0]||live!=null){state.setText("●  Connected"+(live!=null?" · "+live[0]+" bpm, "+ago(live[1]):""));state.setTextColor(positive);}
+            else if(bt&&src.isEmpty()){state.setText("●  Connected over Bluetooth · no data shared yet");state.setTextColor(warning);}
             else if(bt){state.setText("●  Connected over Bluetooth");state.setTextColor(positive);}
             else if(!src.isEmpty()){state.setText("●  Sharing through Health Connect");state.setTextColor(positive);}
             else if(btWatch!=null){state.setText("○  Paired, not connected now");state.setTextColor(warning);}
@@ -1060,6 +1099,7 @@ public class MainActivity extends Activity {
         status.run();liveStatus=status;
         try{com.google.android.gms.wearable.Wearable.getNodeClient(this).getConnectedNodes().addOnSuccessListener(nodes->{if(!nodes.isEmpty()){wearOs[0]=true;if(dev.optString("name","").isEmpty()&&btWatch==null)name.setText(nodes.get(0).getDisplayName());status.run();}});}catch(Throwable ignored){}
         TextView info=tx(src.isEmpty()?(getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false)?"No watch data in Health Connect yet":"Health Connect isn't connected: tap Health Connect to allow it"):"Health data from "+src+(sync>0?" · synced "+ago(System.currentTimeMillis()-sync):""),12,muted,false);info.setPadding(0,dp(12),0,0);c.addView(info);
+        renderSharingFix(c);
         if(dev.has("caps")){JSONArray caps=dev.optJSONArray("caps");StringBuilder b=new StringBuilder();for(int i=0;caps!=null&&i<caps.length();i++){if(b.length()>0)b.append(", ");b.append(caps.optString(i));}if(b.length()>0)c.addView(tx("Sensors on the watch: "+b,12,muted,false));}
         // What it shares
         int have=0,total=0;StringBuilder got=new StringBuilder();for(String[] m:BODY_METRICS){if(unsupported(m[0]))continue;total++;String[] x=bodyMetric(m[0],history());if(!"-2".equals(x[3])){have++;if(got.length()>0)got.append(" · ");got.append(m[1]);}}
@@ -1710,11 +1750,13 @@ public class MainActivity extends Activity {
         if(!AppUpdate.canInstall(this)){dialog().setTitle("Allow Kadamm to install updates").setMessage("Android asks once: turn on \"Allow from this source\" for Kadamm on the next screen, then come back and tap Update again.").setNegativeButton("Cancel",null).setPositiveButton("Open setting",(d,w)->AppUpdate.askInstallPermission(this)).show();return;}
         LinearLayout box=col();box.setPadding(dp(22),dp(14),dp(22),dp(6));TextView msg=tx("Downloading… 0%",14,ink,false);box.addView(msg);
         ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(100);bar.setProgressTintList(android.content.res.ColorStateList.valueOf(lime));LinearLayout.LayoutParams bp=lp(-1,10);bp.topMargin=dp(12);box.addView(bar,bp);
-        AlertDialog wait=dialog().setTitle("Updating to "+r.version).setView(box).setCancelable(false).create();wait.show();
-        AppUpdate.download(this,r,pc->{bar.setProgress(pc);msg.setText(pc>=100?"Checking the download…":"Downloading… "+pc+"%");},(apk,problem)->{
+        AlertDialog wait=dialog().setTitle("Updating Kadamm").setView(box).setCancelable(false).create();wait.show();msg.setText("Finding the newest version…");
+        // Ask GitHub again first: a version published since the last check is installed directly, never one in between.
+        AppUpdate.check(this,true,(latest,reached)->{AppUpdate.Release use=latest!=null&&AppUpdate.isNewer(latest.version,r.version)?latest:r;wait.setTitle("Updating to "+use.version);msg.setText("Downloading… 0%");
+        AppUpdate.download(this,use,pc->{bar.setProgress(pc);msg.setText(pc>=100?"Checking the download…":"Downloading… "+pc+"%");},(apk,problem)->{
             wait.dismiss();if(problem!=null){dialog().setTitle("Update not installed").setMessage(problem).setPositiveButton("OK",null).show();return;}
             try{AppUpdate.install(this,apk);}catch(Exception e){toast("Couldn't open the installer");}
-        });
+        });});
     }
     /** Profile: this version, and an update when there is one. */
     private void renderAppVersion(){
@@ -2220,7 +2262,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         try{HealthSync.refresh(this,()->{StepsWidget.refresh(this);if(resumed&&!dragging&&("Health".equals(page)||"Today".equals(page)||"Body".equals(page)||"Profile".equals(page)||"Trainer".equals(page))){int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));}syncing=false;});}catch(Throwable ignored){}
     }
     @Override protected void onResume(){
-        super.onResume();resumed=true;checkForUpdateOnce();WidgetTick.schedule(this);handler.removeCallbacks(refresh);handler.post(refresh);startStepCounting();refreshHealth(true);handler.postDelayed(()->SessionMetrics.warm(this,history()),1500);handler.postDelayed(()->{WearBridge.pushToday(this);WearBridge.pushLive(this);WearBridge.ping(this);},4000);SleepTracker.register(this);handler.removeCallbacks(bodyTick);handler.postDelayed(bodyTick,2000);
+        super.onResume();Pro.forgetApps();resumed=true;checkForUpdateOnce();WidgetTick.schedule(this);handler.removeCallbacks(refresh);handler.post(refresh);startStepCounting();refreshHealth(true);handler.postDelayed(()->SessionMetrics.warm(this,history()),1500);handler.postDelayed(()->{WearBridge.pushToday(this);WearBridge.pushLive(this);WearBridge.ping(this);},4000);SleepTracker.register(this);handler.removeCallbacks(bodyTick);handler.postDelayed(bodyTick,2000);
         if(content!=null&&(("Today".equals(page)&&stepSetupShown&&DaySteps.permitted(this))||"Health".equals(page)||"Notifications".equals(page)||"Permissions".equals(page)||"Auto".equals(page)||"Storage".equals(page)))renderPageNow();
     }
     @Override protected void onPause(){

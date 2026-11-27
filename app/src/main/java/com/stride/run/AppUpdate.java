@@ -76,7 +76,8 @@ final class AppUpdate {
     /** The newer release last found (no network), or null. */
     static Release known(Context c){String j=p(c).getString("json",null);Release r=j==null?null:parse(j);return r!=null&&isNewer(r.version,current(c))?r:null;}
     /** Whether GitHub has answered within the last check period. */
-    static boolean fresh(Context c){return System.currentTimeMillis()-p(c).getLong("at",0)<CHECK_EVERY;}
+    /** Fresh for an hour: a release published since is found soon, and Update always asks again before downloading. */
+    static boolean fresh(Context c){return System.currentTimeMillis()-p(c).getLong("at",0)<Math.min(CHECK_EVERY,3600000L);}
 
     /** Asks GitHub (unless the remembered answer is recent and not forced); the callback runs on the main thread. */
     static void check(Context ctx,boolean force,Checked cb){

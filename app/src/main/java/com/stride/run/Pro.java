@@ -225,25 +225,76 @@ final class Pro {
         java.util.Set<String> pkgs=new java.util.TreeSet<>();JSONArray a=Vitals.all(c).optJSONArray("sources");if(a!=null)for(int i=0;i<a.length();i++)pkgs.add(a.optString(i));
         for(String p:c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getString("healthSources","").split(","))if(!p.trim().isEmpty())pkgs.add(p.trim());
         pkgs.remove(c.getPackageName());boolean any=false;
+        // An app on the phone that asks to write this type: possible, just not allowed yet, so it isn't hidden.
+        for(App ha:healthApps(c)){any=true;if(ha.wants.contains(type))return true;}
         // Google Fit only relays other apps' data, so what it may write says nothing about the watch.
         for(String p:pkgs){if(p.startsWith("com.android.healthconnect")||p.equals("com.google.android.apps.fitness"))continue;
             try{android.content.pm.PackageInfo pi=c.getPackageManager().getPackageInfo(p,android.content.pm.PackageManager.GET_PERMISSIONS);if(pi.requestedPermissions==null)continue;any=true;
                 for(int i=0;i<pi.requestedPermissions.length;i++)if(("android.permission.health.WRITE_"+type).equals(pi.requestedPermissions[i])&&(pi.requestedPermissionsFlags[i]&android.content.pm.PackageInfo.REQUESTED_PERMISSION_GRANTED)!=0)return true;}catch(Exception ignored){}}
         return any?Boolean.FALSE:null;
     }
+    // ---- Which health apps may share ----
+    /** A health app on this phone and the Health Connect types it asks to write, and which of those it's allowed. */
+    static final class App { String pkg,label;final java.util.Set<String> wants=new java.util.TreeSet<>(),allowed=new java.util.TreeSet<>();
+        boolean blocked(){return !wants.isEmpty()&&allowed.isEmpty();} boolean partly(){return !allowed.isEmpty()&&allowed.size()<wants.size();} }
+    /** The Health Connect write types Kadamm reads, by measure. */
+    static final String[][] READS={{"STEPS","steps"},{"HEART_RATE","heart rate"},{"SLEEP","sleep"},{"RESTING_HEART_RATE","resting heart rate"},{"HEART_RATE_VARIABILITY","HRV"},
+        {"OXYGEN_SATURATION","blood oxygen"},{"RESPIRATORY_RATE","breathing rate"},{"SKIN_TEMPERATURE","skin temperature"},{"BODY_TEMPERATURE","body temperature"},
+        {"BLOOD_PRESSURE","blood pressure"},{"VO2_MAX","VO₂max"},{"WEIGHT","weight"},{"FLOORS_CLIMBED","floors"},{"DISTANCE","distance"},{"EXERCISE","workouts"}};
+    static String readName(String t){for(String[] r:READS)if(r[0].equals(t))return r[1];return null;}
+    private static Object[] appsCache;
+    /** Forget the app list and what each may share, e.g. after coming back from Health Connect. */
+    static void forgetApps(){synchronized(Pro.class){appsCache=null;}synchronized(shareCache){shareCache.clear();}}
+    /**
+     * Every app on this phone that works with Health Connect (found by Health Connect's own intent filters, so any
+     * watch brand counts), with the types Kadamm reads that it asks to write and those it's actually allowed to.
+     * Kadamm itself, Health Connect and Google Fit (which only relays) are left out. Cached for a minute.
+     */
+    @SuppressWarnings("unchecked")
+    static List<App> healthApps(Context c){
+        synchronized(Pro.class){if(appsCache!=null&&System.currentTimeMillis()-(long)appsCache[0]<60000)return (List<App>)appsCache[1];}
+        android.content.pm.PackageManager pm=c.getPackageManager();java.util.Set<String> pkgs=new java.util.TreeSet<>();
+        try{for(android.content.pm.ResolveInfo r:pm.queryIntentActivities(new android.content.Intent("androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"),0))pkgs.add(r.activityInfo.packageName);}catch(Exception ignored){}
+        try{for(android.content.pm.ResolveInfo r:pm.queryIntentActivities(new android.content.Intent("android.intent.action.VIEW_PERMISSION_USAGE").addCategory("android.intent.category.HEALTH_PERMISSIONS"),0))pkgs.add(r.activityInfo.packageName);}catch(Exception ignored){}
+        for(String k:new String[]{"com.sec.android.app.shealth","com.huami.watch.hmwatchmanager","com.fitbit.FitbitMobile","com.garmin.android.apps.connectmobile","com.noisefit","com.realme.link","com.huawei.health","com.mi.health","com.xiaomi.wearable","com.heytap.health","com.oplus.healthservice","com.boat.crest","com.fireboltt","com.crrepa.band.dafit","com.google.android.apps.wear.companion","com.ouraring.oura","fi.polar.polarflow","com.coros.coros","com.suunto.connectivity","com.withings.wiscale2","com.mobvoi.companion"})pkgs.add(k);
+        List<App> out=new ArrayList<>();
+        for(String p:pkgs){if(p.equals(c.getPackageName())||p.startsWith("com.android.healthconnect")||p.startsWith("com.google.android.healthconnect")||p.equals("com.google.android.apps.fitness")||p.equals("com.google.android.apps.healthdata"))continue;
+            try{android.content.pm.PackageInfo pi=pm.getPackageInfo(p,android.content.pm.PackageManager.GET_PERMISSIONS);if(pi.requestedPermissions==null)continue;App a=new App();a.pkg=p;String known=HealthSync.label(p);CharSequence real=null;try{real=pm.getApplicationLabel(pi.applicationInfo);}catch(Exception ignored){}a.label=known.equals(p.substring(p.lastIndexOf('.')+1))&&real!=null?real.toString():known;
+                for(int i=0;i<pi.requestedPermissions.length;i++){String rp=pi.requestedPermissions[i];if(!rp.startsWith("android.permission.health.WRITE_"))continue;String t=rp.substring("android.permission.health.WRITE_".length());if(readName(t)==null)continue;
+                    a.wants.add(t);if((pi.requestedPermissionsFlags[i]&android.content.pm.PackageInfo.REQUESTED_PERMISSION_GRANTED)!=0)a.allowed.add(t);}
+                if(!a.wants.isEmpty())out.add(a);}catch(Exception ignored){}}
+        synchronized(Pro.class){appsCache=new Object[]{System.currentTimeMillis(),out};}return out;
+    }
+    /** Apps that look like a watch or band's companion: they write sleep, which phones and run or food apps don't. */
+    static boolean watchApp(App a){return a.wants.contains("SLEEP");}
+    /** An app on this phone that asks to write this type but isn't allowed to yet (the fix is one switch), or null. */
+    static App blockedFor(Context c,String type){for(App a:healthApps(c))if(watchApp(a)&&a.wants.contains(type)&&!a.allowed.contains(type))return a;return null;}
+    /** Opens Health Connect's permission page for one app (Android 14+), else Health Connect's settings. */
+    static boolean openAppPermissions(Context c,String pkg){
+        // Health Connect's own screens only (other apps answer the same actions; MyFitnessPal does). The page for one
+        // app's permissions is closed to apps like Kadamm, so this opens Health Connect's home.
+        android.content.pm.PackageManager pm=c.getPackageManager();
+        String[][] tries={{"android.health.connect.action.HEALTH_HOME_SETTINGS",null},{"androidx.health.ACTION_HEALTH_CONNECT_SETTINGS","com.google.android.apps.healthdata"},{"android.health.connect.action.MANAGE_HEALTH_DATA",null}};
+        for(String[] t:tries){android.content.Intent i=new android.content.Intent(t[0]).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);if(t[1]!=null)i.setPackage(t[1]);
+            for(android.content.pm.ResolveInfo r:pm.queryIntentActivities(i,0)){String p=r.activityInfo.packageName;if(!p.contains("healthconnect")&&!p.equals("com.google.android.apps.healthdata"))continue;
+                try{c.startActivity(i.setClassName(p,r.activityInfo.name));return true;}catch(Exception ignored){}}}
+        return false;
+    }
+
     /** The watch apps that share, by name ("Zepp, Google Fit"). */
     static String sharingApps(Context c){java.util.List<String> n=new ArrayList<>();JSONArray a=Vitals.all(c).optJSONArray("sources");if(a!=null)for(int i=0;i<a.length();i++){String p=a.optString(i);if(p.startsWith("com.android.healthconnect")||p.equals("com.google.android.apps.fitness")||p.equals(c.getPackageName()))continue;String l=HealthSync.label(p);if(!n.contains(l))n.add(l);}return String.join(", ",n);}
 
     // ---- Floors ----
     /**
      * Floors climbed on a day: {floors, source} with source 1 = Health Connect (the phone's or watch's own count),
-     * 2 = Kadamm sessions recorded with the barometer (metres climbed ÷ 3, a standard floor). The higher of the two,
+     * 2 = Kadamm sessions recorded with the barometer (metres climbed on foot ÷ 3, a standard floor;
+     * see SessionMetrics.climbM). The higher of the two,
      * never their sum; {-1, 0} when neither has anything for the day.
      */
     static double[] floors(Context c,JSONArray hist,String day){
         double hc=-1;Double v=Vitals.series(Vitals.all(c),"floors").get(day);if(v!=null)hc=v;
         double gain=0;boolean any=false;
-        for(int i=0;i<hist.length();i++){JSONObject o=hist.optJSONObject(i);if(o==null||!day.equals(o.optString("day",""))||Insights.vehicle(o))continue;SessionMetrics m=SessionMetrics.of(c,o);if(m.barometer&&m.gain>=0){gain+=m.gain;any=true;}}
+        for(int i=0;i<hist.length();i++){JSONObject o=hist.optJSONObject(i);if(o==null||!day.equals(o.optString("day",""))||Insights.vehicle(o))continue;SessionMetrics m=SessionMetrics.of(c,o);if(m.barometer&&m.climbM>=0){gain+=m.climbM;any=true;}}
         double ses=any?Math.floor(gain/3.0):-1;
         if(hc<0&&ses<0)return new double[]{-1,0};return hc>=ses?new double[]{hc,1}:new double[]{ses,2};
     }
