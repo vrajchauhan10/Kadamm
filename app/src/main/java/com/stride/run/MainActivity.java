@@ -45,7 +45,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSIONS=100;
-    private static final String APP_VERSION="10.3.3";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
+    private static final String APP_VERSION="10.4.0";private int dailyGoal(){return getSharedPreferences("kadamm_settings",MODE_PRIVATE).getInt("stepGoal",10000);}
     private int bg,panel,raised,lime,violet,accentOn,ink,muted,line,focus,positive,warning,critical; private boolean darkTheme=true,previousMoving=false;
     private SharedPreferences prefs,historyPrefs; private FrameLayout root,drawerLayer; private LinearLayout shell,content,nav,drawer,navToday,navHistory,navProfile; private View drawerScrim; private ScrollView scroller; private TextView timer,distance,pace,steps,status,start,todayCount,todayDistance,dailyStepValue,dailyGoalMessage,accuracyLabel,activityModeLabel,todayActiveTime,todayWalkDistance,todayRunDistance,todayCaloriesValue;private ProgressBar dailyGoalProgress,dailyDistanceProgress; private TextView dailyDistanceValue;private View dailyGoalCard; private RouteView route; private Handler handler=new Handler(Looper.getMainLooper()); private String page="Today",activityType="Walk",activityRange="7D"; private Calendar shownMonth=Calendar.getInstance(),selectedDate=Calendar.getInstance(); private JSONObject lastSession; private float gestureDownX,gestureDownY;private long gestureDownAt;
     private static final int STEP_PERMISSION=101;private ProgressRingView ring;private TextView heroPercent,heroRemaining,heroDistance,heroSource,heroStart,heroNote;private View trackCard;private LinearLayout trackStats,trackEnd;private TextView heroSessions;private TextView liveSpeed,liveElev,liveKcal;private Map<String,Long> dayTotals;private double idleLat,idleLon;private float idleAcc;private boolean hasIdle,stepListening,stepSetupShown,resumed,syncing;private long lastHealthRefresh;
@@ -191,12 +191,17 @@ public class MainActivity extends Activity {
         LinearLayout tc=col();LinearLayout.LayoutParams tcp=new LinearLayout.LayoutParams(0,-2,1);tcp.leftMargin=dp(12);today.addView(tc,tcp);
         tc.addView(tx("TODAY",10,muted,true));tc.addView(tx(data?String.format(Locale.US,"%,d steps",n):"Steps not set up",18,ink,true));
         tc.addView(tx(String.format(Locale.US,"%.2f km · %d %s · goal %,d",DaySteps.distanceToday(this)[0],count,count==1?"session":"sessions",goal),11,muted,false));
-        drawerSection("ACTIVITY");
-        drawerAction("Today","◷","Today",null);drawerAction("History","▦","History",sessions.length()+(sessions.length()==1?" session":" sessions"));drawerAction("Profile","◉","Profile",null);int nr=Insights.routes(this).length();drawerAction("Routes","↗","Routes",nr==0?null:nr+(nr==1?" route":" routes"));drawerAction("Places","place","Places",null);drawerAction("Reports","≈","Reports",null);int earned=0;for(Progress.Badge bd:Progress.badges(SessionMetrics.ready()?this:null,history(),DaySteps.allDayTotals(this),dailyGoal()))if(bd.earned())earned++;drawerAction("Achievements","★","Achievements",earned+" badges");
-        drawerSection("SETTINGS");
-        drawerAction("Goals & targets","◎","Goals",String.format(Locale.US,"%,d steps",goal));drawerAction("Notifications","bell","Notifications",notificationsAllowed()?"On":"Off");drawerAction("Auto","run","Auto",AutoTrack.enabled(this)?"On":"Off");drawerAction("Permissions","gear","Permissions",null);drawerAction("Storage","storage","Storage",null);drawerAction("Share Kadamm","share","ShareApp","Send the app");
-        drawerAction("Body","♥","Body",watchData()?"Watch":"Phone");{int nrep=HealthReports.all(this).size();drawerAction("Lab results","♥","Labs",nrep==0?"Add":nrep+(nrep==1?" test":" tests"));}
-        drawerAction("Step sources & health","＋","Health",getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false)?"Connected":"Set up");
+        // Grouped by what you're doing: tracking, your health, your progress, getting data in, and how the app behaves.
+        drawerSection("TRACK");
+        drawerAction("Today","◷","Today",null);drawerAction("History","▦","History",sessions.length()+(sessions.length()==1?" session":" sessions"));int nr=Insights.routes(this).length();drawerAction("Routes","↗","Routes",nr==0?null:nr+(nr==1?" route":" routes"));drawerAction("Places","place","Places",null);
+        drawerSection("HEALTH");
+        drawerAction("Body","♥","Body",watchData()?"Watch":"Phone");{int nrep=HealthReports.all(this).size();drawerAction("Lab results","♥","Labs",nrep==0?"Add":nrep+(nrep==1?" test":" tests"));}drawerAction("Kadamm Trainer","bolt","Trainer",null);
+        drawerSection("PROGRESS");
+        drawerAction("Reports","≈","Reports",null);int earned=0;for(Progress.Badge bd:Progress.badges(SessionMetrics.ready()?this:null,history(),DaySteps.allDayTotals(this),dailyGoal()))if(bd.earned())earned++;drawerAction("Achievements","★","Achievements",earned+" badges");drawerAction("Goals & targets","◎","Goals",String.format(Locale.US,"%,d steps",goal));
+        drawerSection("DATA & DEVICES");
+        drawerAction("Step sources & health","＋","Health",!DaySteps.hcSteps(this)?"Phone only":getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false)?"Connected":"Set up");drawerAction("Connect your watch","watch","WatchSetup",watchData()?"Connected":null);drawerAction("Import history","download","Import",null);drawerAction("Storage","storage","Storage",null);
+        drawerSection("APP SETTINGS");
+        drawerAction("Permissions","gear","Permissions",null);drawerAction("Notifications","bell","Notifications",notificationsAllowed()?"On":"Off");drawerAction("Auto","run","Auto",AutoTrack.enabled(this)?"On":"Off");drawerAction("Share Kadamm","share","ShareApp","Send the app");
         drawerSection("APPEARANCE");
         LinearLayout modes=row();drawerList.addView(modes,lp(-1,40));String selectedMode=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("themeMode","system");
         for(String m:new String[]{"Light","Dark","System"}){boolean on=m.equalsIgnoreCase(selectedMode);Button b=button(m,on?lime:raised,on?accentOn:ink);b.setTextSize(12);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(0,-1,1);if(modes.getChildCount()>0)bp.leftMargin=dp(6);modes.addView(b,bp);
@@ -268,7 +273,7 @@ public class MainActivity extends Activity {
     private String backLabel(){String to=backStack.isEmpty()?("Detail".equals(page)?"History":"Today"):backStack.peek();return "DaySummary".equals(to)?"Day summary":"Import".equals(to)?"Import":"Detail".equals(to)?"Session":"Auto".equals(to)?"Auto tracking":"Body".equals(to)?"Body":"Labs".equals(to)?"Lab results":"WatchSetup".equals(to)?"Watch":"LabEdit".equals(to)?"Lab result":"Today".equals(to)?"Home":to;}
     private void renderPageInner(){trackBack();if(!"Sessions".equals(page)&&!"Detail".equals(page)&&!"DaySummary".equals(page))recentDays=7;if(replayAnim!=null){replayAnim.cancel();replayAnim=null;}if(!page.equals(renderedPage)&&scroller!=null)scroller.scrollTo(0,0);renderedPage=page;content.removeAllViews();styleNavItem(navToday,page.equals("Today"));styleNavItem(navHistory,page.equals("History"));styleNavItem(navProfile,page.equals("Profile"));if(page.equals("Today"))renderToday();else if(page.equals("History"))renderHistory();else if(page.equals("Profile"))renderProfile();else if(page.equals("Goals"))renderGoals();else if(page.equals("Health"))renderHealth();else if(page.equals("Routes"))renderRoutes();else if(page.equals("Notifications"))renderNotifications();else if(page.equals("Reports"))renderReports();else if(page.equals("Achievements"))renderAchievements();else if(page.equals("Permissions"))renderPermissions();else if(page.equals("Auto"))renderAutoTracking();else if(page.equals("Storage"))renderStorage();else if(page.equals("Places"))renderPlaces();else if(page.equals("Sessions"))renderSessions();else if(page.equals("DaySummary"))renderDaySummary();else if(page.equals("Trainer"))renderTrainer();else if(page.equals("Import"))renderImport();else if(page.equals("Body"))renderBody();else if(page.equals("Labs"))renderLabs();else if(page.equals("WatchSetup"))renderWatchSetup();else if(page.equals("LabEdit"))renderLabEdit();else renderDetail(lastSession);if(content.getChildCount()>0)signatureAtEnd();}
     private void styleNavItem(LinearLayout item,boolean selected){int color=selected?lime:muted;item.setBackground(rippleOn(selected?raised:Color.TRANSPARENT,14));((android.widget.ImageView)item.getChildAt(0)).setImageTintList(android.content.res.ColorStateList.valueOf(color));((TextView)item.getChildAt(1)).setTextColor(selected?ink:muted);}
-    private void brand(String eyebrow,String headline,String sub){LinearLayout brand=row();content.addView(brand,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);brand.addView(brandButton(),bbp);if(tabIndex(page)<0){brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));boolean narrowBack=getResources().getConfiguration().screenWidthDp<400;TextView bk=tx(narrowBack?"‹":"‹  "+backLabel(),narrowBack?20:13,ink,true);bk.setGravity(Gravity.CENTER);bk.setPadding(narrowBack?0:dp(14),0,narrowBack?0:dp(16),narrowBack?dp(2):0);bk.setBackground(rippleOn(raised,18));bk.setContentDescription("Back to "+backLabel());bk.setOnClickListener(v->goBack());brand.addView(bk,narrowBack?lp(40,40):lp(-2,36));}TextView e=tx(eyebrow.toUpperCase(Locale.US),10,muted,true);LinearLayout.LayoutParams ep=lp(-1,25);ep.topMargin=dp(8);content.addView(e,ep);TextView h=tx(headline,29,ink,true);content.addView(h);if(sub!=null){TextView s=tx(sub,13,muted,false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(5);sp.bottomMargin=dp(16);content.addView(s,sp);}}
+    private void brand(String eyebrow,String headline,String sub){LinearLayout brand=row();content.addView(brand,lp(-1,48));LinearLayout.LayoutParams bbp=lp(-2,48);bbp.leftMargin=-dp(8);brand.addView(brandButton(),bbp);if(tabIndex(page)<0){brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));boolean narrowBack=getResources().getConfiguration().screenWidthDp<400;TextView bk=tx(narrowBack?"‹":"‹  "+backLabel(),narrowBack?20:13,ink,true);bk.setGravity(Gravity.CENTER);bk.setPadding(narrowBack?0:dp(14),0,narrowBack?0:dp(16),narrowBack?dp(2):0);bk.setBackground(rippleOn(raised,18));bk.setContentDescription("Back to "+backLabel());bk.setOnClickListener(v->goBack());brand.addView(bk,narrowBack?lp(40,40):lp(-2,36));}TextView e=tx(eyebrow.toUpperCase(Locale.US),10,muted,true);LinearLayout.LayoutParams ep=lp(-1,25);ep.topMargin=dp(8);content.addView(e,ep);TextView h=tx(headline,29,ink,true);content.addView(h);if(sub!=null){TextView s=tx(sub,13,muted,false);LinearLayout.LayoutParams sp=lp(-1,-2);sp.topMargin=dp(5);sp.bottomMargin=dp(16);content.addView(s,sp);}else content.addView(new View(this),lp(-1,8));}
     private LinearLayout card(){LinearLayout c=col();c.setPadding(dp(16),dp(16),dp(16),dp(16));c.setBackground(panelShape(16));LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(12);content.addView(c,p);return c;}
     private GradientDrawable panelShape(int radius){GradientDrawable d=shape(panel,radius);d.setStroke(dp(1),line);return d;}
     private void renderToday(){JSONArray hist=history();dayTotals=DaySteps.allDayTotals(this);loadIdleLocation();renderHeader();renderStepSetup();renderAccessCard(true);homeSection("badges",()->renderBadgeBanner(hist));renderHero(hist);homeSection("body",()->deferBodyToday(hist));homeSection("labs",this::renderHealthReportHome);homeSection("coach",this::renderCoach);homeSection("hourly",this::renderStepsByHour);homeSection("spread",this::renderSpread);homeSection("trainer",()->renderTrainerCard(hist));homeSection("plan",()->renderPlan(hist));homeSection("quality",this::renderMovementQuality);homeSection("sitting",this::renderSittingBreaks);homeSection("tiles",()->renderBento(hist));renderDistanceGoal(hist);
@@ -339,13 +344,7 @@ public class MainActivity extends Activity {
     private void renderStepSources(){
         LinearLayout c=card();c.addView(tx("Where today's steps come from",16,ink,true));
         boolean present=DaySteps.sensorPresent(this),allowed=DaySteps.permitted(this);long imported=DaySteps.healthImportedToday(this);
-        healthRow(c,"PHONE SENSOR",!present?"Not on this phone":!allowed?"Permission needed":String.format(Locale.US,"%,d steps",DaySteps.phoneOn(this,todayKey())),present&&allowed?positive:warning);
-        healthRow(c,"HEALTH CONNECT",imported<0?"Not connected":imported==0?"Connected · none shared":String.format(Locale.US,"%,d steps",imported),imported>0?positive:imported==0?warning:muted);
-        healthRow(c,"KADAMM SESSIONS",String.format(Locale.US,"%,d steps",DaySteps.sessionOn(this,todayKey())),muted);
-        c.addView(tx("Kadamm shows the most complete count, never the sum of sources, so no step is counted twice.",10,muted,false));
-        SharedPreferences hs=getSharedPreferences("kadamm_health",MODE_PRIVATE);long at=hs.getLong("healthSyncedAt",0);
-        TextView syncRow=tx(HealthSync.isRunning()?"Syncing Health Connect…":imported<0?"Health Connect not connected":"Last synced "+(at>0?new SimpleDateFormat("h:mm a",Locale.getDefault()).format(new Date(at)):"never")+"  ·  Sync now",12,imported<0?muted:lime,true);syncRow.setGravity(Gravity.CENTER_VERTICAL);syncRow.setFocusable(true);syncRow.setBackground(rippleOn(Color.TRANSPARENT,10));c.addView(syncRow,lp(-1,48));
-        syncRow.setOnClickListener(v->{if(!hs.getBoolean("healthConnected",false)){navigate("Health");return;}syncRow.setText("Syncing Health Connect…");syncing=true;refreshHealth(true);});
+        stepBreakdown(c);
         TextView manage=tx("Manage step sources  →",13,lime,true);manage.setGravity(Gravity.CENTER_VERTICAL);manage.setFocusable(true);c.addView(manage,lp(-1,40));manage.setOnClickListener(v->navigate("Health"));
     }
     private int todaySteps(JSONArray all){return (int)Math.min(Integer.MAX_VALUE,DaySteps.todayTotal(this));}
@@ -371,12 +370,55 @@ public class MainActivity extends Activity {
         String[] names={"GPS","Steps","Alerts","Battery","Health"};boolean[] ok={location,stepsOk,notify,battery,health};
         for(int i=0;i<names.length;i++){int col=ok[i]?positive:i==4?muted:warning;TextView t=tx("● "+names[i],10,col,true);t.setGravity(Gravity.CENTER);t.setPadding(0,dp(4),0,dp(4));t.setBackground(shape(blend(panel,col,.12f),10));LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,-2,1);if(i>0)tp.leftMargin=dp(5);pills.addView(t,tp);}
     }
+    /**
+     * Each place today's steps can come from, its count, and which one is shown: the most complete, never a sum.
+     * Ends with "Sync now", which says plainly what it did, including when no source is allowed.
+     */
+    private void stepBreakdown(LinearLayout c){
+        String today=todayKey();boolean present=DaySteps.sensorPresent(this),allowed=DaySteps.permitted(this),hcOn=DaySteps.hcSteps(this);
+        SharedPreferences hs=getSharedPreferences("kadamm_health",MODE_PRIVATE);boolean connected=hs.getBoolean("healthConnected",false);
+        long phone=DaySteps.phoneOn(this,today),hc=DaySteps.healthImportedToday(this),live=DaySteps.healthLiveToday(this),sess=DaySteps.sessionOn(this,today),total=DaySteps.todayTotal(this);
+        // The winner is whichever count equals the total (Health Connect first when two agree).
+        String win=total<=0?"":hc>=0&&live==total?"health":present&&allowed&&phone==total?"phone":sess==total?"sessions":"";
+        breakdownRow(c,"Phone sensor",!present?"Not on this phone":!allowed?"Not allowed":String.format(Locale.US,"%,d",phone),"phone".equals(win),null);
+        String hcDetail=null;String per=hs.getString("healthSourceTotals","");
+        if(hc>=0){hcDetail=(per.isEmpty()?"":"Best app: "+(hs.getString("healthOrigin","").isEmpty()?"none":HealthSync.label(hs.getString("healthOrigin","")))+" · "+per)+(live>hc?String.format(Locale.US,"%s+%,d counted by the phone since the last sync",per.isEmpty()?"":"\n",live-hc):"");}
+        breakdownRow(c,"Health Connect",!hcOn?"Off":!connected?"Not connected":hc<0?"Not synced today":String.format(Locale.US,"%,d",live),"health".equals(win),hcDetail);
+        breakdownRow(c,"Kadamm sessions",String.format(Locale.US,"%,d",sess),"sessions".equals(win),sess>0&&!"sessions".equals(win)?"Only the steps while recording. They're already inside the bigger count, which also has your walking between sessions, so the numbers differ by design.":null);
+        LinearLayout tr=row();tr.setGravity(Gravity.CENTER_VERTICAL);LinearLayout.LayoutParams trp=lp(-1,-2);trp.topMargin=dp(8);c.addView(tr,trp);
+        tr.addView(tx("Today shows",13,ink,true),new LinearLayout.LayoutParams(0,-2,1));tr.addView(tx(DaySteps.hasTodayData(this)?String.format(Locale.US,"%,d steps",total):"No steps yet",15,lime,true));
+        c.addView(withTop(tx("The highest single count wins. Sources are never added together, so a step counted by both the phone and a watch counts once.",11,muted,false),4));
+        long at=hs.getLong("healthSyncedAt",0);
+        TextView syncRow=tx(HealthSync.isRunning()?"Syncing…":"Sync now"+(connected&&hcOn&&at>0?"  ·  last "+new SimpleDateFormat("h:mm a",Locale.getDefault()).format(new Date(at)):""),13,lime,true);syncRow.setGravity(Gravity.CENTER_VERTICAL);syncRow.setFocusable(true);syncRow.setBackground(rippleOn(Color.TRANSPARENT,10));c.addView(syncRow,lp(-1,48));
+        syncRow.setOnClickListener(v->syncSteps(syncRow));
+    }
+    private void breakdownRow(LinearLayout c,String label,String value,boolean shown,String detail){
+        LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(8);c.addView(r,p);
+        r.addView(tx(label,13,ink,false),new LinearLayout.LayoutParams(0,-2,1));
+        if(shown){TextView t=tx("SHOWN",9,positive,true);t.setPadding(dp(7),dp(2),dp(7),dp(2));t.setBackground(shape(blend(panel,positive,.15f),8));LinearLayout.LayoutParams tp=lp(-2,-2);tp.rightMargin=dp(8);r.addView(t,tp);}
+        r.addView(tx(value,13,shown?ink:muted,true));
+        if(detail!=null&&!detail.isEmpty())c.addView(tx(detail,10,muted,false));
+    }
+    /** Sync now: reads the phone sensor and Health Connect, then says what each gave and what Today shows. */
+    private void syncSteps(TextView label){
+        boolean phoneOk=DaySteps.ready(this),hcOk=DaySteps.hcSteps(this)&&getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false);
+        if(!phoneOk&&!hcOk){
+            dialog().setTitle("No step source allowed").setMessage("Nothing can be synced: "+(!DaySteps.sensorPresent(this)?"this phone has no step sensor":"step counting (Physical activity) isn't allowed")+", and Health Connect steps are "+(DaySteps.hcSteps(this)?"not connected":"turned off")+". Only steps from Kadamm sessions count until you allow one.")
+                .setNegativeButton("Not now",null).setPositiveButton(DaySteps.sensorPresent(this)?"Allow step counting":"Step sources",(d,w)->{if(DaySteps.sensorPresent(this))requestStepPermission();else navigate("Health");}).show();return;}
+        label.setText("Syncing…");long before=DaySteps.todayTotal(this);
+        Runnable report=()->{if(isFinishing())return;long after=DaySteps.todayTotal(this),hcLive=DaySteps.healthLiveToday(this),ph=DaySteps.phoneOn(this,todayKey());
+            String from=hcLive==after&&hcLive>=0?"Health Connect":ph==after&&phoneOk?"the phone":"sessions";
+            toast(String.format(Locale.US,"Synced: %,d steps, from %s",after,from)+(after>before?String.format(Locale.US," (+%,d)",after-before):"")+(hcOk?"":" (HC steps off)"));
+            if(resumed)renderPageNow();};
+        Runnable afterPhone=()->{if(hcOk){syncing=true;try{HealthSync.refresh(this,()->{syncing=false;runOnUiThread(report);});}catch(Throwable t){syncing=false;report.run();}}else report.run();};
+        if(phoneOk)DaySteps.sample(this,()->runOnUiThread(afterPhone));else afterPhone.run();
+    }
     private void healthRow(LinearLayout c,String label,String value,int state){LinearLayout r=row();LinearLayout.LayoutParams p=lp(-1,34);c.addView(r,p);r.addView(tx(label,10,muted,true),new LinearLayout.LayoutParams(0,-2,1));r.addView(tx("●  "+value,11,state,true));}
     private TextView metric(LinearLayout parent,String label,String value,String unit){LinearLayout c=col();c.setPadding(dp(12),dp(13),dp(8),dp(9));c.setBackground(panelShape(14));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(94),1);if(parent.getChildCount()>0)p.leftMargin=dp(8);parent.addView(c,p);c.addView(tx(label,9,muted,true));TextView v=tx(value,24,ink,true);LinearLayout.LayoutParams vp=lp(-1,34);vp.topMargin=dp(4);c.addView(v,vp);c.addView(tx(unit,10,muted,false));if(label.startsWith("TODAY"))todayCount=v;else if(label.equals("DISTANCE"))todayDistance=v;else if(label.equals("ACTIVE TIME"))todayActiveTime=v;else if(label.equals("WALKING"))todayWalkDistance=v;else if(label.equals("RUNNING"))todayRunDistance=v;return v;}
     private TextView value(LinearLayout parent,String label,String val){LinearLayout c=col();LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1);parent.addView(c,p);c.addView(tx(label,9,muted,true));TextView v=tx(val,17,ink,false);v.setTypeface(Typeface.create("monospace",0));LinearLayout.LayoutParams vp=lp(-1,34);vp.topMargin=dp(5);c.addView(v,vp);return v;}
     private Button button(String s,int color,int textColor){Button b=new Button(this);b.setStateListAnimator(null);b.setElevation(0);b.setText(s);b.setTextSize(13);b.setAllCaps(false);b.setTextColor(textColor);GradientDrawable base=shape(color,11);base.setStroke(dp(1),line);b.setBackground(ripple(base));b.setOnFocusChangeListener((v,has)->{GradientDrawable d=shape(color,11);d.setStroke(dp(has?2:1),has?focus:line);b.setBackground(ripple(d));});return b;}private Button smallChoice(String s,boolean selected){int selectedColor="Run".equals(s)?violet:lime;Button b=button(s,selected?selectedColor:raised,selected?accentOn:ink);return b;}
     private void renderHistory(){
-        dayTotals=DaySteps.allDayTotals(this);brand("YOUR ACTIVITY","History","Tap a day to see its steps and sessions.");
+        dayTotals=DaySteps.allDayTotals(this);brand("YOUR ACTIVITY","History",null);
         JSONArray h=history();int goal=dailyGoal();Calendar now=Calendar.getInstance();
         LinearLayout month=row();content.addView(month,lp(-1,52));
         TextView prev=tx("‹",22,ink,false),next=tx("›",22,ink,false);
@@ -479,8 +521,7 @@ public class MainActivity extends Activity {
         if(present&&allowed){
             String from=since<=0?"":" · counting since "+new SimpleDateFormat(DaySteps.key(since).equals(todayKey())?"h:mm a":"d MMM",Locale.getDefault()).format(new Date(since));
             ph.addView(tx(String.format(Locale.US,"%,d steps today",DaySteps.phoneOn(this,todayKey()))+from,12,muted,false));
-            ph.addView(tx("Uses the motion sensor built into your phone, so it works without a watch or any other app and keeps counting while Kadamm is closed. Steps you took before Kadamm started counting are not included.",11,muted,false));
-        }else if(present){
+                    }else if(present){
             ph.addView(tx("Android needs your permission for Physical activity before Kadamm can read the step sensor.",12,muted,false));
             Button allow=button("Allow step counting",lime,accentOn);LinearLayout.LayoutParams ap=lp(-1,46);ap.topMargin=dp(12);ph.addView(allow,ap);allow.setOnClickListener(v->requestStepPermission());
         }else ph.addView(tx("This phone has no hardware step counter. Connect Health Connect below, or record sessions to count steps.",12,muted,false));
@@ -491,9 +532,9 @@ public class MainActivity extends Activity {
         LinearLayout c=card();c.addView(tx("Health Connect",16,ink,true));
         TextView hs=tx(connected?"●  Connected":"○  Not connected",14,connected?positive:muted,true);LinearLayout.LayoutParams hsp=lp(-1,-2);hsp.topMargin=dp(6);c.addView(hs,hsp);
         if(connected){
-            c.addView(tx(imported>0?String.format(Locale.US,"%,d steps shared today",imported)+(sources.isEmpty()?"":" · from "+sources):"No steps shared today yet",12,muted,false));
-            c.addView(tx("Last sync: "+sync+" · refreshes each time you open Kadamm",12,muted,false));
-            if(imported<=0)c.addView(tx("No steps shared yet. In your watch's or health app, turn on sharing to Health Connect.",11,warning,false));
+            c.addView(tx(!DaySteps.hcSteps(this)?"Steps from Health Connect are off: today uses this phone and your sessions. Heart rate, sleep and the rest still come in.":imported>0?String.format(Locale.US,"%,d steps shared today",imported)+(sources.isEmpty()?"":" · from "+sources):"No steps shared today yet",12,muted,false));
+            c.addView(tx("Last sync: "+sync,12,muted,false));
+            if(imported==0)c.addView(tx("No steps shared yet. In your watch's or health app, turn on sharing to Health Connect.",11,warning,false));
         }else c.addView(tx("Adds data from your watch's app, Google Fit and other health apps, and fills in 30 past days.",12,muted,false));
         settingSwitch(c,"Use Health Connect steps","Adds steps from your watch and health apps. Turn off to count with this phone only; useful when another app counts steps while you ride.","hcSteps",true,
             "Stop using Health Connect steps?","Kadamm will count only with this phone's step sensor and your sessions. Steps from other apps, including any counted in a vehicle, won't be added, and minute-by-minute charts will use Kadamm's own data. You can turn it back on any time.",
@@ -505,11 +546,10 @@ public class MainActivity extends Activity {
         Button imp=button("Import past walks and steps",raised,ink);LinearLayout.LayoutParams ip=lp(-1,46);ip.topMargin=dp(8);c.addView(imp,ip);imp.setOnClickListener(v->navigate("Import"));
         open.setOnClickListener(v->{try{startActivity(new Intent(this,HealthConnectActivity.class));}catch(Exception e){toast("Health Connect could not be opened");}});
 
-        LinearLayout n=card();n.addView(tx("How the total is worked out",15,ink,true));
-        n.addView(tx("Your phone sensor and Health Connect both measure the whole day, so Kadamm shows whichever is more complete instead of adding them together. Health Connect steps are read only from outside your Kadamm sessions; the session's own steps fill those windows.",12,muted,false));
+        LinearLayout n=card();n.addView(tx("How today's total is worked out",15,ink,true));stepBreakdown(n);
     }
     private void renderGoals(){
-        brand("PERSONALISE","Goals & targets","Shape what a good day looks like. Past days keep the results they earned.");
+        brand("PERSONALISE","Goals & targets","Past days keep the results they earned.");
         SharedPreferences st=getSharedPreferences("kadamm_settings",MODE_PRIVATE);JSONArray h=history();
         LinearLayout sum=card();sum.addView(tx("TODAY AGAINST YOUR GOALS",10,muted,true));
         goalProgress(sum,"Steps",DaySteps.todayTotal(this),st.getInt("stepGoal",10000),lime,String.format(Locale.US,"%,d / %,d",DaySteps.todayTotal(this),st.getInt("stepGoal",10000)));
@@ -590,7 +630,7 @@ public class MainActivity extends Activity {
         if(me!=null){TextView since=tx("Member since "+new SimpleDateFormat("MMMM yyyy",Locale.getDefault()).format(new Date(me.created)),11,muted,false);since.setGravity(Gravity.CENTER);LinearLayout.LayoutParams sp=lp(-2,-2);sp.topMargin=dp(2);hero.addView(since,sp);}
         LinearLayout chips=row();chips.setGravity(Gravity.CENTER);LinearLayout.LayoutParams cp=lp(-2,-2);cp.topMargin=dp(14);hero.addView(chips,cp);
         Insights.Coverage cv=Insights.coverage(h);int earned=0;for(Progress.Badge bd:Progress.badges(this,h,totals,dailyGoal()))if(bd.earned())earned++;
-        heroChip(chips,"🔥 "+st[0]+(st[0]==1?" day":" days"),flame());heroChip(chips,"★ "+earned+" badges",lime);heroChip(chips,String.format(Locale.US,"◎ %.1f km explored",cv.uniqueKm),teal());
+        heroChip(chips,"🔥 "+st[0]+(st[0]==1?" day":" days"),flame());{TextView bc=heroChip(chips,"★ "+earned+" badges",lime);bc.setContentDescription(earned+" badges earned, show them");bc.setOnClickListener(v->{scrollToEarned=true;navigate("Achievements");});}heroChip(chips,String.format(Locale.US,"◎ %.1f km explored",cv.uniqueKm),teal());
         if(me==null){Button in=button(LocalAccount.exists(this)?"Log in":"Create account",lime,accentOn);in.setTextSize(15);LinearLayout.LayoutParams ip=lp(-1,50);ip.topMargin=dp(16);hero.addView(in,ip);in.setOnClickListener(v->showAuth(LocalAccount.exists(this)));}
         // Lifetime totals.
         long steps=0;for(Long v:totals.values())steps+=v;double km=distanceAll(h);long ms=0;for(int i=0;i<h.length();i++){JSONObject o=h.optJSONObject(i);if(o!=null)ms+=o.optLong("durationMs",0);}
@@ -599,16 +639,29 @@ public class MainActivity extends Activity {
         renderWatchConnection(false);
         renderFitnessSnapshot(h);
         renderRecords();
-        // Shortcuts.
-        LinearLayout links=card();links.setPadding(dp(6),dp(6),dp(6),dp(6));
-        profileLink(links,"Places you walk","Your street map and explorer level",R.drawable.ic_my_location,teal(),()->navigate("Places"));
-        profileLink(links,"Achievements",earned+" badges earned",R.drawable.ic_trophy,flame(),()->navigate("Achievements"));
-        profileLink(links,"Goals and targets",String.format(Locale.US,"%,d steps a day",dailyGoal()),R.drawable.ic_flag,green(),()->navigate("Goals"));
-        profileLink(links,"Kadamm Trainer","Your stage, today's workout and the week ahead",R.drawable.ic_bolt,teal(),()->navigate("Trainer"));profileLink(links,"Import history","Walks, runs and steps from Samsung Health, Zepp, Google Fit",R.drawable.ic_download,indigo(),()->navigate("Import"));profileLink(links,"Activity calendar","Your days and sessions",R.drawable.ic_calendar,purple(),()->navigate("History"));
-        profileLink(links,"Share Kadamm","Send the app to a friend",R.drawable.ic_share,lime,this::shareApp);
+        // Everything else, grouped the same way as the menu.
+        boolean hcOn=getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false);
+        LinearLayout g1=linkGroup("PROGRESS");
+        profileLink(g1,"Achievements",earned+" badges earned · see them",R.drawable.ic_trophy,flame(),()->{scrollToEarned=true;navigate("Achievements");});
+        profileLink(g1,"Goals and targets",String.format(Locale.US,"%,d steps a day",dailyGoal()),R.drawable.ic_flag,green(),()->navigate("Goals"));
+        profileLink(g1,"Reports","Weeks and months",R.drawable.ic_chart,purple(),()->navigate("Reports"));
+        profileLink(g1,"Kadamm Trainer","Today's workout and the week ahead",R.drawable.ic_bolt,teal(),()->navigate("Trainer"));
+        LinearLayout g2=linkGroup("YOUR DATA");
+        profileLink(g2,"Activity calendar","Your days and sessions",R.drawable.ic_calendar,purple(),()->navigate("History"));
+        profileLink(g2,"Places you walk","Your street map",R.drawable.ic_my_location,teal(),()->navigate("Places"));
+        profileLink(g2,"Import history","From Samsung Health, Zepp, Google Fit",R.drawable.ic_download,indigo(),()->navigate("Import"));
+        profileLink(g2,"Storage & backup","Save or restore a copy",R.drawable.ic_storage,indigo(),()->navigate("Storage"));
+        LinearLayout g3=linkGroup("DATA & DEVICES");
+        profileLink(g3,"Step sources & health",!DaySteps.hcSteps(this)?"Phone sensor only":hcOn?"Health Connect connected":"Health Connect not set up",R.drawable.ic_heart,green(),()->navigate("Health"));
+        profileLink(g3,"Connect your watch",watchData()?"Watch data arriving":"Step by step",R.drawable.ic_timer,teal(),()->navigate("WatchSetup"));
+        LinearLayout g4=linkGroup("APP SETTINGS");
+        profileLink(g4,"Permissions","Location, steps, battery",R.drawable.ic_settings,indigo(),()->navigate("Permissions"));
+        profileLink(g4,"Notifications",notificationsAllowed()?"On":"Off",R.drawable.ic_bell,flame(),()->navigate("Notifications"));
+        profileLink(g4,"Auto-tracking",AutoTrack.enabled(this)?"On":"Off",R.drawable.ic_run,green(),()->navigate("Auto"));
+        profileLink(g4,"Share Kadamm","Send the app to a friend",R.drawable.ic_share,lime,this::shareApp);
         renderAccount();
         renderAppVersion();
-        LinearLayout appearance=card();appearance.addView(tx("Appearance",16,ink,true));appearance.addView(tx("Choose how Kadamm looks on this device.",12,muted,false));String selected=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("themeMode","system");LinearLayout choices=row();LinearLayout.LayoutParams chp=lp(-1,42);chp.topMargin=dp(12);appearance.addView(choices,chp);for(String mode:new String[]{"Light","Dark","System"}){boolean active=mode.equalsIgnoreCase(selected);Button b=button(mode,active?lime:raised,active?accentOn:ink);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(0,-1,1);if(choices.getChildCount()>0)bp.leftMargin=dp(7);choices.addView(b,bp);b.setOnClickListener(v->{if(mode.toLowerCase(Locale.US).equals(selected))return;confirmChange("Switch to "+mode.toLowerCase(Locale.US)+" theme?","Kadamm will redraw in the "+mode.toLowerCase(Locale.US)+" theme.",()->{getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("themeMode",mode.toLowerCase(Locale.US)).apply();applyTheme();renderPage();},null);});}
+        LinearLayout appearance=card();appearance.addView(tx("Appearance",16,ink,true));String selected=getSharedPreferences("kadamm_settings",MODE_PRIVATE).getString("themeMode","system");LinearLayout choices=row();LinearLayout.LayoutParams chp=lp(-1,42);chp.topMargin=dp(12);appearance.addView(choices,chp);for(String mode:new String[]{"Light","Dark","System"}){boolean active=mode.equalsIgnoreCase(selected);Button b=button(mode,active?lime:raised,active?accentOn:ink);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(0,-1,1);if(choices.getChildCount()>0)bp.leftMargin=dp(7);choices.addView(b,bp);b.setOnClickListener(v->{if(mode.toLowerCase(Locale.US).equals(selected))return;confirmChange("Switch to "+mode.toLowerCase(Locale.US)+" theme?","Kadamm will redraw in the "+mode.toLowerCase(Locale.US)+" theme.",()->{getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putString("themeMode",mode.toLowerCase(Locale.US)).apply();applyTheme();renderPage();},null);});}
     }
     private void changePassword(){
         android.widget.EditText cur=field("Current password",android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD),nw=field("New password (8+ characters)",android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD),cf=field("Confirm new password",android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
@@ -616,7 +669,8 @@ public class MainActivity extends Activity {
         AlertDialog d=dialog().setTitle("Change password").setView(box).setNegativeButton("Cancel",null).setPositiveButton("Save",null).create();
         d.setOnShowListener(x->d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{String err=LocalAccount.changePassword(this,cur.getText().toString(),nw.getText().toString(),cf.getText().toString());if(err!=null){(err.contains("current")?cur:nw).setError(err);return;}d.dismiss();toast("Password changed");}));d.show();
     }
-    private void heroChip(LinearLayout p,String text,int color){TextView t=tx(text,11,darkTheme?blend(color,Color.WHITE,.2f):blend(color,Color.BLACK,.25f),true);t.setPadding(dp(10),dp(6),dp(10),dp(6));t.setBackground(shape(blend(panel,color,darkTheme?.22f:.14f),14));LinearLayout.LayoutParams lp2=lp(-2,-2);if(p.getChildCount()>0)lp2.leftMargin=dp(6);p.addView(t,lp2);}
+    private TextView heroChip(LinearLayout p,String text,int color){TextView t=tx(text,11,darkTheme?blend(color,Color.WHITE,.2f):blend(color,Color.BLACK,.25f),true);t.setPadding(dp(10),dp(6),dp(10),dp(6));t.setBackground(shape(blend(panel,color,darkTheme?.22f:.14f),14));LinearLayout.LayoutParams lp2=lp(-2,-2);if(p.getChildCount()>0)lp2.leftMargin=dp(6);p.addView(t,lp2);return t;}
+    private LinearLayout linkGroup(String title){TextView t=tx(title,10,muted,true);t.setLetterSpacing(.08f);LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(20);tp.leftMargin=dp(4);content.addView(t,tp);LinearLayout c=card();c.setPadding(dp(6),dp(6),dp(6),dp(6));((LinearLayout.LayoutParams)c.getLayoutParams()).topMargin=dp(6);return c;}
     private void profileLink(LinearLayout parent,String title,String sub,int res,int color,Runnable go){
         LinearLayout r=row();r.setPadding(dp(10),dp(10),dp(10),dp(10));r.setBackground(rippleOn(Color.TRANSPARENT,14));r.setFocusable(true);r.setContentDescription(title);parent.addView(r,lp(-1,-2));
         android.widget.ImageView ic=icon(res,darkTheme?Color.rgb(11,11,13):Color.WHITE,8);ic.setBackground(shape(color,12));r.addView(ic,lp(38,38));
@@ -1205,7 +1259,7 @@ public class MainActivity extends Activity {
 
     // ---- The Health data page ----
     private void renderBody(){
-        JSONArray h=history();brand("MEASURED EVERY DAY","Body","What your watch and phone measure each day. Estimates are marked.");
+        JSONArray h=history();brand("MEASURED EVERY DAY","Body","Estimates are marked.");
         renderAccessCard(false);renderWatchConnection(true);renderAlertsCard();renderBodyToday(h);renderLabsLink();renderRecoveryCard();renderStrainCard(h);renderSleepCard();renderHeartCard();renderStressCard();
         // Breathing, oxygen and temperature only come from a watch: the card appears once any of them does.
         boolean any=false;for(String k:new String[]{"resp","spo2","skin","btemp"})if(!"-2".equals(bodyMetric(k,h)[3]))any=true;if(any)renderOxygenCard();
@@ -1223,7 +1277,7 @@ public class MainActivity extends Activity {
     }
     private void renderLabs(){
         java.util.List<JSONObject> reps=HealthReports.all(this);
-        brand("BLOOD TESTS YOU ADD","Lab results","Your blood test and lab results over time, and what Kadamm measured in the 30 days up to each test.");
+        brand("BLOOD TESTS YOU ADD","Lab results","Your tests over time, beside what Kadamm measured in the 30 days before each.");
         LinearLayout ab=row();LinearLayout.LayoutParams ap=lp(-1,50);ap.topMargin=dp(14);content.addView(ab,ap);
         Button add=button("+  Add lab results",lime,accentOn);add.setTextSize(15);ab.addView(add,new LinearLayout.LayoutParams(0,-1,1.4f));add.setOnClickListener(v->openLabEditor(null));
         if(!reps.isEmpty()){Button pdf=button("Share as PDF",raised,ink);LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(0,-1,1);pp.leftMargin=dp(10);ab.addView(pdf,pp);pdf.setOnClickListener(v->shareLabPdf());}
@@ -1660,7 +1714,7 @@ public class MainActivity extends Activity {
             if(android.os.SystemClock.elapsedRealtime()-lastHealthRefresh>60000){WearBridge.ping(MainActivity.this);refreshHealth(true);}}
         handler.postDelayed(this,2000);}};
     private void renderTrainer(){
-        JSONArray h=history();brand("KADAMM TRAINER","Your training","A plan built from your own walks, steps and pace.");
+        JSONArray h=history();brand("KADAMM TRAINER","Your training",null);
         if(!SessionMetrics.ready()){LinearLayout w=card();w.addView(tx("Analysing your sessions…",13,muted,false));handler.postDelayed(()->{if("Trainer".equals(page))renderPageNow();},800);return;}
         renderCoachSection(h);renderForecast();renderWeekly(h);renderFriends(h);renderPaceTrend(h);renderSpreadTrend();renderBody(h);renderWatchFitness(h);renderRecordsTrend(h);
         Trainer.State st=trainerState(h);KadammTheme th=chartTheme();int teal=GoalCapsule.COLORS[0];
@@ -2138,7 +2192,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     /** Vector icon for each symbol used across the app. */
     private int iconRes(String g){
         switch(g){
-            case "Goals":return R.drawable.ic_flag;case "Routes":return R.drawable.ic_place;case "Notifications":return R.drawable.ic_bell;case "Permissions":return R.drawable.ic_settings;case "Auto":return R.drawable.ic_run;case "Storage":return R.drawable.ic_storage;case "Reports":return R.drawable.ic_chart;case "Body":return R.drawable.ic_heart;case "Labs":return R.drawable.ic_lab;case "Achievements":return R.drawable.ic_trophy;case "Health":return R.drawable.ic_heart;case "ShareApp":return R.drawable.ic_share;case "Places":return R.drawable.ic_my_location;
+            case "Goals":return R.drawable.ic_flag;case "Routes":return R.drawable.ic_place;case "Notifications":return R.drawable.ic_bell;case "Permissions":return R.drawable.ic_settings;case "Auto":return R.drawable.ic_run;case "Storage":return R.drawable.ic_storage;case "Reports":return R.drawable.ic_chart;case "Body":return R.drawable.ic_heart;case "Labs":return R.drawable.ic_lab;case "Achievements":return R.drawable.ic_trophy;case "Health":return R.drawable.ic_heart;case "ShareApp":return R.drawable.ic_share;case "Places":return R.drawable.ic_my_location;case "Trainer":return R.drawable.ic_bolt;case "Import":return R.drawable.ic_download;case "WatchSetup":return R.drawable.ic_timer;
             case "Today":case "◷home":return R.drawable.ic_home;case "History":case "▦":return R.drawable.ic_calendar;case "Profile":case "◉p":return R.drawable.ic_person;
             case "↗":return R.drawable.ic_place;case "⚡\uFE0E":return R.drawable.ic_flame;case "◷":return R.drawable.ic_timer;case "▶":return R.drawable.ic_walk;case "◉":return R.drawable.ic_walk;
             case "»":return R.drawable.ic_run;case "★":return R.drawable.ic_bolt;case "≈":return R.drawable.ic_chart;case "◎":return R.drawable.ic_flag;case "＋":return R.drawable.ic_heart;case "⇅":return R.drawable.ic_ruler;
@@ -3186,7 +3240,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             }
         }
         boolean remind=Reminders.inactiveOn(this);int after=Reminders.get(this,"remAfter",Reminders.DEF_AFTER);
-        TextView srcS=tx("From "+DaySteps.sitSource(this),10,muted,false);srcS.setPadding(0,dp(10),0,0);c.addView(srcS);
+        boolean phoneOnly=DaySteps.minuteDays(this).optJSONObject(todayKey())==null;TextView srcS=tx("From "+DaySteps.sitSource(this)+(phoneOnly?". The phone only feels steps while you carry it: if it stays on the desk while you walk, that time looks like sitting. A watch through Health Connect is more exact.":""),10,muted,false);srcS.setPadding(0,dp(10),0,0);c.addView(srcS);
         TextView rem=tx((remind?"Reminder after "+mins(after)+" still · change":"Sitting reminder is off · turn on")+"  ›",12,lime,true);rem.setPadding(0,dp(14),0,dp(2));rem.setOnClickListener(v->navigate("Notifications"));c.addView(rem);
     }
     private String mins(long m){return m>=60?(m%60==0?(m/60)+(m/60==1?" hour":" hours"):String.format(Locale.US,"%dh %02dm",m/60,m%60)):m+" min";}
@@ -3285,7 +3339,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     // ---- Places you walk ----
     /** Every street you have covered on one map, how much of it is unique, and what is new lately. */
     private void renderPlaces(){
-        brand("YOUR MAP","Places you walk","Every street you've covered. Walk somewhere new and watch the map fill in.");
+        brand("YOUR MAP","Places you walk",null);
         Insights.Coverage cv=Insights.coverage(history());boolean[] placesAll={false};
         if(cv.sessions==0){LinearLayout e=card();e.addView(tx("No routes yet",16,ink,true));e.addView(tx("Record an outdoor walk or run and its streets appear here. Indoor sessions have no route.",12,muted,false));return;}
         FrameLayout box=new FrameLayout(this);LinearLayout.LayoutParams bp=lp(-1,380);bp.topMargin=dp(4);content.addView(box,bp);
@@ -3373,7 +3427,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     }
     private void openAppNotificationSettings(){try{startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()));}catch(Exception e){toast("Open Settings > Apps > Kadamm > Notifications");}}
     private void renderNotifications(){
-        brand("SETTINGS","Notifications","Choose what Kadamm tells you, and when.");
+        brand("SETTINGS","Notifications",null);
         boolean on=notificationsAllowed();
         LinearLayout st=card();LinearLayout h=row();st.addView(h);
         android.widget.ImageView ic=icon(R.drawable.ic_bell,darkTheme?Color.rgb(11,11,13):Color.WHITE,9);ic.setBackground(shape(on?positive:warning,14));h.addView(ic,lp(40,40));
@@ -3502,7 +3556,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     private long bytesOf(java.io.File f){if(f==null||!f.exists())return 0;if(f.isFile())return f.length();long n=0;java.io.File[] k=f.listFiles();if(k!=null)for(java.io.File x:k)n+=bytesOf(x);return n;}
     private String size(long b){return b>=1048576?String.format(Locale.US,"%.1f MB",b/1048576d):String.format(Locale.US,"%.0f KB",Math.max(1,b/1024d));}
     private void renderStorage(){
-        brand("SETTINGS","Storage & backup","See what Kadamm keeps, clear what you don't need, and save a copy anywhere.");
+        brand("SETTINGS","Storage & backup",null);
         JSONArray h=history();long histBytes=historyPrefs.getString("sessions","[]").length(),mapBytes=bytesOf(new java.io.File(getCacheDir(),"osm-tile-cache")),shareBytes=bytesOf(new java.io.File(getCacheDir(),"share"));
         LinearLayout u=card();u.addView(tx("ON THIS PHONE",10,muted,true));
         detailRow(u,"SESSIONS",h.length()+" · "+size(histBytes),"SAVED ROUTES",String.valueOf(Insights.routes(this).length()));
@@ -3573,20 +3627,20 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     // ---- Permissions ----
     private static final int LOCATION_PERMISSION=103;
     private void renderPermissions(){
-        brand("SETTINGS","Permissions","What Kadamm needs to track reliably, and why.");
+        brand("SETTINGS","Permissions",null);
         boolean loc=checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;
         android.os.PowerManager pm=(android.os.PowerManager)getSystemService(POWER_SERVICE);boolean battery=pm!=null&&pm.isIgnoringBatteryOptimizations(getPackageName());
         boolean hc=getSharedPreferences("kadamm_health",MODE_PRIVATE).getBoolean("healthConnected",false);
-        permissionRow(R.drawable.ic_bolt,"Unrestricted battery","Lets Kadamm keep recording when you switch apps or lock the phone. Without it, Samsung's battery saver can pause a session.",battery,"Allow",()->{
+        permissionRow(R.drawable.ic_bolt,"Unrestricted battery","Without it, the battery saver can pause a session and stop syncing.","Sessions keep recording and syncing with the screen off.",battery,"Allow",()->{
             try{startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:"+getPackageName())));}catch(Exception e){openAppSettings();}});
-        if(!battery||true){TextView tip=tx("On Samsung, also open Battery settings > Kadamm > Unrestricted, and keep Kadamm out of \"Sleeping apps\".",11,muted,false);LinearLayout.LayoutParams tpp=lp(-1,-2);tpp.topMargin=dp(6);content.addView(tip,tpp);
+        if(!battery){TextView tip=tx("On Samsung, also open Battery settings > Kadamm > Unrestricted, and keep Kadamm out of \"Sleeping apps\".",11,muted,false);LinearLayout.LayoutParams tpp=lp(-1,-2);tpp.topMargin=dp(6);content.addView(tip,tpp);
             TextView open=tx("Open Kadamm's battery settings  →",13,lime,true);open.setGravity(Gravity.CENTER_VERTICAL);open.setFocusable(true);open.setBackground(rippleOn(Color.TRANSPARENT,10));content.addView(open,lp(-1,44));open.setOnClickListener(v->openAppSettings());}
-        permissionRow(R.drawable.ic_place,"Precise location","Draws your route and measures outdoor distance. Only used while a session is recording.",loc,"Allow",()->{
+        permissionRow(R.drawable.ic_place,"Precise location","For your route and outdoor distance, only while recording.","Routes and outdoor distance are recorded during sessions.",loc,"Allow",()->{
             if(shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)||!getSharedPreferences("kadamm_settings",MODE_PRIVATE).getBoolean("locAsked",false)){getSharedPreferences("kadamm_settings",MODE_PRIVATE).edit().putBoolean("locAsked",true).apply();requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},LOCATION_PERMISSION);}else openAppSettings();});
-        permissionRow(R.drawable.ic_run,"Location all the time","Only needed for Auto-tracking, so a walk Kadamm starts by itself still gets its route. Choose \"Allow all the time\".",AutoTrack.backgroundLocation(this)||!AutoTrack.enabled(this),"Allow",()->requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},BG_LOCATION_PERMISSION));
-        permissionRow(R.drawable.ic_walk,"Physical activity","Counts your steps all day and on the treadmill, with the phone's step sensor.",DaySteps.permitted(this),"Allow",this::requestStepPermission);
-        permissionRow(R.drawable.ic_bell,"Notifications","The live session card, goal alerts, reminders and your daily summary.",notificationsAllowed(),"Allow",()->navigate("Notifications"));
-        permissionRow(R.drawable.ic_heart,"Health Connect","Brings in your watch's and health apps' data. Optional.",hc,"Connect",()->navigate("Health"));
+        permissionRow(R.drawable.ic_run,"Location all the time","Only for Auto-tracking. Choose \"Allow all the time\".",AutoTrack.enabled(this)?"Walks Kadamm starts by itself get their route.":"Not needed while Auto-tracking is off.",AutoTrack.backgroundLocation(this)||!AutoTrack.enabled(this),"Allow",()->requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},BG_LOCATION_PERMISSION));
+        permissionRow(R.drawable.ic_walk,"Physical activity","Counts your steps all day with the phone's step sensor.",String.format(Locale.US,"Counting: %,d steps on this phone today.",DaySteps.phoneOn(this,todayKey())),DaySteps.permitted(this),"Allow",this::requestStepPermission);
+        permissionRow(R.drawable.ic_bell,"Notifications","For the live session card, goals and reminders.","Live session card, goal alerts and reminders are shown. Choose which in Notifications.",notificationsAllowed(),"Allow",()->navigate("Notifications"));
+        permissionRow(R.drawable.ic_heart,"Health Connect","Optional: brings in your watch's and health apps' data.",hcDoneText(),hc,"Connect",()->navigate("Health"));
     }
     /**
      * "Set up access": one card at the top of Home and Body listing only what's still missing, each with the one tap
@@ -3600,7 +3654,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     }
     private Runnable setupPoll;
     private void renderWatchSetup(){
-        brand("YOUR WATCH","Connect your watch","Four steps from your wrist to Kadamm. Each one is checked here as you go.");
+        brand("YOUR WATCH","Connect your watch","Each step is checked here as you go.");
         String paired=bluetoothWatch();String watchName=paired==null?null:paired.split("\\|")[0];boolean on=paired!=null&&paired.endsWith("|true");
         java.util.List<Pro.App> apps=Pro.watchAppsFor(this,watchName);Pro.App app=apps.isEmpty()?null:apps.get(0);
         for(Pro.App a:apps)if(sentFrom(a.pkg)){app=a;break;}
@@ -3682,7 +3736,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         LinearLayout c=card();c.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{blend(panel,lime,darkTheme?.16f:.08f),panel}){{setCornerRadius(dp(16));setStroke(dp(1),blend(line,lime,.35f));}});
         LinearLayout h=row();h.setGravity(Gravity.CENTER_VERTICAL);c.addView(h,lp(-1,-2));TextView t=tx("SET UP ACCESS",10,lime,true);t.setLetterSpacing(.08f);h.addView(t,new LinearLayout.LayoutParams(0,-2,1));
         h.addView(tx(items.size()+(items.size()==1?" step left":" steps left"),11,muted,true));
-        c.addView(withTop(tx("Allow these so Kadamm gets all your data. Each takes one tap.",13,ink,false),4));
+        
         for(int i=0;i<items.size();i++){Object[] it=items.get(i);
             LinearLayout r=row();r.setGravity(Gravity.CENTER_VERTICAL);LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(12);c.addView(r,rp);
             TextView n=tx(String.valueOf(i+1),12,accentOn,true);n.setGravity(Gravity.CENTER);GradientDrawable g=new GradientDrawable();g.setShape(GradientDrawable.OVAL);g.setColor(lime);n.setBackground(g);r.addView(n,lp(24,24));
@@ -3690,13 +3744,16 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             tc.addView(tx((String)it[0],14,ink,true));TextView why=tx((String)it[1],11,muted,false);why.setLineSpacing(dp(1),1f);tc.addView(why);
             Button b=button((String)it[2],lime,accentOn);b.setTextSize(13);b.setPadding(dp(14),0,dp(14),0);r.addView(b,lp(-2,38));Runnable go=(Runnable)it[3];b.setOnClickListener(v->go.run());}
     }
+    /** What Health Connect is doing for you right now, once it's allowed. */
+    private String hcDoneText(){SharedPreferences h=getSharedPreferences("kadamm_health",MODE_PRIVATE);long at=h.getLong("healthSyncedAt",0);String o=h.getString("healthOrigin","");
+        return (DaySteps.hcSteps(this)?(o.isEmpty()?"Reading your health apps":"Reading steps from "+HealthSync.label(o)):"Reading heart rate, sleep and more (steps are off)")+(at>0?" · synced "+new SimpleDateFormat("h:mm a",Locale.getDefault()).format(new Date(at)):"")+".";}
     private void openAppSettings(){try{startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.fromParts("package",getPackageName(),null)));}catch(Exception ignored){}}
-    private void permissionRow(int res,String title,String why,boolean ok,String action,Runnable fix){
+    private void permissionRow(int res,String title,String why,String done,boolean ok,String action,Runnable fix){
         LinearLayout c=card();LinearLayout h=row();c.addView(h);
         android.widget.ImageView ic=icon(res,darkTheme?Color.rgb(11,11,13):Color.WHITE,8);ic.setBackground(shape(ok?positive:warning,12));h.addView(ic,lp(38,38));
         LinearLayout t=col();LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,-2,1);tp.leftMargin=dp(12);h.addView(t,tp);t.addView(tx(title,15,ink,true));
         TextView pill=tx(ok?"Allowed":"Needed",10,ok?positive:warning,true);pill.setPadding(dp(8),dp(3),dp(8),dp(3));pill.setBackground(shape(blend(panel,ok?positive:warning,.15f),10));h.addView(pill);
-        TextView w=tx(why,12,muted,false);LinearLayout.LayoutParams wp=lp(-1,-2);wp.topMargin=dp(8);c.addView(w,wp);
+        TextView w=tx(ok?done:why,12,ok?ink:muted,false);LinearLayout.LayoutParams wp=lp(-1,-2);wp.topMargin=dp(8);c.addView(w,wp);
         if(!ok){Button b=button(action,lime,accentOn);LinearLayout.LayoutParams bp=lp(-1,44);bp.topMargin=dp(10);c.addView(b,bp);b.setOnClickListener(v->fix.run());}
     }
     // ---- Daily summary card ----
@@ -3884,7 +3941,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             LinearLayout.LayoutParams p=lp(34,34);p.leftMargin=dp(4);head.addView(me[0],head.getChildCount()>2?head.getChildCount()-1:head.getChildCount(),p);}catch(Exception ignored){}
     }
     private void renderReports(){
-        brand("YOUR PROGRESS","Reports","How your weeks and months add up.");
+        brand("YOUR PROGRESS","Reports",null);
         LinearLayout seg=row();seg.setPadding(dp(4),dp(4),dp(4),dp(4));seg.setBackground(shape(raised,14));content.addView(seg,lp(-1,48));
         for(String m:new String[]{"Week","Month","Custom"}){boolean on=m.equals("Custom")?reportCustom:!reportCustom&&m.equals("Month")==reportMonth;TextView t=tx(m,14,on?ink:muted,true);t.setGravity(Gravity.CENTER);t.setFocusable(true);if(on)t.setBackground(shape(panel,11));seg.addView(t,new LinearLayout.LayoutParams(0,-1,1));
             t.setOnClickListener(v->{reportCustom=m.equals("Custom");reportMonth=m.equals("Month");reportOffset=0;renderPageNow();});}
@@ -3963,7 +4020,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         c.setFocusable(true);c.setOnClickListener(v->navigate("Achievements"));
     }
     private void renderAchievements(){
-        brand("YOUR PROGRESS","Achievements","Earn medals in four tiers, from easy to extreme.");
+        brand("YOUR PROGRESS","Achievements",null);
         JSONArray h=history();java.util.Map<String,Long> totals=DaySteps.allDayTotals(this);int goal=dailyGoal();KadammTheme th=chartTheme();
         java.util.List<Progress.Badge> all=Progress.badges(this,h,totals,goal);boolean celebrate=!Progress.unseen(this,all).isEmpty();
         int earned=0;int[] perTier=new int[4],earnedTier=new int[4];for(Progress.Badge b:all){perTier[b.tier]++;if(b.earned()){earned++;earnedTier[b.tier]++;}}
@@ -3983,6 +4040,23 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         View rest=new View(this);strip.addView(rest,new LinearLayout.LayoutParams(0,-1,all.size()-earned));
         LinearLayout legend=row();LinearLayout.LayoutParams lgp=lp(-1,-2);lgp.topMargin=dp(8);hero.addView(legend,lgp);
         for(int t=0;t<4;t++){LinearLayout cl=col();legend.addView(cl,new LinearLayout.LayoutParams(0,-2,1));cl.addView(tx(earnedTier[t]+"/"+perTier[t],14,ink,true));TextView n=tx(MetricViews.TIER_NAMES[t],10,darkTheme?MetricViews.TIER[t][0]:MetricViews.TIER[t][1],true);cl.addView(n);}
+        // The badges you have, all together, highest tier first: what the Profile count means.
+        java.util.List<Progress.Badge> mine=new java.util.ArrayList<>();for(Progress.Badge b:all)if(b.earned())mine.add(b);mine.sort((x,y)->y.tier-x.tier);
+        TextView yb=tx("YOUR BADGES  ·  "+mine.size()+" EARNED",11,ink,true);yb.setLetterSpacing(.08f);LinearLayout.LayoutParams ybp=lp(-1,-2);ybp.topMargin=dp(22);content.addView(yb,ybp);earnedAnchor=yb;
+        if(mine.isEmpty())content.addView(withTop(tx("None yet. Your first one comes with your first goal day or session.",12,muted,false),6));
+        else{LinearLayout grid=col();LinearLayout.LayoutParams gdp=lp(-1,-2);gdp.topMargin=dp(10);content.addView(grid,gdp);LinearLayout gr=null;
+            int shown=showAllBadges?mine.size():Math.min(6,mine.size());
+            for(int i=0;i<shown;i++){if(i%3==0){gr=row();gr.setGravity(Gravity.TOP);LinearLayout.LayoutParams grp=lp(-1,-2);if(i>0)grp.topMargin=dp(8);grid.addView(gr,grp);}
+                Progress.Badge b=mine.get(i);LinearLayout cell=col();cell.setGravity(Gravity.CENTER_HORIZONTAL);cell.setPadding(dp(6),dp(12),dp(6),dp(10));
+                GradientDrawable cg=shape(blend(panel,MetricViews.TIER[b.tier][0],darkTheme?.14f:.12f),18);cg.setStroke(dp(1),blend(line,MetricViews.TIER[b.tier][0],.5f));cell.setBackground(cg);
+                LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(0,-2,1);if(i%3>0)clp.leftMargin=dp(8);gr.addView(cell,clp);
+                cell.addView(new MetricViews.Medal(this,th,b.tier,b.icon,true,1),lp(56,56));
+                TextView bn=tx(b.name,12,ink,true);bn.setGravity(Gravity.CENTER);bn.setMaxLines(2);LinearLayout.LayoutParams bnp=lp(-1,-2);bnp.topMargin=dp(6);cell.addView(bn,bnp);
+                TextView bt=tx(MetricViews.TIER_NAMES[b.tier],10,darkTheme?MetricViews.TIER[b.tier][0]:MetricViews.TIER[b.tier][1],true);bt.setGravity(Gravity.CENTER);cell.addView(bt,lp(-1,-2));
+                cell.setContentDescription(b.name+", "+MetricViews.TIER_NAMES[b.tier]+", earned. "+b.desc);cell.setOnClickListener(v->badgeDetail(b));}
+            for(int k=shown%3;k>0&&k<3;k++){View pad=new View(this);LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(0,1,1);pp.leftMargin=dp(8);gr.addView(pad,pp);}
+            if(mine.size()>6){TextView more=tx(showAllBadges?"Show fewer":"Show all "+mine.size(),13,lime,true);more.setGravity(Gravity.CENTER);more.setBackground(rippleOn(Color.TRANSPARENT,12));more.setFocusable(true);content.addView(more,lp(-1,44));
+                more.setOnClickListener(v->{showAllBadges=!showAllBadges;int y=scroller.getScrollY();renderPageNow();scroller.post(()->scroller.scrollTo(0,y));});}}
         // Current streak with a flame.
         int[] st=DaySteps.streaks(totals,goal);Long tv=totals.get(todayKey());long todaySteps=tv==null?0:tv;
         LinearLayout sc=card();LinearLayout sr=row();sc.addView(sr,lp(-1,-2));
@@ -3997,7 +4071,8 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         // In progress
         java.util.List<Progress.Badge> close=new java.util.ArrayList<>();for(Progress.Badge b:all)if(!b.earned()&&b.fraction()>0)close.add(b);
         close.sort((x,y)->Float.compare(y.fraction(),x.fraction()));
-        if(!close.isEmpty()){shelfTitle("IN PROGRESS",null);LinearLayout s1=shelf();for(int i=0;i<Math.min(8,close.size());i++)medalCell(s1,close.get(i),true);}
+        for(Progress.Badge b:all)if(!b.earned()&&b.fraction()<=0)close.add(b);
+        if(!close.isEmpty()){shelfTitle("STILL TO EARN  ·  "+close.size()+"  ·  closest first",null);LinearLayout s1=shelf();for(Progress.Badge b:close)medalCell(s1,b,true);}
         // Personal bests as gold medals: tap one to open its session.
         java.util.List<Insights.Record> recs=Insights.records(h,totals);
         if(!recs.isEmpty()){shelfTitle("PERSONAL BESTS",null);LinearLayout s2=shelf();
@@ -4008,13 +4083,6 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
                 TextView l=tx(r.label,10,darkTheme?MetricViews.TIER[2][0]:MetricViews.TIER[2][1],true);l.setGravity(Gravity.CENTER);l.setMaxLines(2);cell.addView(l,lp(-1,-2));
                 TextView d=tx(r.date,10,muted,false);d.setGravity(Gravity.CENTER);d.setMaxLines(1);cell.addView(d,lp(-1,-2));
                 if(r.sessionId>0){JSONObject go=null;for(int i=0;i<h.length();i++){JSONObject o=h.optJSONObject(i);if(o!=null&&o.optLong("id")==r.sessionId)go=o;}final JSONObject g2=go;if(g2!=null)cell.setOnClickListener(v2->{lastSession=g2;page="Detail";renderPage();});}}
-        }
-        // Each tier as a shelf, earned medals first.
-        for(int t=0;t<4;t++){
-            shelfTitle(MetricViews.TIER_NAMES[t].toUpperCase(Locale.US)+"  ·  "+earnedTier[t]+" of "+perTier[t],MetricViews.TIER[t]);
-            LinearLayout s3=shelf();java.util.List<Progress.Badge> tierList=new java.util.ArrayList<>();for(Progress.Badge b:all)if(b.tier==t)tierList.add(b);
-            tierList.sort((x,y)->x.earned()==y.earned()?Float.compare(y.fraction(),x.fraction()):x.earned()?-1:1);
-            for(Progress.Badge b:tierList)medalCell(s3,b,false);
         }
         TextView chT=tx("CHALLENGES",10,muted,true);chT.setLetterSpacing(.08f);LinearLayout.LayoutParams ctp=lp(-1,-2);ctp.topMargin=dp(24);content.addView(chT,ctp);
         for(Progress.Challenge ch:Progress.challenges(this,h,totals,goal)){
@@ -4029,9 +4097,11 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
             int[] presets=ch.key.equals("chMonthSteps")?new int[]{150000,200000,250000,300000,400000}:ch.key.equals("chMonthKm")?new int[]{20,50,100,150}:new int[]{3,4,5,6,7};
             choiceChips(c,"Target",presets,(int)ch.target,ch.key,v->ch.key.equals("chMonthSteps")?(v/1000)+"k":ch.key.equals("chMonthKm")?v+" km":v+" days");
         }
+        if(scrollToEarned&&earnedAnchor!=null){scrollToEarned=false;View an=earnedAnchor;scroller.post(()->scroller.smoothScrollTo(0,Math.max(0,an.getTop()-dp(12))));}
         if(celebrate&&!reducedMotion()){ConfettiView confetti=new ConfettiView(this);root.addView(confetti,new FrameLayout.LayoutParams(-1,-1));confetti.play();}
         Progress.markSeen(this,all);
     }
+    private View earnedAnchor;private boolean scrollToEarned,showAllBadges;
     private void shelfTitle(String title,int[] tier){
         LinearLayout r=row();LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(22);content.addView(r,rp);
         if(tier!=null){View dot=new View(this);GradientDrawable dg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,tier);dg.setShape(GradientDrawable.OVAL);dot.setBackground(dg);LinearLayout.LayoutParams dp2=lp(12,12);dp2.rightMargin=dp(8);r.addView(dot,dp2);}

@@ -93,7 +93,9 @@ final class DaySteps {
                         prune(days);
                         e.putString("days",days.toString()).putLong("lastMoveAt",now);
                         // Sitting: 10+ steps after 30+ minutes without walking counts as getting up from a sit.
-                        if(delta>=10){long prev=p.getLong("activeAt",0);if(prev>0&&now-prev>=30*60000L){long end=Math.max(lastAt,now-delta*600L);if(end-prev>=30*60000L)recordSit(e,p,prev,end);}e.putLong("activeAt",now);}
+                        // The steps happened somewhere between the last reading and now. Only the span the readings show still
+                        // counts as a sit: after a long gap (phone asleep), when you got up isn't known, so the sit ends at the last reading.
+                        if(delta>=10){long prev=p.getLong("activeAt",0);if(prev>0&&now-prev>=30*60000L){long end=now-lastAt<=20*60000L?Math.max(lastAt,now-delta*600L):lastAt;if(end-prev>=30*60000L)recordSit(e,p,prev,end);}e.putLong("activeAt",now);}
                         changed=true;
                     }catch(Exception ignored){}
                 }
@@ -205,34 +207,52 @@ final class DaySteps {
     static double[] hoursOn(Context c,String day){
         try{JSONArray h=new JSONObject(c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getString("hours","{}")).optJSONArray(day);if(h==null)return null;double[] out=new double[24];for(int i=0;i<24;i++)out[i]=Math.round(h.optDouble(i));return out;}catch(Exception e){return null;}
     }
-    /** Saves one sitting stretch [start, end] under its day, keeping 35 days. */
+    /** Saves one sitting stretch [start, end] under its day, keeping 35 days. Stored as "sits2" since 10.4.0: the
+     *  older "sits" guessed when you got up after a reading gap and showed walks as sitting, so they aren't used. */
     private static void recordSit(SharedPreferences.Editor e,SharedPreferences p,long start,long end){
-        try{JSONObject all=new JSONObject(p.getString("sits","{}"));String k=key(end);JSONArray a=all.optJSONArray(k);if(a==null){a=new JSONArray();all.put(k,a);}
+        try{JSONObject all=new JSONObject(p.getString("sits2","{}"));String k=key(end);JSONArray a=all.optJSONArray(k);if(a==null){a=new JSONArray();all.put(k,a);}
             a.put(new JSONArray().put(start).put(end));
             if(all.length()>36){String cutoff=key(System.currentTimeMillis()-35L*86400000L);for(Iterator<String> it=all.keys();it.hasNext();)if(it.next().compareTo(cutoff)<0)it.remove();}
-            e.putString("sits",all.toString());}catch(Exception ignored){}
+            e.putString("sits2",all.toString());}catch(Exception ignored){}
     }
     /**
      * Today's sitting stretches as {start minute of day, length in minutes}, 30 minutes or longer, between 7 am
      * and 11 pm: from Health Connect's minute steps when that is on (exact), else Kadamm's own readings (to
      * within its sampling, a few minutes while open, up to 15 when closed).
      */
-    static java.util.List<int[]> sitsToday(Context c){
+    static java.util.List<int[]> sitsToday(Context c){return withoutSessions(c,sitsRaw(c));}
+    /** A Kadamm session is walking, so no sit can cover it: sits are cut around sessions, and pieces under 30 minutes dropped. */
+    private static java.util.List<int[]> withoutSessions(Context c,java.util.List<int[]> sits){
+        Calendar mid=Calendar.getInstance();mid.set(Calendar.HOUR_OF_DAY,0);mid.set(Calendar.MINUTE,0);mid.set(Calendar.SECOND,0);mid.set(Calendar.MILLISECOND,0);long m0=mid.getTimeInMillis();
+        java.util.List<int[]> walks=new java.util.ArrayList<>();JSONArray all=sessions(c);String today=todayKey();
+        for(int i=0;i<all.length();i++){JSONObject o=all.optJSONObject(i);if(o==null||!today.equals(o.optString("day","")))continue;long st=o.optLong("id",0);if(st<m0)continue;int a=(int)((st-m0)/60000);walks.add(new int[]{a,a+(int)Math.max(1,o.optLong("durationMs",0)/60000)});}
+        java.util.List<int[]> cur=sits;
+        for(int[] w:walks){java.util.List<int[]> next=new java.util.ArrayList<>();
+            for(int[] x:cur){int s=x[0],e=x[0]+x[1];if(w[1]<=s||w[0]>=e){next.add(x);continue;}if(w[0]-s>=30)next.add(new int[]{s,w[0]-s});if(e-w[1]>=30)next.add(new int[]{w[1],e-w[1]});}
+            cur=next;}
+        return cur;
+    }
+    private static java.util.List<int[]> sitsRaw(Context c){
         java.util.List<int[]> out=new java.util.ArrayList<>();String today=todayKey();
         JSONObject m=minuteDays(c).optJSONObject(today);JSONArray hc=m!=null?m.optJSONArray("sits"):null;
         if(hc!=null){for(int i=0;i<hc.length();i++){JSONArray r=hc.optJSONArray(i);if(r!=null)out.add(new int[]{r.optInt(0),r.optInt(1)});}return out;}
-        try{JSONArray a=new JSONObject(c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getString("sits","{}")).optJSONArray(today);if(a==null)return out;
+        try{JSONArray a=new JSONObject(c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getString("sits2","{}")).optJSONArray(today);if(a==null)return out;
             Calendar mid=Calendar.getInstance();mid.set(Calendar.HOUR_OF_DAY,0);mid.set(Calendar.MINUTE,0);mid.set(Calendar.SECOND,0);mid.set(Calendar.MILLISECOND,0);long m0=mid.getTimeInMillis();
-            for(int i=0;i<a.length();i++){JSONArray r=a.optJSONArray(i);if(r==null)continue;int s=(int)Math.max(420,(r.optLong(0)-m0)/60000),e=(int)Math.min(1380,(r.optLong(1)-m0)/60000);if(e-s>=30)out.add(new int[]{s,e-s});}
+            double[] hrs=hoursOn(c,today);
+            for(int i=0;i<a.length();i++){JSONArray r=a.optJSONArray(i);if(r==null)continue;int s=(int)Math.max(420,(r.optLong(0)-m0)/60000),e=(int)Math.min(1380,(r.optLong(1)-m0)/60000);if(e-s<30)continue;
+                // A sit with 60+ steps counted inside one of its whole hours wasn't a sit (saved before 10.4.0 across a reading gap).
+                boolean moved=false;for(int h=(s+59)/60;hrs!=null&&(h+1)*60<=e&&h<24;h++)if(hrs[h]>=60)moved=true;if(!moved)out.add(new int[]{s,e-s});}
         }catch(Exception ignored){}
         return out;
     }
     /** Minutes since you last walked (10+ steps), or -1 if unknown. */
     /** Minutes since you last walked: the later of this phone's step sensor and Health Connect's minute steps (a watch's, when shared). */
-    static long stillMinutes(Context c){long a=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getLong("activeAt",0);
+    static long stillMinutes(Context c){SharedPreferences sp=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE);long a=sp.getLong("activeAt",0),lastAt=sp.getLong("lastAt",0);
         JSONObject m=minuteDays(c).optJSONObject(todayKey());int lm=m==null?-1:m.optInt("lastMove",-1);
         if(lm>=0){Calendar mid=Calendar.getInstance();mid.set(Calendar.HOUR_OF_DAY,0);mid.set(Calendar.MINUTE,0);mid.set(Calendar.SECOND,0);mid.set(Calendar.MILLISECOND,0);a=Math.max(a,mid.getTimeInMillis()+(lm+1)*60000L);}
-        return a<=0?-1:Math.max(0,(System.currentTimeMillis()-a)/60000);}
+        // Still only as far as a reading confirms it: with no reading for 20+ minutes, you may have walked since.
+        long now=System.currentTimeMillis(),seen=now-lastAt<=20*60000L?now:Math.max(lastAt,a);
+        return a<=0?-1:Math.max(0,(seen-a)/60000);}
     /** Where sitting and moving come from: the Health Connect app whose minute steps are used, or this phone. */
     static String sitSource(Context c){JSONObject m=minuteDays(c).optJSONObject(todayKey());if(m!=null&&m.has("sits")){String o=c.getSharedPreferences("kadamm_health",Context.MODE_PRIVATE).getString("healthOrigin","");return (o.isEmpty()?"Health Connect":HealthSync.label(o))+", minute by minute";}return "this phone's step sensor";}
     /** The phone step counter's last raw reading (since boot), or 0. */

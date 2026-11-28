@@ -1,5 +1,21 @@
 # Changelog
 
+## 10.4.0 (versionCode 64)
+
+- Organised by what you're doing. The menu is now Track (Today, History, Routes, Places), Health (Body, Lab results, Kadamm Trainer), Progress (Reports, Achievements, Goals), Data & devices (Step sources, Connect your watch, Import history, Storage & backup) and App settings (Permissions, Notifications, Auto-tracking, Share). Profile uses the same groups, so every setting has one place.
+- Achievements: "Your badges" lists the badges you've earned, highest tier first. It shows 6 with "Show all". Tapping "★ N badges" on Profile goes there. The four tier rows and In progress are now one "Still to earn" row, closest first, so the page is much shorter.
+- Fewer descriptions: filler subtitles are gone. On Permissions, an allowed item says what it's doing now (for example "Counting: 9,168 steps on this phone today") instead of why it's needed.
+- Sitting breaks:
+  - Fixed walks shown as sitting. After a gap with no step reading (phone asleep), Kadamm assumed the steps came at the end of the gap and called the rest a sit. A sit now ends at the last reading that showed you still.
+  - Sits saved by the old rule aren't used any more.
+  - No sit can overlap a Kadamm session.
+  - "Sitting now" counts only time a reading confirms.
+- Step sources: "How today's total is worked out" lists the phone sensor, Health Connect (with each app's count) and Kadamm sessions. It marks the one shown: the highest single count, never a sum. Sessions are explained as already inside the bigger count.
+- Sync now:
+  - Reads the phone sensor and then Health Connect, and says what Today shows and where it came from.
+  - With no step source allowed, it says so and offers to allow one.
+  - With Health Connect steps turned off, it no longer says "not connected" or "no steps shared".
+
 ## 10.3.3 (versionCode 63)
 
 - Reports: the pace curve is gone. New for each week, month or custom range, against the period before:
