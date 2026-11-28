@@ -189,11 +189,13 @@ final class Progress {
     private static String next(String day){try{Calendar c=Calendar.getInstance();c.setTime(new SimpleDateFormat("yyyy-MM-dd",Locale.US).parse(day));c.add(Calendar.DAY_OF_YEAR,1);return DaySteps.key(c.getTimeInMillis());}catch(Exception e){return "";}}
     private static SharedPreferences seen(Context c){return c.getSharedPreferences("kadamm_badges",Context.MODE_PRIVATE);}
     /** Badges earned since the user last looked at Achievements. */
-    static List<Badge> unseen(Context c,List<Badge> all){
+    static List<Badge> unseen(Context c,List<Badge> all){return unseen(c,all,true);}
+    /** full=false when the badges were worked out without session metrics: those can't judge metric badges, so nothing is forgotten. */
+    static List<Badge> unseen(Context c,List<Badge> all,boolean full){
         Set<String> s=new HashSet<>(seen(c).getStringSet("seen",new HashSet<>()));List<Badge> out=new ArrayList<>();
         // A badge that's no longer earned (its data was corrected, e.g. steps a relay app had doubled) is forgotten, so
         // it's celebrated properly when it's really earned.
-        boolean pruned=false;for(Badge b:all)if(!b.earned()&&s.remove(b.id))pruned=true;if(pruned)seen(c).edit().putStringSet("seen",s).apply();
+        boolean pruned=false;if(full)for(Badge b:all)if(!b.earned()&&s.remove(b.id))pruned=true;if(pruned)seen(c).edit().putStringSet("seen",s).apply();
         for(Badge b:all)if(b.earned()&&!s.contains(b.id))out.add(b);return out;
     }
     static void markSeen(Context c,List<Badge> all){Set<String> s=new HashSet<>();for(Badge b:all)if(b.earned())s.add(b.id);seen(c).edit().putStringSet("seen",s).apply();}

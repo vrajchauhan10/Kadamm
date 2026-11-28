@@ -4012,17 +4012,18 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
     }
     // ---- Achievements: badges and challenges ----
     private void renderBadgeBanner(JSONArray hist){
-        java.util.List<Progress.Badge> fresh=Progress.unseen(this,Progress.badges(SessionMetrics.ready()?this:null,hist,dayTotals,dailyGoal()));if(fresh.isEmpty())return;
+        boolean full=SessionMetrics.ready();java.util.List<Progress.Badge> fresh=Progress.unseen(this,Progress.badges(full?this:null,hist,dayTotals,dailyGoal()),full);if(fresh.isEmpty())return;
         LinearLayout c=card();GradientDrawable g=shape(blend(panel,flame(),darkTheme?.18f:.10f),16);g.setStroke(dp(1),blend(line,flame(),.4f));c.setBackground(g);
         LinearLayout r=row();c.addView(r);android.widget.ImageView ic=icon(R.drawable.ic_trophy,darkTheme?Color.rgb(11,11,13):Color.WHITE,8);ic.setBackground(shape(flame(),12));r.addView(ic,lp(40,40));
         LinearLayout t=col();LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,-2,1);tp.leftMargin=dp(12);r.addView(t,tp);
-        t.addView(tx(fresh.size()==1?"New badge: "+fresh.get(0).name:fresh.size()+" new badges",15,ink,true));t.addView(tx("Tap to see your achievements",11,muted,false));
-        c.setFocusable(true);c.setOnClickListener(v->navigate("Achievements"));
+        StringBuilder names=new StringBuilder();for(Progress.Badge b:fresh){if(names.length()>0)names.append(", ");names.append(b.name);}
+        t.addView(tx(fresh.size()==1?"New badge: "+fresh.get(0).name:fresh.size()+" new badges",15,ink,true));t.addView(tx(fresh.size()==1?"Tap to see it with your badges":names.toString(),11,muted,false));
+        c.setFocusable(true);c.setOnClickListener(v->{scrollToEarned=true;navigate("Achievements");});
     }
     private void renderAchievements(){
         brand("YOUR PROGRESS","Achievements",null);
         JSONArray h=history();java.util.Map<String,Long> totals=DaySteps.allDayTotals(this);int goal=dailyGoal();KadammTheme th=chartTheme();
-        java.util.List<Progress.Badge> all=Progress.badges(this,h,totals,goal);boolean celebrate=!Progress.unseen(this,all).isEmpty();
+        java.util.List<Progress.Badge> all=Progress.badges(this,h,totals,goal);java.util.List<Progress.Badge> freshList=Progress.unseen(this,all);boolean celebrate=!freshList.isEmpty();java.util.Set<String> newIds=new java.util.HashSet<>();for(Progress.Badge b:freshList)newIds.add(b.id);
         int earned=0;int[] perTier=new int[4],earnedTier=new int[4];for(Progress.Badge b:all){perTier[b.tier]++;if(b.earned()){earned++;earnedTier[b.tier]++;}}
         // Hero: the highest-tier medal earned, the count, and a tier-coloured progress strip.
         Progress.Badge top=null;for(Progress.Badge b:all)if(b.earned()&&(top==null||b.tier>=top.tier))top=b;
@@ -4041,7 +4042,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
         LinearLayout legend=row();LinearLayout.LayoutParams lgp=lp(-1,-2);lgp.topMargin=dp(8);hero.addView(legend,lgp);
         for(int t=0;t<4;t++){LinearLayout cl=col();legend.addView(cl,new LinearLayout.LayoutParams(0,-2,1));cl.addView(tx(earnedTier[t]+"/"+perTier[t],14,ink,true));TextView n=tx(MetricViews.TIER_NAMES[t],10,darkTheme?MetricViews.TIER[t][0]:MetricViews.TIER[t][1],true);cl.addView(n);}
         // The badges you have, all together, highest tier first: what the Profile count means.
-        java.util.List<Progress.Badge> mine=new java.util.ArrayList<>();for(Progress.Badge b:all)if(b.earned())mine.add(b);mine.sort((x,y)->y.tier-x.tier);
+        java.util.List<Progress.Badge> mine=new java.util.ArrayList<>();for(Progress.Badge b:all)if(b.earned())mine.add(b);mine.sort((x,y)->newIds.contains(x.id)!=newIds.contains(y.id)?(newIds.contains(x.id)?-1:1):y.tier-x.tier);
         TextView yb=tx("YOUR BADGES  ·  "+mine.size()+" EARNED",11,ink,true);yb.setLetterSpacing(.08f);LinearLayout.LayoutParams ybp=lp(-1,-2);ybp.topMargin=dp(22);content.addView(yb,ybp);earnedAnchor=yb;
         if(mine.isEmpty())content.addView(withTop(tx("None yet. Your first one comes with your first goal day or session.",12,muted,false),6));
         else{LinearLayout grid=col();LinearLayout.LayoutParams gdp=lp(-1,-2);gdp.topMargin=dp(10);content.addView(grid,gdp);LinearLayout gr=null;
@@ -4052,7 +4053,7 @@ sheet.setPadding(dp(20),dp(10),dp(20),dp(24));GradientDrawable sb=new GradientDr
                 LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(0,-2,1);if(i%3>0)clp.leftMargin=dp(8);gr.addView(cell,clp);
                 cell.addView(new MetricViews.Medal(this,th,b.tier,b.icon,true,1),lp(56,56));
                 TextView bn=tx(b.name,12,ink,true);bn.setGravity(Gravity.CENTER);bn.setMaxLines(2);LinearLayout.LayoutParams bnp=lp(-1,-2);bnp.topMargin=dp(6);cell.addView(bn,bnp);
-                TextView bt=tx(MetricViews.TIER_NAMES[b.tier],10,darkTheme?MetricViews.TIER[b.tier][0]:MetricViews.TIER[b.tier][1],true);bt.setGravity(Gravity.CENTER);cell.addView(bt,lp(-1,-2));
+                TextView bt=tx(newIds.contains(b.id)?"NEW · "+MetricViews.TIER_NAMES[b.tier]:MetricViews.TIER_NAMES[b.tier],10,darkTheme?MetricViews.TIER[b.tier][0]:MetricViews.TIER[b.tier][1],true);bt.setGravity(Gravity.CENTER);cell.addView(bt,lp(-1,-2));
                 cell.setContentDescription(b.name+", "+MetricViews.TIER_NAMES[b.tier]+", earned. "+b.desc);cell.setOnClickListener(v->badgeDetail(b));}
             for(int k=shown%3;k>0&&k<3;k++){View pad=new View(this);LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(0,1,1);pp.leftMargin=dp(8);gr.addView(pad,pp);}
             if(mine.size()>6){TextView more=tx(showAllBadges?"Show fewer":"Show all "+mine.size(),13,lime,true);more.setGravity(Gravity.CENTER);more.setBackground(rippleOn(Color.TRANSPARENT,12));more.setFocusable(true);content.addView(more,lp(-1,44));

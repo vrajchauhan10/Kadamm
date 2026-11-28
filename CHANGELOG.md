@@ -10,6 +10,7 @@
   - Sits saved by the old rule aren't used any more.
   - No sit can overlap a Kadamm session.
   - "Sitting now" counts only time a reading confirms.
+- Fixed "2 new badges" on every open. When Home opened before session analysis was ready, badges that need it (WHO week, Double dose) looked unearned. They were then forgotten as seen and announced again. They're now only forgotten when checked with full data. The banner names the new badges, and Achievements marks them NEW, listed first.
 - Step sources: "How today's total is worked out" lists the phone sensor, Health Connect (with each app's count) and Kadamm sessions. It marks the one shown: the highest single count, never a sum. Sessions are explained as already inside the bigger count.
 - Sync now:
   - Reads the phone sensor and then Health Connect, and says what Today shows and where it came from.
