@@ -232,6 +232,8 @@ final class DaySteps {
             cur=next;}
         return cur;
     }
+    /** When sits started being measured with the 10.4.0 rule (set the first time it's asked). */
+    static long sitsSince(Context c){SharedPreferences p=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE);long t=p.getLong("sits2Since",0);if(t==0){t=System.currentTimeMillis();p.edit().putLong("sits2Since",t).apply();}return t;}
     private static java.util.List<int[]> sitsRaw(Context c){
         java.util.List<int[]> out=new java.util.ArrayList<>();String today=todayKey();
         JSONObject m=minuteDays(c).optJSONObject(today);JSONArray hc=m!=null?m.optJSONArray("sits"):null;

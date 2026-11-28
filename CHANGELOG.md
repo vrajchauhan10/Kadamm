@@ -7,7 +7,7 @@
 - Fewer descriptions: filler subtitles are gone. On Permissions, an allowed item says what it's doing now (for example "Counting: 9,168 steps on this phone today") instead of why it's needed.
 - Sitting breaks:
   - Fixed walks shown as sitting. After a gap with no step reading (phone asleep), Kadamm assumed the steps came at the end of the gap and called the rest a sit. A sit now ends at the last reading that showed you still.
-  - Sits saved by the old rule aren't used any more.
+  - Sits saved by the old rule aren't used any more. On the day you update, the card says from what time sits are measured with the corrected rule.
   - No sit can overlap a Kadamm session.
   - "Sitting now" counts only time a reading confirms.
 - Fixed "2 new badges" on every open. When Home opened before session analysis was ready, badges that need it (WHO week, Double dose) looked unearned. They were then forgotten as seen and announced again. They're now only forgotten when checked with full data. The banner names the new badges, and Achievements marks them NEW, listed first.
